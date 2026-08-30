@@ -73,12 +73,22 @@ class _GameTutorialPageState extends State<GameTutorialPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'LEVEL ${widget.level.number.toString().padLeft(2, '0')} · ${widget.level.mutator}',
+                  'LEVEL ${widget.level.number.toString().padLeft(2, '0')} · ${widget.level.chapterTitle}',
                   style: const TextStyle(
                     color: Color(0xFFA9B7CA),
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     letterSpacing: .8,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'OBJECTIVE · ${widget.level.objective}',
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: .35,
                   ),
                 ),
                 const Spacer(),

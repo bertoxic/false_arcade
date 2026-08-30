@@ -58,12 +58,23 @@ class _GameLevelSelectPageState extends State<GameLevelSelectPage> {
       await _store.markTutorialCompleted(widget.game.id);
       if (!mounted) return;
     }
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
+    final navigation = await Navigator.of(context).push<CampaignNavigation>(
+      MaterialPageRoute<CampaignNavigation>(
         builder: (_) =>
-            widget.game.levelPageBuilder(blueprint, _recordCompletion),
+            widget.game.levelPageBuilder(blueprint, _recordCompletion, () {
+              Navigator.of(context).pop(CampaignNavigation.nextLevel);
+            }),
       ),
     );
+    if (!mounted ||
+        navigation != CampaignNavigation.nextLevel ||
+        _selectedLevel >= gameCampaignLevelCount) {
+      return;
+    }
+    setState(() => _selectedLevel++);
+    // The progress object is updated synchronously by _recordCompletion, so
+    // the next mission is unlocked even while its disk save completes.
+    await _launch(progress);
   }
 
   @override
@@ -306,7 +317,7 @@ class _ChallengeCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'LEVEL ${level.number.toString().padLeft(2, '0')} · ${level.mutator}',
+                  'LEVEL ${level.number.toString().padLeft(2, '0')} · ${level.chapterTitle}',
                   style: TextStyle(
                     color: accent,
                     fontSize: 10,
@@ -316,7 +327,7 @@ class _ChallengeCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${level.briefing}\nTarget $targetScore · Par ${level.parSeconds.round()}s · ${existingStars}/3 stars',
+                  '${level.storyBeat}\nObjective: ${level.objective}\nFocus: ${level.gameplayFocus}\nTarget $targetScore · Par ${level.parSeconds.round()}s · ${existingStars}/3 stars',
                   style: const TextStyle(
                     color: Color(0xFFC0CDDF),
                     fontSize: 11,

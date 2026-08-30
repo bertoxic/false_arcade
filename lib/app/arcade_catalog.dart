@@ -31,7 +31,11 @@ class ArcadeGameDefinition {
   final int campaignStages;
   final IconData icon;
   final List<Color> colors;
-  final Widget Function(GeneratedGameLevel, LevelCompleteCallback)
+  final Widget Function(
+    GeneratedGameLevel,
+    LevelCompleteCallback,
+    VoidCallback?,
+  )
   levelPageBuilder;
 }
 
@@ -108,29 +112,59 @@ final arcadeCatalog = <ArcadeGameDefinition>[
 Widget _notYetLevelPage(
   GeneratedGameLevel level,
   LevelCompleteCallback onComplete,
-) => RealityGamePage(level: level, onLevelComplete: onComplete);
+  VoidCallback? onNextLevel,
+) => RealityGamePage(
+  level: level,
+  onLevelComplete: onComplete,
+  onNextLevel: onNextLevel,
+);
 
 Widget _edgeLoadLevelPage(
   GeneratedGameLevel level,
   LevelCompleteCallback onComplete,
-) => EdgeLoadPage(level: level, onLevelComplete: onComplete);
+  VoidCallback? onNextLevel,
+) => EdgeLoadPage(
+  level: level,
+  onLevelComplete: onComplete,
+  onNextLevel: onNextLevel,
+);
 
 Widget _falseHabitLevelPage(
   GeneratedGameLevel level,
   LevelCompleteCallback onComplete,
-) => EchoHeistPage(level: level, onLevelComplete: onComplete);
+  VoidCallback? onNextLevel,
+) => EchoHeistPage(
+  level: level,
+  onLevelComplete: onComplete,
+  onNextLevel: onNextLevel,
+);
 
 Widget _numberfallLevelPage(
   GeneratedGameLevel level,
   LevelCompleteCallback onComplete,
-) => NumberfallPage(level: level, onLevelComplete: onComplete);
+  VoidCallback? onNextLevel,
+) => NumberfallPage(
+  level: level,
+  onLevelComplete: onComplete,
+  onNextLevel: onNextLevel,
+);
 
 Widget _fallDueLevelPage(
   GeneratedGameLevel level,
   LevelCompleteCallback onComplete,
-) => FallDuePage(level: level, onLevelComplete: onComplete);
+  VoidCallback? onNextLevel,
+) => FallDuePage(
+  level: level,
+  onLevelComplete: onComplete,
+  onNextLevel: onNextLevel,
+);
 
 Widget _futureDebtLevelPage(
   GeneratedGameLevel level,
   LevelCompleteCallback onComplete,
-) => FutureDebtPage(level: level, onLevelComplete: onComplete);
+  VoidCallback? onNextLevel,
+) => FutureDebtPage(
+  level: level,
+  onLevelComplete: onComplete,
+  onNextLevel: onNextLevel,
+);

@@ -9,6 +9,12 @@ const gameCampaignLevelCount = 21;
 
 typedef LevelCompleteCallback = void Function(LevelRunResult result);
 
+/// Result returned by a campaign game page to its level-select host.
+/// Keeping this separate from a level result makes persistence happen before
+/// navigation, and avoids every game inventing a slightly different next-level
+/// flow.
+enum CampaignNavigation { nextLevel }
+
 @immutable
 class GeneratedGameLevel {
   const GeneratedGameLevel({
@@ -22,6 +28,11 @@ class GeneratedGameLevel {
     required this.parSeconds,
     required this.mutator,
     required this.briefing,
+    required this.chapterTitle,
+    required this.storyBeat,
+    required this.objective,
+    required this.gameplayFocus,
+    required this.lengthMultiplier,
   });
 
   final String gameId;
@@ -34,6 +45,15 @@ class GeneratedGameLevel {
   final double parSeconds;
   final String mutator;
   final String briefing;
+
+  /// Narrative and mechanical framing for a single, authored-feeling
+  /// campaign mission. These are deliberately part of the level blueprint so
+  /// every screen and simulation describes the same challenge.
+  final String chapterTitle;
+  final String storyBeat;
+  final String objective;
+  final String gameplayFocus;
+  final double lengthMultiplier;
 }
 
 /// A deterministic campaign generator. The same game/level always produces
@@ -53,12 +73,16 @@ abstract final class GameLevelGenerator {
     final rewards = (1.18 - curve * .24 + random.nextDouble() * .08)
         .clamp(.82, 1.25)
         .toDouble();
-    final targetScore = (650 + levelNumber * 310 + random.nextInt(220));
-    final baseParSeconds = (50 - curve * 16 + random.nextInt(9)).toDouble();
+    final story = _storyFor(gameId, levelNumber);
+    // Campaign missions should feel like missions, not 30-second score
+    // sprints. Their score target and par window now budget time for a setup,
+    // a complication, and an extraction/settlement beat.
+    final targetScore = (780 + levelNumber * 365 + random.nextInt(260));
+    final baseParSeconds = (76 - curve * 14 + random.nextInt(10)).toDouble();
     final parSeconds = gameId == 'future_debt'
-        ? baseParSeconds + 42
+        ? baseParSeconds + 58
         : baseParSeconds;
-    final mutator = _mutators[(seed >>> 3) % _mutators.length];
+    final mutator = story.mutator;
     return GeneratedGameLevel(
       gameId: gameId,
       number: levelNumber,
@@ -69,7 +93,12 @@ abstract final class GameLevelGenerator {
       targetScore: targetScore,
       parSeconds: parSeconds,
       mutator: mutator,
-      briefing: 'Pattern ${seed.toRadixString(16).toUpperCase()} · $mutator',
+      briefing: story.briefing,
+      chapterTitle: story.title,
+      storyBeat: story.storyBeat,
+      objective: story.objective,
+      gameplayFocus: story.gameplayFocus,
+      lengthMultiplier: story.lengthMultiplier,
     );
   }
 
@@ -81,15 +110,435 @@ abstract final class GameLevelGenerator {
     return (hash ^ (levelNumber * 0x9E3779B9)) & 0x7fffffff;
   }
 
-  static const _mutators = [
-    'TIGHT WINDOWS',
-    'SHIFTING ROUTES',
-    'HIGH-VALUE RISK',
-    'COMPOUND PRESSURE',
-    'LEAN RECOVERY',
-    'UNSTABLE SIGNAL',
-    'DOUBLE-BACK LANES',
-  ];
+  static _CampaignStory _storyFor(String gameId, int levelNumber) {
+    final act = (levelNumber - 1) ~/ 7;
+    final beat = (levelNumber - 1) % 7;
+    final template = _stories[gameId] ?? _stories['not_yet']!;
+    final mission = template.missions[beat];
+    final actStory = template.acts[act];
+    return _CampaignStory(
+      title: 'ACT ${act + 1} · ${mission.title}',
+      mutator: mission.mutator,
+      briefing: '${actStory.location} — ${mission.briefing}',
+      storyBeat: actStory.storyBeat,
+      objective: mission.objective,
+      gameplayFocus: mission.gameplayFocus,
+      lengthMultiplier: 1.18 + act * .16 + beat * .025,
+    );
+  }
+
+  static const _stories = <String, _CampaignStoryTemplate>{
+    'not_yet': _CampaignStoryTemplate(
+      acts: [
+        _CampaignAct(
+          'THE FIRST BREACH',
+          'A debt fracture opens over the quiet district.',
+        ),
+        _CampaignAct(
+          'COLLECTOR TERRITORY',
+          'The fracture learns your release timing.',
+        ),
+        _CampaignAct(
+          'THE LAST ACCOUNT',
+          'Reality offers one final chance to settle the ledger.',
+        ),
+      ],
+      missions: [
+        _CampaignMission(
+          'STATIC WAKE',
+          'TIGHT WINDOWS',
+          'Clear the first breach before it spreads.',
+          'Short defer stacks and clean releases.',
+        ),
+        _CampaignMission(
+          'DRUM LINE',
+          'SHIFTING ROUTES',
+          'Hold the center while drifting drums close lanes.',
+          'Positioning before settlement.',
+        ),
+        _CampaignMission(
+          'LATE PAYMENT',
+          'LEAN RECOVERY',
+          'Survive a thin-repair sector.',
+          'Choosing which consequence to defer.',
+        ),
+        _CampaignMission(
+          'RED RUSH',
+          'COMPOUND PRESSURE',
+          'Break a charger swarm without a margin call.',
+          'Release timing under pursuit.',
+        ),
+        _CampaignMission(
+          'SENTINEL RING',
+          'DOUBLE-BACK LANES',
+          'Punch through the outer sentry circuit.',
+          'Using the arena edge as a recovery route.',
+        ),
+        _CampaignMission(
+          'INTEREST STORM',
+          'HIGH-VALUE RISK',
+          'Turn a dangerous debt stack into a payout.',
+          'Building a controlled high-debt chain.',
+        ),
+        _CampaignMission(
+          'BREACH ANCHOR',
+          'UNSTABLE SIGNAL',
+          'Destroy the anchor feeding the next act.',
+          'Combining movement, fire, and settlement.',
+        ),
+      ],
+    ),
+    'edge_load': _CampaignStoryTemplate(
+      acts: [
+        _CampaignAct(
+          'THE SERVICE WING',
+          'A patron wants proof the mansion can be robbed.',
+        ),
+        _CampaignAct(
+          'THE PRIVATE FLOOR',
+          'The family has hired guards who remember every route.',
+        ),
+        _CampaignAct(
+          'THE CROWN VAULT',
+          'One last diamond can buy the crew out of the city.',
+        ),
+      ],
+      missions: [
+        _CampaignMission(
+          'SIDE DOOR',
+          'QUIET ENTRY',
+          'Lift the diamond and enough portable loot to escape.',
+          'Learning the mansion loop.',
+        ),
+        _CampaignMission(
+          'GALLERY SWITCH',
+          'SHIFTING ROUTES',
+          'Cross two patrol lanes without filling the cargo border.',
+          'Route choice versus valuable loot.',
+        ),
+        _CampaignMission(
+          'BELL TOWER',
+          'NOISE WINDOW',
+          'Use a coin to create one clean vault opening.',
+          'Deliberate noise timing.',
+        ),
+        _CampaignMission(
+          'MASKED DINNER',
+          'LEAN RECOVERY',
+          'Recover a disguise after a risky pickup.',
+          'Resetting suspicion instead of outrunning it.',
+        ),
+        _CampaignMission(
+          'MIRROR HALL',
+          'DOUBLE-BACK LANES',
+          'Double back through the mansion after the vault trips.',
+          'Reading guard search patterns.',
+        ),
+        _CampaignMission(
+          'BLACK LABEL',
+          'HIGH-VALUE RISK',
+          'Carry an optional premium haul to the exit.',
+          'Choosing score against visibility.',
+        ),
+        _CampaignMission(
+          'ROOFTOP EXIT',
+          'COMPOUND PRESSURE',
+          'Leave through the final extraction corridor.',
+          'Sprint management under compression.',
+        ),
+      ],
+    ),
+    'false_habit': _CampaignStoryTemplate(
+      acts: [
+        _CampaignAct(
+          'THE OBSERVATION BLOCK',
+          'The Warden is still collecting a model of your habits.',
+        ),
+        _CampaignAct(
+          'PREDICTION MARKET',
+          'Your false routes are being sold back to the security grid.',
+        ),
+        _CampaignAct(
+          "THE WARDEN'S CORE",
+          'Break the machine that teaches every guard your move.',
+        ),
+      ],
+      missions: [
+        _CampaignMission(
+          'FIRST TELL',
+          'READABLE PATTERN',
+          'Teach one believable route, then cut away from it.',
+          'Building and breaking a prediction.',
+        ),
+        _CampaignMission(
+          'COLD ECHO',
+          'SHIFTING ROUTES',
+          'Use an Echo to claim the far-side loot.',
+          'Planning a replayed path.',
+        ),
+        _CampaignMission(
+          'LOCKDOWN LOOP',
+          'TIGHT WINDOWS',
+          'Reach the exit during its short unlocked pulse.',
+          'Timing a cash-out.',
+        ),
+        _CampaignMission(
+          'FALSE TRAIL',
+          'DOUBLE-BACK LANES',
+          'Lead the Warden into a loop before the vault.',
+          'Feints and reverse routes.',
+        ),
+        _CampaignMission(
+          'BLACK DIAMOND',
+          'HIGH-VALUE RISK',
+          'Secure the black diamond before escaping.',
+          'Taking the exposed premium objective.',
+        ),
+        _CampaignMission(
+          'HARD COMMIT',
+          'COMPOUND PRESSURE',
+          'Outrun the Warden after its longest prediction.',
+          'Breaking direction after commitment.',
+        ),
+        _CampaignMission(
+          'MODEL BREAK',
+          'UNSTABLE SIGNAL',
+          'Bank the final haul and destroy the prediction model.',
+          'Combining Echoes, loot, and extraction.',
+        ),
+      ],
+    ),
+    'numberfall': _CampaignStoryTemplate(
+      acts: [
+        _CampaignAct(
+          'THE COUNTING ROOM',
+          'The city display begins to count itself upward.',
+        ),
+        _CampaignAct(
+          'CARRY THE ONE',
+          'Every rewrite now steals a platform from another route.',
+        ),
+        _CampaignAct(
+          'ZERO HOUR',
+          'Stabilize the last number before the display erases the skyline.',
+        ),
+      ],
+      missions: [
+        _CampaignMission(
+          'ONE MORE',
+          'READABLE REWRITE',
+          'Collect enough fragments to open the display exit.',
+          'Reading a single safe rewrite.',
+        ),
+        _CampaignMission(
+          'CARRY LANE',
+          'SHIFTING ROUTES',
+          'Use catch dashes after the lower segments vanish.',
+          'Recovering from a missed platform.',
+        ),
+        _CampaignMission(
+          'RED DIGIT',
+          'TIGHT WINDOWS',
+          'Cross a hostile segment before the next redraw.',
+          'Stomping enemies into rewrites.',
+        ),
+        _CampaignMission(
+          'BORROWED SEVEN',
+          'DOUBLE-BACK LANES',
+          'Choose between the high fragment and the safe digit.',
+          'Optional route risk.',
+        ),
+        _CampaignMission(
+          'FRACTURE COUNT',
+          'COMPOUND PRESSURE',
+          'Keep the display stable through repeated changes.',
+          'Maintaining momentum across rewrites.',
+        ),
+        _CampaignMission(
+          'MISSING ZERO',
+          'LEAN RECOVERY',
+          'Find the recovery dashes below the broken number.',
+          'Using safety platforms intentionally.',
+        ),
+        _CampaignMission(
+          'FINAL SUM',
+          'UNSTABLE SIGNAL',
+          'Finish the equation and reach its hidden exit.',
+          'Combining platform reading and enemy pressure.',
+        ),
+      ],
+    ),
+    'fall_due': _CampaignStoryTemplate(
+      acts: [
+        _CampaignAct(
+          'THE ENTRY LEDGER',
+          'A debt clerk opens the first gravity contract.',
+        ),
+        _CampaignAct(
+          'THE TRANSFER WORKS',
+          'The routes only move when weight changes hands.',
+        ),
+        _CampaignAct(
+          'SETTLEMENT TOWER',
+          'Climb to the audit room before the account closes.',
+        ),
+      ],
+      missions: [
+        _CampaignMission(
+          'FIRST FALL',
+          'SAFE DEBT',
+          'Collect the route seals and reach the ledger door.',
+          'Borrowing air time then landing safely.',
+        ),
+        _CampaignMission(
+          'COUNTERWEIGHT',
+          'SHIFTING ROUTES',
+          'Move the first crate into a useful route position.',
+          'Giving gravity to build a bridge.',
+        ),
+        _CampaignMission(
+          'RISING CLAIM',
+          'VERTICAL ROUTE',
+          'Take gravity from a crate to reach a raised lock.',
+          'Using light crates as moving lifts.',
+        ),
+        _CampaignMission(
+          'PAYBACK WALK',
+          'TIGHT WINDOWS',
+          'Cross the spike lane with a heavy landing due.',
+          'Controlling payback and checkpoints.',
+        ),
+        _CampaignMission(
+          'TRANSFER BRIDGE',
+          'DOUBLE-BACK LANES',
+          'Trade weight between crates to open the long route.',
+          'Sequencing Give and Take.',
+        ),
+        _CampaignMission(
+          'AUDIT GUNS',
+          'COMPOUND PRESSURE',
+          'Clear the emitter corridor without losing the seals.',
+          'Routing under projectile pressure.',
+        ),
+        _CampaignMission(
+          'CLOSING ENTRY',
+          'UNSTABLE SIGNAL',
+          'Settle the final annex and escape the floor.',
+          'Combining all gravity verbs.',
+        ),
+      ],
+    ),
+    'future_debt': _CampaignStoryTemplate(
+      acts: [
+        _CampaignAct(
+          'OPEN CREDIT',
+          'The first ledger rooms still offer cheap shortcuts.',
+        ),
+        _CampaignAct(
+          'MATURITY DISTRICT',
+          'Every borrowed power now prints an enemy into the maze.',
+        ),
+        _CampaignAct(
+          'DEFAULT COURT',
+          'Earn the final score and leave before the Collector owns you.',
+        ),
+      ],
+      missions: [
+        _CampaignMission(
+          'FIRST BILL',
+          'LOW INTEREST',
+          'Reach the score gate and locate the exit.',
+          'Borrowing one power with a readable bill.',
+        ),
+        _CampaignMission(
+          'GHOST CORRIDOR',
+          'SHIFTING ROUTES',
+          'Phase through a blocked room, then survive the echo.',
+          'Ghost Wage movement routes.',
+        ),
+        _CampaignMission(
+          'COMPOUND ROOM',
+          'HIGH-VALUE RISK',
+          'Use overcharge to clear an elite pocket.',
+          'Trading firepower for later pressure.',
+        ),
+        _CampaignMission(
+          'REVERSE CLAIM',
+          'DOUBLE-BACK LANES',
+          'Reflect audit fire through the return corridor.',
+          'Turning hostile shots into damage.',
+        ),
+        _CampaignMission(
+          'LATE FEE HUNT',
+          'TIGHT WINDOWS',
+          'Hit the score goal before the expiry clock closes.',
+          'Fast target selection.',
+        ),
+        _CampaignMission(
+          'COLLECTOR BAIT',
+          'COMPOUND PRESSURE',
+          'Carry debt long enough to control the Collector.',
+          'Managing a dangerous ledger state.',
+        ),
+        _CampaignMission(
+          'FINAL MATURITY',
+          'UNSTABLE SIGNAL',
+          'Open the last gate and transfer the ledger onward.',
+          'Combining all borrowed powers.',
+        ),
+      ],
+    ),
+  };
+}
+
+@immutable
+class _CampaignStoryTemplate {
+  const _CampaignStoryTemplate({required this.acts, required this.missions});
+  final List<_CampaignAct> acts;
+  final List<_CampaignMission> missions;
+}
+
+@immutable
+class _CampaignAct {
+  const _CampaignAct(this.location, this.storyBeat);
+  final String location;
+  final String storyBeat;
+}
+
+@immutable
+class _CampaignMission {
+  const _CampaignMission(
+    this.title,
+    this.mutator,
+    this.objective,
+    this.gameplayFocus,
+  );
+  final String title;
+  final String mutator;
+  final String objective;
+  final String gameplayFocus;
+
+  String get briefing => objective;
+}
+
+@immutable
+class _CampaignStory {
+  const _CampaignStory({
+    required this.title,
+    required this.mutator,
+    required this.briefing,
+    required this.storyBeat,
+    required this.objective,
+    required this.gameplayFocus,
+    required this.lengthMultiplier,
+  });
+  final String title;
+  final String mutator;
+  final String briefing;
+  final String storyBeat;
+  final String objective;
+  final String gameplayFocus;
+  final double lengthMultiplier;
 }
 
 @immutable

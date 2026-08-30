@@ -235,7 +235,12 @@ class RealityGame {
   static LevelSpec _campaignLevelSpec(GeneratedGameLevel campaign) {
     final base = levels[(campaign.number - 1) % levels.length];
     final random = math.Random(campaign.seed);
-    final totalEnemies = base.goal + 12 + campaign.number * 2;
+    // A campaign sector is a three-beat breach: establish control, survive a
+    // complication, then settle the final wave. It is intentionally longer
+    // than a quick-play arena without relying only on enemy speed.
+    final totalEnemies =
+        ((base.goal + 16 + campaign.number * 3) * campaign.lengthMultiplier)
+            .round();
     final roster = <EnemyKind>[...base.roster];
     while (roster.length < totalEnemies) {
       final roll = random.nextDouble();
@@ -248,8 +253,8 @@ class RealityGame {
       );
     }
     return LevelSpec(
-      'Sector ${campaign.number.toString().padLeft(2, '0')} · ${campaign.mutator}',
-      'A generated ${totalEnemies}-host breach. ${campaign.briefing}',
+      'Sector ${campaign.number.toString().padLeft(2, '0')} · ${campaign.chapterTitle}',
+      '${campaign.storyBeat} ${campaign.objective} A ${totalEnemies}-host breach.',
       roster,
       (base.spawnInterval / campaign.enemyPressure).clamp(.38, 1.15).toDouble(),
       (base.maxOnField + (campaign.number / 6).floor()).clamp(3, 10).toInt(),
@@ -340,7 +345,7 @@ class RealityGame {
     holding = value;
     if (holding) {
       statusText = 'The world moves. The consequences wait.';
-      HapticFeedback.selectionClick();
+      GameFeedback.selection();
       return;
     }
     _beginSettlement();
@@ -359,9 +364,9 @@ class RealityGame {
           ? 'MARGIN CALL — the entire stack is resolving now.'
           : 'Newest consequence resolves first.';
       if (forced) {
-        HapticFeedback.heavyImpact();
+        GameFeedback.heavyImpact();
       } else {
-        HapticFeedback.mediumImpact();
+        GameFeedback.mediumImpact();
       }
     } else {
       debt = 0;
@@ -728,7 +733,7 @@ class RealityGame {
 
   void _detonate(Offset center) {
     _burst(center, 27, const Color(0xFFFF9C4E), .72);
-    HapticFeedback.mediumImpact();
+    GameFeedback.mediumImpact();
     for (final enemy in _enemies) {
       if (enemy.alive &&
           !enemy.pending &&
@@ -742,7 +747,7 @@ class RealityGame {
   void _takeHit(int damage) {
     if (_player.invulnerable > 0 || phase != GamePhase.playing) return;
     _player.invulnerable = .55;
-    HapticFeedback.heavyImpact();
+    GameFeedback.heavyImpact();
     if (holding) {
       _addConsequence(
         Consequence(
@@ -838,7 +843,7 @@ class RealityGame {
         return;
     }
     _burst(position, 15, _pickupColor(kind), .5);
-    HapticFeedback.mediumImpact();
+    GameFeedback.mediumImpact();
   }
 
   void _addConsequence(Consequence consequence) {
@@ -897,7 +902,7 @@ class RealityGame {
       case ConsequenceType.blast:
         _detonate(consequence.position);
     }
-    HapticFeedback.selectionClick();
+    GameFeedback.selection();
   }
 
   void _finishSettlement() {
@@ -944,7 +949,7 @@ class RealityGame {
     lastClearBonus = (300 * chain).round() + timeBonus;
     score += lastClearBonus;
     statusText = 'Sector cleared.';
-    HapticFeedback.mediumImpact();
+    GameFeedback.mediumImpact();
   }
 
   void _lose() {
@@ -952,7 +957,7 @@ class RealityGame {
     holding = false;
     phase = GamePhase.gameOver;
     statusText = 'Reality won this round.';
-    HapticFeedback.heavyImpact();
+    GameFeedback.heavyImpact();
   }
 
   void _cleanupWorld() {

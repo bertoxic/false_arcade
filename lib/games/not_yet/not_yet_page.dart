@@ -1,10 +1,16 @@
 part of 'not_yet_game.dart';
 
 class RealityGamePage extends StatefulWidget {
-  const RealityGamePage({super.key, this.level, this.onLevelComplete});
+  const RealityGamePage({
+    super.key,
+    this.level,
+    this.onLevelComplete,
+    this.onNextLevel,
+  });
 
   final GeneratedGameLevel? level;
   final LevelCompleteCallback? onLevelComplete;
+  final VoidCallback? onNextLevel;
 
   @override
   State<RealityGamePage> createState() => _RealityGamePageState();
@@ -19,6 +25,7 @@ class _RealityGamePageState extends State<RealityGamePage>
   bool _firing = false;
   bool _paused = false;
   bool _completionReported = false;
+  bool _continuingCampaign = false;
 
   @override
   void initState() {
@@ -48,7 +55,7 @@ class _RealityGamePageState extends State<RealityGamePage>
     _clearInput();
     _loop.dispose();
     _gameFocus.dispose();
-    GamePresentation.restore();
+    if (!_continuingCampaign) GamePresentation.restore();
     super.dispose();
   }
 
@@ -88,6 +95,16 @@ class _RealityGamePageState extends State<RealityGamePage>
         elapsedSeconds: _game.time,
       ),
     );
+  }
+
+  void _continueCampaign() {
+    _continuingCampaign = true;
+    final next = widget.onNextLevel;
+    if (next != null) {
+      next();
+    } else {
+      Navigator.of(context).pop(CampaignNavigation.nextLevel);
+    }
   }
 
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
@@ -247,20 +264,42 @@ class _RealityGamePageState extends State<RealityGamePage>
                                     if (game.phase == GamePhase.title)
                                       _StartOverlay(onTap: game.startRun)
                                     else if (game.phase == GamePhase.levelClear)
-                                      _LevelClearOverlay(
-                                        game: game,
-                                        onTap: game.nextLevel,
-                                      )
+                                      if (widget.level != null)
+                                        CampaignMissionClearOverlay(
+                                          level: widget.level!,
+                                          score: game.score,
+                                          elapsedSeconds: game.time,
+                                          accent: const Color(0xFFE94D79),
+                                          onNextLevel: _continueCampaign,
+                                          onExit: () =>
+                                              Navigator.of(context).pop(),
+                                        )
+                                      else
+                                        _LevelClearOverlay(
+                                          game: game,
+                                          onTap: game.nextLevel,
+                                        )
                                     else if (game.phase == GamePhase.gameOver)
                                       _GameOverOverlay(
                                         game: game,
                                         onTap: game.startRun,
                                       )
                                     else if (game.phase == GamePhase.victory)
-                                      _VictoryOverlay(
-                                        game: game,
-                                        onTap: game.startRun,
-                                      ),
+                                      if (widget.level != null)
+                                        CampaignMissionClearOverlay(
+                                          level: widget.level!,
+                                          score: game.score,
+                                          elapsedSeconds: game.time,
+                                          accent: const Color(0xFFE94D79),
+                                          onNextLevel: _continueCampaign,
+                                          onExit: () =>
+                                              Navigator.of(context).pop(),
+                                        )
+                                      else
+                                        _VictoryOverlay(
+                                          game: game,
+                                          onTap: game.startRun,
+                                        ),
                                     if (_paused)
                                       GamePauseOverlay(
                                         gameName: 'NOT YET',

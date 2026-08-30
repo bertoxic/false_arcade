@@ -298,7 +298,10 @@ class _EchoHeist {
         ),
       );
     }
-    final extendedLoot = 4 + _campaignLevel ~/ 4;
+    // Campaign districts place a second route of tempting common loot. The
+    // exit requirement still makes the black-diamond path mandatory, while
+    // this creates a meaningful choice about how much heat to carry home.
+    final extendedLoot = 6 + _campaignLevel ~/ 3;
     for (var index = 0; index < extendedLoot; index++) {
       final random = math.Random(_routeVariant ^ (index * 0x45D9F3B));
       loot.add(
@@ -376,7 +379,7 @@ class _EchoHeist {
       _predictionBroken = true;
       _breakWindow = 1.25;
       message = 'PREDICTION BROKEN — steal before the Warden recovers.';
-      HapticFeedback.lightImpact();
+      GameFeedback.lightImpact();
     }
 
     for (final item in loot) {
@@ -409,7 +412,7 @@ class _EchoHeist {
       runLoot = 0;
       echoes.clear();
       message = 'The Warden caught the real thief.';
-      HapticFeedback.heavyImpact();
+      GameFeedback.heavyImpact();
     }
   }
 
@@ -447,7 +450,7 @@ class _EchoHeist {
       combo = math.max(1, combo * .8);
       _award(item.value, 'PATTERN CONFIRMED');
     }
-    HapticFeedback.selectionClick();
+    GameFeedback.selection();
   }
 
   void _award(double value, String text) {
@@ -479,7 +482,7 @@ class _EchoHeist {
     echoes.add(_Echo(player, List<Offset>.of(_recentPath)));
     _echoCooldown = 5.2;
     message = 'Echo replaying your recorded route.';
-    HapticFeedback.lightImpact();
+    GameFeedback.lightImpact();
   }
 
   void _updateEchoes(double dt) {
@@ -615,7 +618,7 @@ class _EchoHeist {
     phase = stageIndex + 1 == stageCount
         ? _HeistPhase.won
         : _HeistPhase.stageClear;
-    HapticFeedback.mediumImpact();
+    GameFeedback.mediumImpact();
   }
 }
 

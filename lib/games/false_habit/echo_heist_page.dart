@@ -1,10 +1,16 @@
 part of 'echo_heist_game.dart';
 
 class EchoHeistPage extends StatefulWidget {
-  const EchoHeistPage({super.key, this.level, this.onLevelComplete});
+  const EchoHeistPage({
+    super.key,
+    this.level,
+    this.onLevelComplete,
+    this.onNextLevel,
+  });
 
   final GeneratedGameLevel? level;
   final LevelCompleteCallback? onLevelComplete;
+  final VoidCallback? onNextLevel;
 
   @override
   State<EchoHeistPage> createState() => _EchoHeistPageState();
@@ -17,6 +23,7 @@ class _EchoHeistPageState extends State<EchoHeistPage>
   Offset _input = Offset.zero;
   bool _paused = false;
   bool _completionReported = false;
+  bool _continuingCampaign = false;
   double _elapsedSeconds = 0;
   int _inputEpoch = 0;
 
@@ -83,6 +90,16 @@ class _EchoHeistPageState extends State<EchoHeistPage>
     );
   }
 
+  void _continueCampaign() {
+    _continuingCampaign = true;
+    final next = widget.onNextLevel;
+    if (next != null) {
+      next();
+    } else {
+      Navigator.of(context).pop(CampaignNavigation.nextLevel);
+    }
+  }
+
   void _exitGame() {
     _clearInput();
     final navigator = Navigator.of(context);
@@ -93,7 +110,7 @@ class _EchoHeistPageState extends State<EchoHeistPage>
   @override
   void dispose() {
     _loop.dispose();
-    GamePresentation.restore();
+    if (!_continuingCampaign) GamePresentation.restore();
     super.dispose();
   }
 
@@ -215,24 +232,46 @@ class _EchoHeistPageState extends State<EchoHeistPage>
                                       danger: true,
                                     ),
                                   if (heist.phase == _HeistPhase.stageClear)
-                                    _HeistOverlay(
-                                      title: 'DISTRICT CLEARED',
-                                      eyebrow:
-                                          '+${heist.runLoot.round()} BANKED THIS DISTRICT',
-                                      copy:
-                                          'The next Warden learns faster and runs harder. Keep breaking the prediction at the moment you steal.',
-                                      button: 'NEXT DISTRICT',
-                                      onTap: heist.nextStage,
-                                    ),
+                                    if (widget.level != null)
+                                      CampaignMissionClearOverlay(
+                                        level: widget.level!,
+                                        score: heist.runLoot.round(),
+                                        elapsedSeconds: _elapsedSeconds,
+                                        accent: const Color(0xFFC29CFF),
+                                        onNextLevel: _continueCampaign,
+                                        onExit: () =>
+                                            Navigator.of(context).pop(),
+                                      )
+                                    else
+                                      _HeistOverlay(
+                                        title: 'DISTRICT CLEARED',
+                                        eyebrow:
+                                            '+${heist.runLoot.round()} BANKED THIS DISTRICT',
+                                        copy:
+                                            'The next Warden learns faster and runs harder. Keep breaking the prediction at the moment you steal.',
+                                        button: 'NEXT DISTRICT',
+                                        onTap: heist.nextStage,
+                                      ),
                                   if (heist.phase == _HeistPhase.won)
-                                    _HeistOverlay(
-                                      title: 'THE HABIT BROKE',
-                                      eyebrow: 'ALL DISTRICTS CASHED OUT',
-                                      copy:
-                                          'No Warden can hold your pattern. You cleared the complete heist.',
-                                      button: 'NEW HEIST',
-                                      onTap: _startRun,
-                                    ),
+                                    if (widget.level != null)
+                                      CampaignMissionClearOverlay(
+                                        level: widget.level!,
+                                        score: heist.runLoot.round(),
+                                        elapsedSeconds: _elapsedSeconds,
+                                        accent: const Color(0xFFC29CFF),
+                                        onNextLevel: _continueCampaign,
+                                        onExit: () =>
+                                            Navigator.of(context).pop(),
+                                      )
+                                    else
+                                      _HeistOverlay(
+                                        title: 'THE HABIT BROKE',
+                                        eyebrow: 'ALL DISTRICTS CASHED OUT',
+                                        copy:
+                                            'No Warden can hold your pattern. You cleared the complete heist.',
+                                        button: 'NEW HEIST',
+                                        onTap: _startRun,
+                                      ),
                                   if (_paused)
                                     GamePauseOverlay(
                                       gameName: 'FALSE HABIT',

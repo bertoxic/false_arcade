@@ -209,8 +209,13 @@ class _NumberfallGame {
     final base = _stageConfigs[(campaign.number - 1) % _stageConfigs.length];
     return _NumberStageConfig(
       name:
-          'SEQUENCE ${campaign.number.toString().padLeft(2, '0')} · ${campaign.mutator}',
-      pickupGoal: base.pickupGoal + 10 + campaign.number * 2,
+          'SEQUENCE ${campaign.number.toString().padLeft(2, '0')} · ${campaign.chapterTitle}',
+      // The level needs enough rewrites to create a route-reading arc rather
+      // than ending as soon as the player learns the first digit.
+      pickupGoal:
+          ((base.pickupGoal + 14 + campaign.number * 3) *
+                  campaign.lengthMultiplier)
+              .round(),
       enemySpeed: base.enemySpeed * campaign.enemyPressure,
       enemyRespawns: base.enemyRespawns + campaign.number ~/ 7,
       rewriteLead: (base.rewriteLead / campaign.difficulty)
@@ -445,7 +450,7 @@ class _NumberfallGame {
       player.coyote = 0;
       player.grounded = false;
       _jumpBuffer = 0;
-      HapticFeedback.lightImpact();
+      GameFeedback.lightImpact();
     }
     _resolve(player, dt, enemyMode: false);
     if (_pendingRewrite == null && exitOpen && player.rect.overlaps(exitDoor)) {
@@ -457,7 +462,7 @@ class _NumberfallGame {
         message = 'DISPLAY $stageNumber STABLE. The next rewrite is waiting.';
       }
       clearInput();
-      HapticFeedback.mediumImpact();
+      GameFeedback.mediumImpact();
       return;
     }
     if (enemy.alive) {
@@ -490,7 +495,7 @@ class _NumberfallGame {
     if (collected != null) {
       pickups++;
       pickupsOnField.clear();
-      HapticFeedback.mediumImpact();
+      GameFeedback.mediumImpact();
       _requestRewrite(
         collected.delta,
         collected.risky ? 'RISK ROUTE +${collected.delta}' : 'FRAGMENT +1',
@@ -551,7 +556,7 @@ class _NumberfallGame {
           dash.trigger();
           _pulse = 1;
           message = 'CATCH DASH — REBOUNDING INTO THE DISPLAY.';
-          HapticFeedback.lightImpact();
+          GameFeedback.lightImpact();
           break;
         }
       }
@@ -773,7 +778,7 @@ class _NumberfallGame {
     }
     message =
         '${numberfallDisplayString(score)} → ${numberfallDisplayString(_pendingRewrite!.targetScore)} · $cause · REWRITE PRIMED';
-    HapticFeedback.selectionClick();
+    GameFeedback.selection();
   }
 
   void _commitRewrite() {
@@ -834,7 +839,7 @@ class _NumberfallGame {
     phase = _NumberPhase.dead;
     clearInput();
     message = reason;
-    HapticFeedback.heavyImpact();
+    GameFeedback.heavyImpact();
   }
 }
 

@@ -824,11 +824,13 @@ class _FallDueGame {
   final int _initialLevelIndex;
   final int _campaignLevel;
   final int _campaignSeed;
+  final double _campaignLength;
 
   _FallDueGame({int campaignLevel = 1, GeneratedGameLevel? campaign})
     : _initialLevelIndex = campaignLevel - 1,
       _campaignLevel = campaign?.number ?? campaignLevel,
-      _campaignSeed = campaign?.seed ?? campaignLevel;
+      _campaignSeed = campaign?.seed ?? campaignLevel,
+      _campaignLength = campaign?.lengthMultiplier ?? 1;
 
   final Map<int, _DueStage> _generatedStages = {};
   final math.Random _random = math.Random();
@@ -1012,23 +1014,47 @@ class _FallDueGame {
   void _appendCampaignAnnex() {
     if (_campaignLevel <= 1) return;
     final random = math.Random(_campaignSeed ^ (levelIndex * 0x9E3779B9));
-    final extension = 310 + _campaignLevel * 36 + random.nextInt(260);
+    // A campaign mission adds an authored-feeling annex after the selected
+    // stage. It has two to four distinct beats (spike crossing, elevated seal,
+    // and a guarded exit) so higher levels feel like a route, not a single
+    // extra platform bolted onto an old level.
+    final extension =
+        ((520 + _campaignLevel * 58 + random.nextInt(280)) * _campaignLength)
+            .roundToDouble();
     final start = exit.left - 18;
-    final shelfX = start + 90 + random.nextDouble() * 120;
-    final shelfY = 285 + random.nextDouble() * 55;
+    final shelfX = start + extension * .28;
+    final shelfY = 260 + random.nextDouble() * 50;
     platforms.add(Rect.fromLTWH(start, 430, extension + 90, 110));
     platforms.add(Rect.fromLTWH(shelfX, shelfY, 140, 18));
+    platforms.add(Rect.fromLTWH(start + extension * .56, 300, 150, 18));
+    platforms.add(Rect.fromLTWH(start + extension * .78, 246, 130, 18));
     spikes.add(
-      Rect.fromLTWH(start + 42, 465, 94 + random.nextDouble() * 62, 55),
+      Rect.fromLTWH(
+        start + extension * .12,
+        465,
+        110 + random.nextDouble() * 76,
+        55,
+      ),
+    );
+    spikes.add(
+      Rect.fromLTWH(
+        start + extension * .68,
+        465,
+        94 + random.nextDouble() * 70,
+        55,
+      ),
     );
     targets.add(
-      _DueTarget(start + extension * .62, 388, 32, 42, _TargetKind.enemy),
+      _DueTarget(start + extension * .46, 388, 32, 42, _TargetKind.enemy),
     );
     targets.add(
-      _DueTarget(start + extension * .84, 388, 32, 42, _TargetKind.enemy),
+      _DueTarget(start + extension * .87, 388, 32, 42, _TargetKind.enemy),
     );
     seals.add(_DueSeal(Offset(shelfX + 70, shelfY - 18)));
-    seals.add(_DueSeal(Offset(start + extension * .82, 390)));
+    seals.add(_DueSeal(Offset(start + extension * .61, 260)));
+    seals.add(_DueSeal(Offset(start + extension * .82, 208)));
+    emitters.add(_DueEmitter(Offset(start + extension * .54, 388), -250, 1.35));
+    emitters.add(_DueEmitter(Offset(start + extension * .9, 388), 245, 1.2));
     _activeExit = Rect.fromLTWH(start + extension, 350, 56, 80);
   }
 
@@ -1083,7 +1109,7 @@ class _FallDueGame {
         player.vy = -FallDueTuning.borrowLaunchImpulse;
         player.grounded = false;
         player.coyote = 0;
-        HapticFeedback.lightImpact();
+        GameFeedback.lightImpact();
       }
     }
     if (!value && _borrowHeld) {
@@ -1165,7 +1191,7 @@ class _FallDueGame {
           'SECTION ${_sectionIndex + 2}/${sections.length + 1}: '
           '${section.title}. ${section.instruction}';
       _burst(player.center, const Color(0xFF8DE1FF), 10);
-      HapticFeedback.selectionClick();
+      GameFeedback.selection();
     }
   }
 
@@ -1193,7 +1219,7 @@ class _FallDueGame {
       player.coyote = 0;
       player.grounded = false;
       _jumpBuffer = 0;
-      HapticFeedback.lightImpact();
+      GameFeedback.lightImpact();
     }
     final playerRectBeforeMove = player.rect;
     double gravity = 1;
@@ -1278,7 +1304,7 @@ class _FallDueGame {
       score += 250;
       message = 'SEAL $collectedSeals/${seals.length} COLLECTED +250';
       _burst(seal.position, const Color(0xFF8CFFB1), 16);
-      HapticFeedback.selectionClick();
+      GameFeedback.selection();
     }
   }
 
@@ -1293,7 +1319,7 @@ class _FallDueGame {
       pad.cooldown = .9;
       message = 'SAFE DEBT PAD: ${paid.round()}% PAYBACK ABSORBED.';
       _burst(pad.rect.center, const Color(0xFF8CFFB1), 12);
-      HapticFeedback.selectionClick();
+      GameFeedback.selection();
     }
   }
 
@@ -1311,7 +1337,7 @@ class _FallDueGame {
       score += 400;
       message = '$source BROKE A WEAK FLOOR +400.';
       _burst(panel.rect.center, const Color(0xFFFFD86E), 22);
-      HapticFeedback.mediumImpact();
+      GameFeedback.mediumImpact();
     }
   }
 
@@ -1336,7 +1362,7 @@ class _FallDueGame {
         const Color(0xFF8DE1FF),
         16,
       );
-      HapticFeedback.selectionClick();
+      GameFeedback.selection();
     }
   }
 
@@ -1449,7 +1475,7 @@ class _FallDueGame {
       message = '${level.title} settled. Next: ${next.title}.';
     }
     _burst(exit.center, const Color(0xFF8CFFB1), 32);
-    HapticFeedback.mediumImpact();
+    GameFeedback.mediumImpact();
   }
 
   void _updateEffects(double dt) {
@@ -1595,7 +1621,7 @@ class _FallDueGame {
       score += 700;
       message = 'CRATE DROP: collector crushed +700.';
       _burst(enemy.center, const Color(0xFFFFD86E), 20);
-      HapticFeedback.mediumImpact();
+      GameFeedback.mediumImpact();
     }
   }
 
@@ -1612,7 +1638,7 @@ class _FallDueGame {
       score += 450;
       message = 'GRAVITY LAUNCH: collector struck another collector +450.';
       _burst(other.center, const Color(0xFF8DE1FF), 18);
-      HapticFeedback.mediumImpact();
+      GameFeedback.mediumImpact();
     }
   }
 
@@ -1643,7 +1669,7 @@ class _FallDueGame {
         message = 'WEIGHT ANCHORED: bridge restored.';
       }
       _burst(crate.center, const Color(0xFF8CFFB1), 16);
-      HapticFeedback.mediumImpact();
+      GameFeedback.mediumImpact();
       return;
     }
   }
@@ -1671,7 +1697,7 @@ class _FallDueGame {
             ? 'LAUNCHED COLLECTOR HIT THE LEVER: gate latched open +700.'
             : 'CRATE LATCHED THE LEVER: route gate stays open +500.';
         _burst(lever.position, const Color(0xFF8CFFB1), 22);
-        HapticFeedback.mediumImpact();
+        GameFeedback.mediumImpact();
       }
     }
   }
@@ -2158,7 +2184,7 @@ class _FallDueGame {
     };
     message =
         'TARGET ${candidates.indexOf(_selectedTarget!) + 1}/${candidates.length}: $label.';
-    HapticFeedback.selectionClick();
+    GameFeedback.selection();
   }
 
   _DueEmitter? _nearestEmitter() {
@@ -2214,7 +2240,7 @@ class _FallDueGame {
       message =
           'GAVE ${amount.round()}% TO TURRET: its shots slow and fall sooner.';
       _burst(emitter.position, const Color(0xFFFFD86E), 10);
-      HapticFeedback.selectionClick();
+      GameFeedback.selection();
       return;
     }
     final recipient = target!;
@@ -2232,7 +2258,7 @@ class _FallDueGame {
         ? 'GAVE ${amount.round()}% TO CRATE: push it into a spike bed to build a bridge.'
         : 'GAVE ${amount.round()}% TO COLLECTOR: heavy, slow, and shoved toward the edge.';
     _burst(recipient.center, const Color(0xFFFFD86E), 10);
-    HapticFeedback.selectionClick();
+    GameFeedback.selection();
   }
 
   void stealDebt() {
@@ -2267,7 +2293,7 @@ class _FallDueGame {
       message =
           'TOOK ${amount.round()}% BACK: credit is ready for your next lift.';
       _burst(emitter.position, const Color(0xFF8DE1FF), 10);
-      HapticFeedback.selectionClick();
+      GameFeedback.selection();
       return;
     }
     final recipient = target!;
@@ -2329,7 +2355,7 @@ class _FallDueGame {
         ? 'TOOK ${amount.round()}% BACK: credit is ready for another lift.'
         : 'TOOK ${amount.round()}% OF NATURAL GRAVITY: target is light and knocked outward.';
     _burst(recipient.center, const Color(0xFF8DE1FF), 10);
-    HapticFeedback.selectionClick();
+    GameFeedback.selection();
   }
 
   void _die(String reason) {
@@ -2358,7 +2384,7 @@ class _FallDueGame {
       phase = _DuePhase.dead;
       message = '$reason  No hearts left; ${_payback.round()}% remains due.';
     }
-    HapticFeedback.heavyImpact();
+    GameFeedback.heavyImpact();
   }
 
   void _resetPlayerAtFieldStart() {

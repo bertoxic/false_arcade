@@ -1,10 +1,16 @@
 part of 'edge_load_game.dart';
 
 class EdgeLoadPage extends StatefulWidget {
-  const EdgeLoadPage({super.key, this.level, this.onLevelComplete});
+  const EdgeLoadPage({
+    super.key,
+    this.level,
+    this.onLevelComplete,
+    this.onNextLevel,
+  });
 
   final GeneratedGameLevel? level;
   final LevelCompleteCallback? onLevelComplete;
+  final VoidCallback? onNextLevel;
 
   @override
   State<EdgeLoadPage> createState() => _EdgeLoadPageState();
@@ -18,6 +24,7 @@ class _EdgeLoadPageState extends State<EdgeLoadPage>
   bool _sprinting = false;
   bool _paused = false;
   bool _completionReported = false;
+  bool _continuingCampaign = false;
   int _stickEpoch = 0;
 
   @override
@@ -74,10 +81,20 @@ class _EdgeLoadPageState extends State<EdgeLoadPage>
     );
   }
 
+  void _continueCampaign() {
+    _continuingCampaign = true;
+    final next = widget.onNextLevel;
+    if (next != null) {
+      next();
+    } else {
+      Navigator.of(context).pop(CampaignNavigation.nextLevel);
+    }
+  }
+
   @override
   void dispose() {
     _loop.dispose();
-    GamePresentation.restore();
+    if (!_continuingCampaign) GamePresentation.restore();
     super.dispose();
   }
 
@@ -194,13 +211,23 @@ class _EdgeLoadPageState extends State<EdgeLoadPage>
                       onTap: () => setState(_start),
                     ),
                   if (game.phase == _MansionPhase.extracted)
-                    _MansionOverlay(
-                      title: 'EXTRACTION COMPLETE',
-                      copy:
-                          'You extracted \$${game.player.loot}. The more you stole, the less you could see.',
-                      button: 'NEW RUN',
-                      onTap: () => setState(_start),
-                    ),
+                    if (widget.level != null)
+                      CampaignMissionClearOverlay(
+                        level: widget.level!,
+                        score: game.player.loot,
+                        elapsedSeconds: game.time,
+                        accent: const Color(0xFFF7C948),
+                        onNextLevel: _continueCampaign,
+                        onExit: () => Navigator.of(context).pop(),
+                      )
+                    else
+                      _MansionOverlay(
+                        title: 'EXTRACTION COMPLETE',
+                        copy:
+                            'You extracted \$${game.player.loot}. The more you stole, the less you could see.',
+                        button: 'NEW RUN',
+                        onTap: () => setState(_start),
+                      ),
                   if (_paused)
                     GamePauseOverlay(
                       gameName: 'EDGELOAD: MANSION RUN',

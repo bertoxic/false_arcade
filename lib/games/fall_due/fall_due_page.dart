@@ -1,10 +1,16 @@
 part of 'fall_due_game.dart';
 
 class FallDuePage extends StatefulWidget {
-  const FallDuePage({super.key, this.level, this.onLevelComplete});
+  const FallDuePage({
+    super.key,
+    this.level,
+    this.onLevelComplete,
+    this.onNextLevel,
+  });
 
   final GeneratedGameLevel? level;
   final LevelCompleteCallback? onLevelComplete;
+  final VoidCallback? onNextLevel;
 
   @override
   State<FallDuePage> createState() => _FallDuePageState();
@@ -18,6 +24,7 @@ class _FallDuePageState extends State<FallDuePage>
   final Set<LogicalKeyboardKey> _pressedKeys = {};
   bool _paused = false;
   bool _completionReported = false;
+  bool _continuingCampaign = false;
   double _elapsedSeconds = 0;
 
   @override
@@ -133,6 +140,16 @@ class _FallDuePageState extends State<FallDuePage>
     );
   }
 
+  void _continueCampaign() {
+    _continuingCampaign = true;
+    final next = widget.onNextLevel;
+    if (next != null) {
+      next();
+    } else {
+      Navigator.of(context).pop(CampaignNavigation.nextLevel);
+    }
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) return;
@@ -149,7 +166,7 @@ class _FallDuePageState extends State<FallDuePage>
     _gameFocus.removeListener(_onFocusChanged);
     _loop.dispose();
     _gameFocus.dispose();
-    GamePresentation.restore();
+    if (!_continuingCampaign) GamePresentation.restore();
     super.dispose();
   }
 
@@ -420,25 +437,47 @@ class _FallDuePageState extends State<FallDuePage>
                                         danger: true,
                                       ),
                                     if (game.phase == _DuePhase.stageClear)
-                                      _DueOverlay(
-                                        title: 'STAGE CLEAR',
-                                        copy: game.message,
-                                        button: 'NEXT STAGE',
-                                        onTap: () => setState(game.nextStage),
-                                      ),
-                                    if (game.phase == _DuePhase.won)
-                                      _DueOverlay(
-                                        title: 'DEBT SETTLED',
-                                        copy:
-                                            'The campaign account is clear. Continue into escalating contract runs, or replay the authored audit.',
-                                        button: 'ENTER CONTRACT RUNS',
-                                        onTap: () => setState(
-                                          game.startEndlessContracts,
+                                      if (widget.level != null)
+                                        CampaignMissionClearOverlay(
+                                          level: widget.level!,
+                                          score: game.score,
+                                          elapsedSeconds: _elapsedSeconds,
+                                          accent: const Color(0xFF8DE1FF),
+                                          onNextLevel: _continueCampaign,
+                                          onExit: () =>
+                                              Navigator.of(context).pop(),
+                                        )
+                                      else
+                                        _DueOverlay(
+                                          title: 'STAGE CLEAR',
+                                          copy: game.message,
+                                          button: 'NEXT STAGE',
+                                          onTap: () => setState(game.nextStage),
                                         ),
-                                        secondaryButton: 'REPLAY CAMPAIGN',
-                                        onSecondaryTap: () =>
-                                            setState(game.start),
-                                      ),
+                                    if (game.phase == _DuePhase.won)
+                                      if (widget.level != null)
+                                        CampaignMissionClearOverlay(
+                                          level: widget.level!,
+                                          score: game.score,
+                                          elapsedSeconds: _elapsedSeconds,
+                                          accent: const Color(0xFF8DE1FF),
+                                          onNextLevel: _continueCampaign,
+                                          onExit: () =>
+                                              Navigator.of(context).pop(),
+                                        )
+                                      else
+                                        _DueOverlay(
+                                          title: 'DEBT SETTLED',
+                                          copy:
+                                              'The campaign account is clear. Continue into escalating contract runs, or replay the authored audit.',
+                                          button: 'ENTER CONTRACT RUNS',
+                                          onTap: () => setState(
+                                            game.startEndlessContracts,
+                                          ),
+                                          secondaryButton: 'REPLAY CAMPAIGN',
+                                          onSecondaryTap: () =>
+                                              setState(game.start),
+                                        ),
                                     if (_paused)
                                       GamePauseOverlay(
                                         gameName: 'FALL DUE',

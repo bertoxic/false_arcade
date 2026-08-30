@@ -11,6 +11,32 @@ void main() {
     expect(first.mutator, again.mutator);
     expect(next.seed, isNot(first.seed));
     expect(gameCampaignLevelCount, 21);
+    expect(first.chapterTitle, again.chapterTitle);
+    expect(first.objective, isNotEmpty);
+    expect(first.gameplayFocus, isNotEmpty);
+  });
+
+  test('every game has a three-act campaign with mission-length levels', () {
+    const gameIds = [
+      'not_yet',
+      'edge_load',
+      'false_habit',
+      'numberfall',
+      'fall_due',
+      'future_debt',
+    ];
+
+    for (final gameId in gameIds) {
+      final opening = GameLevelGenerator.generate(gameId, 1);
+      final middle = GameLevelGenerator.generate(gameId, 8);
+      final finale = GameLevelGenerator.generate(gameId, 15);
+
+      expect(opening.chapterTitle, startsWith('ACT 1'));
+      expect(middle.chapterTitle, startsWith('ACT 2'));
+      expect(finale.chapterTitle, startsWith('ACT 3'));
+      expect(opening.parSeconds, greaterThanOrEqualTo(70));
+      expect(finale.lengthMultiplier, greaterThan(opening.lengthMultiplier));
+    }
   });
 
   test(

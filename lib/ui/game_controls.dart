@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../core/game_feedback.dart';
+import '../core/level_campaign.dart';
+
 class TouchStick extends StatefulWidget {
   const TouchStick({super.key, required this.onChanged, this.size = 104});
 
@@ -126,6 +129,7 @@ class _HoldGameButtonState extends State<HoldGameButton> {
           if (_pointer != null) return;
           _pointer = event.pointer;
           setState(() => _held = true);
+          GameFeedback.selection();
           widget.onChanged(true);
         },
         onPointerUp: _release,
@@ -238,6 +242,7 @@ class _AimGameButtonState extends State<AimGameButton> {
           if (_pointer != null) return;
           _pointer = event.pointer;
           setState(() => _firing = true);
+          GameFeedback.selection();
           _update(event);
           widget.onFiringChanged(true);
         },
@@ -330,7 +335,10 @@ class TapGameButton extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onTap,
+          onTap: () {
+            GameFeedback.selection();
+            onTap();
+          },
           borderRadius: BorderRadius.circular(16),
           child: Ink(
             width: width,
@@ -377,7 +385,10 @@ class GameExitButton extends StatelessWidget {
         color: const Color(0xD9111828),
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
-          onTap: onExit,
+          onTap: () {
+            GameFeedback.selection();
+            onExit();
+          },
           borderRadius: BorderRadius.circular(12),
           child: const Padding(
             padding: EdgeInsets.all(8),
@@ -405,7 +416,10 @@ class GamePauseButton extends StatelessWidget {
       color: const Color(0xD9111828),
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          GameFeedback.selection();
+          onTap();
+        },
         borderRadius: BorderRadius.circular(12),
         child: const Padding(
           padding: EdgeInsets.all(8),
@@ -495,6 +509,18 @@ class GamePauseOverlay extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => showGameFeedbackSettings(context),
+                  icon: const Icon(Icons.tune_rounded, size: 18),
+                  label: const Text(
+                    'FEEDBACK SETTINGS',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
@@ -516,6 +542,294 @@ class GamePauseOverlay extends StatelessWidget {
           ),
         ),
       ),
+    ),
+  );
+}
+
+/// Opens the same persisted music, sound, and haptic preferences from the
+/// arcade cabinet and every pause screen.
+Future<void> showGameFeedbackSettings(BuildContext context) => showDialog<void>(
+  context: context,
+  builder: (_) => const _FeedbackSettingsSheet(),
+);
+
+class _FeedbackSettingsSheet extends StatelessWidget {
+  const _FeedbackSettingsSheet();
+
+  @override
+  Widget build(BuildContext context) => Dialog(
+    backgroundColor: Colors.transparent,
+    insetPadding: const EdgeInsets.all(16),
+    child: ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: 460,
+        maxHeight: MediaQuery.sizeOf(context).height * .88,
+      ),
+      child: SingleChildScrollView(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF101827),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFF58749A)),
+            boxShadow: const [
+              BoxShadow(color: Color(0x99000000), blurRadius: 24),
+            ],
+          ),
+          child: ValueListenableBuilder<GameFeedbackSettings>(
+            valueListenable: GameFeedback.settings,
+            builder: (context, settings, _) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'FEEDBACK',
+                  style: TextStyle(
+                    color: Color(0xFF8FEAFF),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Arcade preferences',
+                  style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'These settings apply immediately and are remembered across games.',
+                  style: TextStyle(color: Color(0xFFC3D0E7), fontSize: 12),
+                ),
+                const SizedBox(height: 8),
+                _FeedbackToggle(
+                  icon: Icons.music_note_rounded,
+                  title: 'Music',
+                  subtitle: 'Background soundtrack',
+                  value: settings.musicEnabled,
+                  onChanged: GameFeedback.setMusicEnabled,
+                ),
+                _FeedbackToggle(
+                  icon: Icons.volume_up_rounded,
+                  title: 'Sound effects',
+                  subtitle: 'Shots, pickups, and game cues',
+                  value: settings.soundEnabled,
+                  onChanged: GameFeedback.setSoundEnabled,
+                ),
+                _FeedbackToggle(
+                  icon: Icons.vibration_rounded,
+                  title: 'Haptics',
+                  subtitle: 'Hits, pickups, and major actions',
+                  value: settings.hapticsEnabled,
+                  onChanged: GameFeedback.setHapticsEnabled,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _FeedbackToggle extends StatelessWidget {
+  const _FeedbackToggle({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) => SwitchListTile.adaptive(
+    contentPadding: EdgeInsets.zero,
+    secondary: Icon(icon, color: const Color(0xFF8FEAFF)),
+    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+    subtitle: Text(subtitle, style: const TextStyle(fontSize: 11)),
+    value: value,
+    onChanged: onChanged,
+  );
+}
+
+/// Shared end-of-mission flow for every campaign title. Internal game stages
+/// may still use their own transitions, but a selected campaign level always
+/// ends here so players can deliberately continue to the newly unlocked level.
+class CampaignMissionClearOverlay extends StatelessWidget {
+  const CampaignMissionClearOverlay({
+    super.key,
+    required this.level,
+    required this.score,
+    required this.elapsedSeconds,
+    required this.accent,
+    required this.onExit,
+    this.onNextLevel,
+  });
+
+  final GeneratedGameLevel level;
+  final int score;
+  final double elapsedSeconds;
+  final Color accent;
+  final VoidCallback onExit;
+  final VoidCallback? onNextLevel;
+
+  @override
+  Widget build(BuildContext context) {
+    final result = LevelRunResult(
+      level: level,
+      score: score,
+      elapsedSeconds: elapsedSeconds,
+    );
+    final isFinalMission = level.number >= gameCampaignLevelCount;
+    return Positioned.fill(
+      child: ColoredBox(
+        color: const Color(0xE8080C16),
+        child: Center(
+          child: Container(
+            width: 480,
+            margin: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF111A2A),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: accent.withValues(alpha: .9),
+                width: 1.4,
+              ),
+              boxShadow: [
+                BoxShadow(color: accent.withValues(alpha: .16), blurRadius: 32),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isFinalMission ? 'CAMPAIGN COMPLETE' : 'MISSION COMPLETE',
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'LEVEL ${level.number.toString().padLeft(2, '0')} · ${level.chapterTitle}',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    height: 1.05,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: .5,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  level.storyBeat,
+                  style: const TextStyle(
+                    color: Color(0xFFC6D2E6),
+                    fontSize: 13,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _CampaignResultChip(
+                      icon: Icons.star_rounded,
+                      label: '${result.stars}/3 STARS',
+                      color: const Color(0xFFFFD36A),
+                    ),
+                    _CampaignResultChip(
+                      icon: Icons.stars_rounded,
+                      label: '$score SCORE',
+                      color: accent,
+                    ),
+                    _CampaignResultChip(
+                      icon: Icons.timer_outlined,
+                      label: '${elapsedSeconds.round()}s',
+                      color: const Color(0xFF9EB4D1),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                if (!isFinalMission)
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: onNextLevel ?? onExit,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: accent,
+                        foregroundColor: const Color(0xFF04101A),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                      ),
+                      icon: const Icon(Icons.arrow_forward_rounded),
+                      label: Text(
+                        'NEXT LEVEL · ${level.number + 1}',
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  ),
+                if (!isFinalMission) const SizedBox(height: 6),
+                Center(
+                  child: TextButton(
+                    onPressed: onExit,
+                    child: Text(
+                      isFinalMission ? 'RETURN TO LEVELS' : 'CHOOSE A LEVEL',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CampaignResultChip extends StatelessWidget {
+  const _CampaignResultChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+    decoration: BoxDecoration(
+      color: const Color(0xFF0A111E),
+      borderRadius: BorderRadius.circular(99),
+      border: Border.all(color: color.withValues(alpha: .48)),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 14),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 9,
+            fontWeight: FontWeight.w900,
+            letterSpacing: .45,
+          ),
+        ),
+      ],
     ),
   );
 }

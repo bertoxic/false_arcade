@@ -1,10 +1,16 @@
 part of 'numberfall_game.dart';
 
 class NumberfallPage extends StatefulWidget {
-  const NumberfallPage({super.key, this.level, this.onLevelComplete});
+  const NumberfallPage({
+    super.key,
+    this.level,
+    this.onLevelComplete,
+    this.onNextLevel,
+  });
 
   final GeneratedGameLevel? level;
   final LevelCompleteCallback? onLevelComplete;
+  final VoidCallback? onNextLevel;
 
   @override
   State<NumberfallPage> createState() => _NumberfallPageState();
@@ -16,6 +22,7 @@ class _NumberfallPageState extends State<NumberfallPage>
   late final _NumberfallGame _game;
   bool _paused = false;
   bool _completionReported = false;
+  bool _continuingCampaign = false;
   double _elapsedSeconds = 0;
 
   @override
@@ -79,11 +86,21 @@ class _NumberfallPageState extends State<NumberfallPage>
     );
   }
 
+  void _continueCampaign() {
+    _continuingCampaign = true;
+    final next = widget.onNextLevel;
+    if (next != null) {
+      next();
+    } else {
+      Navigator.of(context).pop(CampaignNavigation.nextLevel);
+    }
+  }
+
   @override
   void dispose() {
     _game.clearInput();
     _loop.dispose();
-    GamePresentation.restore();
+    if (!_continuingCampaign) GamePresentation.restore();
     super.dispose();
   }
 
@@ -221,21 +238,43 @@ class _NumberfallPageState extends State<NumberfallPage>
                                       danger: true,
                                     ),
                                   if (game.phase == _NumberPhase.stageClear)
-                                    _NumberOverlay(
-                                      title: 'DISPLAY STABLE',
-                                      copy:
-                                          'This number held together. The next display rewrites faster and asks for more pickups.',
-                                      button: 'NEXT DISPLAY',
-                                      onTap: _nextStage,
-                                    ),
+                                    if (widget.level != null)
+                                      CampaignMissionClearOverlay(
+                                        level: widget.level!,
+                                        score: game.score,
+                                        elapsedSeconds: _elapsedSeconds,
+                                        accent: const Color(0xFF55F2D7),
+                                        onNextLevel: _continueCampaign,
+                                        onExit: () =>
+                                            Navigator.of(context).pop(),
+                                      )
+                                    else
+                                      _NumberOverlay(
+                                        title: 'DISPLAY STABLE',
+                                        copy:
+                                            'This number held together. The next display rewrites faster and asks for more pickups.',
+                                        button: 'NEXT DISPLAY',
+                                        onTap: _nextStage,
+                                      ),
                                   if (game.phase == _NumberPhase.won)
-                                    _NumberOverlay(
-                                      title: 'EQUATION SOLVED',
-                                      copy:
-                                          'You cleared every display, read its rewrites, and found a stable route through the equation.',
-                                      button: 'PLAY AGAIN',
-                                      onTap: _startRun,
-                                    ),
+                                    if (widget.level != null)
+                                      CampaignMissionClearOverlay(
+                                        level: widget.level!,
+                                        score: game.score,
+                                        elapsedSeconds: _elapsedSeconds,
+                                        accent: const Color(0xFF55F2D7),
+                                        onNextLevel: _continueCampaign,
+                                        onExit: () =>
+                                            Navigator.of(context).pop(),
+                                      )
+                                    else
+                                      _NumberOverlay(
+                                        title: 'EQUATION SOLVED',
+                                        copy:
+                                            'You cleared every display, read its rewrites, and found a stable route through the equation.',
+                                        button: 'PLAY AGAIN',
+                                        onTap: _startRun,
+                                      ),
                                   if (_paused)
                                     GamePauseOverlay(
                                       gameName: 'NUMBERFALL',

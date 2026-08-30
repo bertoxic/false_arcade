@@ -134,17 +134,23 @@ class _FuturePainter extends CustomPainter {
         Paint()..color = color,
       );
     }
-    for (final shot in game.shots) _shot(canvas, shot, const Color(0xFFB4F6FF));
+    for (final shot in game.shots) {
+      if (visible.inflate(48).contains(shot.position)) {
+        _shot(canvas, shot, const Color(0xFFB4F6FF));
+      }
+    }
     for (final shot in game.enemyShots) {
-      _shot(
-        canvas,
-        shot,
-        shot.type == _FutureShotType.collector
-            ? const Color(0xFFC995FF)
-            : shot.type == _FutureShotType.echo
-            ? const Color(0xFF58E8FF)
-            : const Color(0xFFFF708D),
-      );
+      if (visible.inflate(48).contains(shot.position)) {
+        _shot(
+          canvas,
+          shot,
+          shot.type == _FutureShotType.collector
+              ? const Color(0xFFC995FF)
+              : shot.type == _FutureShotType.echo
+              ? const Color(0xFF58E8FF)
+              : const Color(0xFFFF708D),
+        );
+      }
     }
     for (final enemy in game.enemies) {
       if (visible.inflate(48).contains(enemy.position)) _enemy(canvas, enemy);
@@ -158,53 +164,110 @@ class _FuturePainter extends CustomPainter {
   }
 
   void _floorTiles(Canvas canvas, Rect visible) {
-    const tileSize = 48.0;
+    const tileSize = 96.0;
     final startX = (visible.left / tileSize).floor() * tileSize;
     final startY = (visible.top / tileSize).floor() * tileSize;
-    final seam = Paint()
+    // Keep the material detail deterministic as the camera moves, and avoid
+    // the per-tile shaders that made the original floor unnecessarily costly.
+    final panelPaints = [
+      Paint()..color = const Color(0xFF0B1420),
+      Paint()..color = const Color(0xFF0D1724),
+      Paint()..color = const Color(0xFF101A28),
+      Paint()..color = const Color(0xFF0A121D),
+    ];
+    final topBevel = Paint()
+      ..color = const Color(0xFF6E90B2).withValues(alpha: .16);
+    final leftBevel = Paint()
+      ..color = const Color(0xFF47617E).withValues(alpha: .11);
+    final lowerBevel = Paint()
+      ..color = const Color(0xFF02050B).withValues(alpha: .72);
+    final panelOutline = Paint()
+      ..color = const Color(0xFF9DB5D0).withValues(alpha: .08)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
-      ..color = const Color(0xFF526583).withValues(alpha: .2);
+      ..strokeWidth = 1;
+    final scuff = Paint()
+      ..color = const Color(0xFF9CB2C9).withValues(alpha: .10)
+      ..strokeWidth = 1.2
+      ..strokeCap = StrokeCap.round;
+    final hatch = Paint()
+      ..color = const Color(0xFF060C15).withValues(alpha: .86);
+    final hatchRim = Paint()
+      ..color = const Color(0xFF58708B).withValues(alpha: .45)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final bolt = Paint()..color = const Color(0xFF93ACC5).withValues(alpha: .3);
+
     for (var x = startX; x < visible.right + tileSize; x += tileSize) {
+      final column = (x / tileSize).floor();
       for (var y = startY; y < visible.bottom + tileSize; y += tileSize) {
-        final column = (x / tileSize).floor();
         final row = (y / tileSize).floor();
-        final variation = (column * 13 + row * 7) & 3;
-        final tile = RRect.fromRectAndRadius(
-          Rect.fromLTWH(x + 1, y + 1, tileSize - 2, tileSize - 2),
-          const Radius.circular(3),
+        final noise = _floorNoise(column, row);
+        final tile = Rect.fromLTWH(x, y, tileSize, tileSize);
+        canvas.drawRect(tile, panelPaints[noise & 3]);
+
+        // Raised leading edges and a deep trailing edge make each slab read
+        // as a physical, slightly worn panel rather than a flat grid.
+        canvas.drawRect(
+          Rect.fromLTWH(tile.left, tile.top, tile.width, 2),
+          topBevel,
         );
-        canvas.drawRRect(
-          tile.shift(const Offset(1.5, 2)),
-          Paint()..color = const Color(0xFF02050C).withValues(alpha: .25),
+        canvas.drawRect(
+          Rect.fromLTWH(tile.left, tile.top, 2, tile.height),
+          leftBevel,
         );
-        canvas.drawRRect(
-          tile,
-          Paint()
-            ..shader = LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                const Color(0xFF18243A).withValues(alpha: .94),
-                [
-                  const Color(0xFF0E1727),
-                  const Color(0xFF101B2D),
-                  const Color(0xFF132038),
-                  const Color(0xFF0C1524),
-                ][variation],
-              ],
-            ).createShader(tile.outerRect),
+        canvas.drawRect(
+          Rect.fromLTWH(tile.left, tile.bottom - 3, tile.width, 3),
+          lowerBevel,
         );
-        canvas.drawRRect(tile, seam);
-        canvas.drawLine(
-          Offset(x + 7, y + 7),
-          Offset(x + tileSize - 8, y + 7),
-          Paint()
-            ..color = const Color(0xFFB8D6FF).withValues(alpha: .055)
-            ..strokeWidth = 1,
+        canvas.drawRect(
+          Rect.fromLTWH(tile.right - 3, tile.top, 3, tile.height),
+          lowerBevel,
         );
+        canvas.drawRect(tile.deflate(5), panelOutline);
+
+        if ((noise & 7) == 0) {
+          final start = Offset(tile.left + 19, tile.top + 25 + (noise % 36));
+          canvas.drawLine(start, start + const Offset(38, -5), scuff);
+          canvas.drawLine(
+            start + const Offset(8, 5),
+            start + const Offset(28, 2),
+            scuff,
+          );
+        }
+        if (noise % 13 == 0) {
+          final accessPanel = Rect.fromCenter(
+            center: tile.center,
+            width: 48,
+            height: 25,
+          );
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(accessPanel, const Radius.circular(2)),
+            hatch,
+          );
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              accessPanel.deflate(2),
+              const Radius.circular(1),
+            ),
+            hatchRim,
+          );
+          for (final corner in [
+            accessPanel.topLeft + const Offset(5, 5),
+            Offset(accessPanel.right - 5, accessPanel.top + 5),
+            Offset(accessPanel.left + 5, accessPanel.bottom - 5),
+            accessPanel.bottomRight - const Offset(5, 5),
+          ]) {
+            canvas.drawCircle(corner, 1.2, bolt);
+          }
+        }
       }
     }
+  }
+
+  int _floorNoise(int column, int row) {
+    var value = column * 73856093 ^ row * 19349663;
+    value = (value ^ (value >> 13)) * 83492791;
+    return (value ^ (value >> 16)) & 0x7fffffff;
   }
 
   void _playerLight(Canvas canvas, Rect visible) {
@@ -260,16 +323,9 @@ class _FuturePainter extends CustomPainter {
     drawWallClippedBeam(
       halfAngle: .56,
       reach: 430,
-      samples: 48,
-      fill: const Color(0xFF3DC9F6).withValues(alpha: .105),
+      samples: 24,
+      fill: const Color(0xFF3DC9F6).withValues(alpha: .14),
       rim: const Color(0xFFB4F6FF).withValues(alpha: .3),
-    );
-    drawWallClippedBeam(
-      halfAngle: .29,
-      reach: 285,
-      samples: 32,
-      fill: const Color(0xFF89F4FF).withValues(alpha: .09),
-      rim: const Color(0xFFDEFCFF).withValues(alpha: .24),
     );
     final glow = Rect.fromCircle(center: player, radius: 145 * pulse);
     canvas.drawCircle(

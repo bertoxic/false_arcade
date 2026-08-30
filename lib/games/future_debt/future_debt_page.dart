@@ -1,10 +1,16 @@
 part of 'future_debt_game.dart';
 
 class FutureDebtPage extends StatefulWidget {
-  const FutureDebtPage({super.key, this.level, this.onLevelComplete});
+  const FutureDebtPage({
+    super.key,
+    this.level,
+    this.onLevelComplete,
+    this.onNextLevel,
+  });
 
   final GeneratedGameLevel? level;
   final LevelCompleteCallback? onLevelComplete;
+  final VoidCallback? onNextLevel;
 
   @override
   State<FutureDebtPage> createState() => _FutureDebtPageState();
@@ -19,6 +25,11 @@ class _FutureDebtPageState extends State<FutureDebtPage>
   bool _firing = false;
   bool _paused = false;
   bool _campaignComplete = false;
+  // A Next Level action pops this route and immediately launches another
+  // Future Debt route. Do not restore portrait/orientation in the gap: the
+  // platform can apply that asynchronous restore after the next route has
+  // requested landscape, leaving the new level rotated incorrectly.
+  bool _continuingCampaign = false;
 
   @override
   void initState() {
@@ -73,11 +84,21 @@ class _FutureDebtPageState extends State<FutureDebtPage>
     );
   }
 
+  void _continueCampaign() {
+    final next = widget.onNextLevel;
+    if (next != null) {
+      _continuingCampaign = true;
+      next();
+    } else {
+      Navigator.of(context).pop(CampaignNavigation.nextLevel);
+    }
+  }
+
   @override
   void dispose() {
     _clearInput();
     _loop.dispose();
-    GamePresentation.restore();
+    if (!_continuingCampaign) GamePresentation.restore();
     super.dispose();
   }
 
@@ -109,9 +130,11 @@ class _FutureDebtPageState extends State<FutureDebtPage>
                     return Stack(
                       children: [
                         Positioned.fill(
-                          child: CustomPaint(
-                            key: const ValueKey('future-debt-playfield'),
-                            painter: _FuturePainter(game),
+                          child: RepaintBoundary(
+                            child: CustomPaint(
+                              key: const ValueKey('future-debt-playfield'),
+                              painter: _FuturePainter(game),
+                            ),
                           ),
                         ),
                         Positioned(
@@ -194,13 +217,12 @@ class _FutureDebtPageState extends State<FutureDebtPage>
                         if (game.phase == _FuturePhase.dead)
                           _FutureDeathOverlay(game: game, onRestart: _start),
                         if (_campaignComplete)
-                          _FutureCampaignClearOverlay(
+                          CampaignMissionClearOverlay(
                             level: widget.level!,
                             score: game.score.floor(),
-                            onReplay: () {
-                              _loop.setPaused(false);
-                              _start();
-                            },
+                            elapsedSeconds: game.time,
+                            accent: const Color(0xFF58E8FF),
+                            onNextLevel: _continueCampaign,
                             onExit: () => Navigator.of(context).pop(),
                           ),
                         if (_paused)

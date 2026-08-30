@@ -529,7 +529,7 @@ class _MansionGame {
       if (distance < 22) {
         phase = _MansionPhase.caught;
         message = 'A GUARD REACHED YOU DURING PURSUIT.';
-        HapticFeedback.heavyImpact();
+        GameFeedback.heavyImpact();
       }
     } else if (g.state == _GuardState.suspicious ||
         g.state == _GuardState.search) {
@@ -612,7 +612,7 @@ class _MansionGame {
         k.taken = true;
         player.kits++;
         _message('DISGUISE KIT ACQUIRED · TAP MASK TO USE');
-        HapticFeedback.selectionClick();
+        GameFeedback.selection();
         return;
       }
     }
@@ -621,7 +621,7 @@ class _MansionGame {
       player.loot += 300;
       player.lootCount++;
       _message('VAULT DIAMOND SECURED · REACH EXTRACTION');
-      HapticFeedback.mediumImpact();
+      GameFeedback.mediumImpact();
       return;
     }
     for (final l in loot.where((e) => !e.taken)) {
@@ -630,7 +630,7 @@ class _MansionGame {
         player.loot += l.value;
         player.lootCount++;
         _message('LOOT SECURED · YOUR VIEWPORT SHRINKS');
-        HapticFeedback.selectionClick();
+        GameFeedback.selection();
         return;
       }
     }
@@ -638,7 +638,7 @@ class _MansionGame {
       if (extractionReady) {
         phase = _MansionPhase.extracted;
         _message('EXTRACTION COMPLETE');
-        HapticFeedback.mediumImpact();
+        GameFeedback.mediumImpact();
       } else if (vaultTaken) {
         _message(
           'EXTRACTION NEEDS ${requiredLootCount - player.lootCount} MORE LOOT ITEM${requiredLootCount - player.lootCount == 1 ? '' : 'S'}',
@@ -672,7 +672,7 @@ class _MansionGame {
     player.kits--;
     player.disguise = disguiseDuration;
     _message('DISGUISED FOR 4 SECONDS');
-    HapticFeedback.selectionClick();
+    GameFeedback.selection();
   }
 
   void _throwCoin() {
@@ -688,7 +688,7 @@ class _MansionGame {
       ),
     );
     _message('COIN THROWN');
-    HapticFeedback.selectionClick();
+    GameFeedback.selection();
   }
 
   void _noise(Offset at, double radius) => noises.add(_Noise(at, radius, .55));

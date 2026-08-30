@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'arcade_catalog.dart';
 import 'arcade_game_art.dart';
 import 'game_level_select_page.dart';
+import '../ui/game_controls.dart';
 
 class FalseArcadeApp extends StatelessWidget {
   const FalseArcadeApp({super.key});
@@ -97,6 +98,8 @@ class _ArcadeHomePageState extends State<ArcadeHomePage> {
                         child: _ArcadeHeader(
                           active: _selectedIndex + 1,
                           total: arcadeCatalog.length,
+                          onFeedbackSettings: () =>
+                              showGameFeedbackSettings(context),
                         ),
                       ),
                     ),
@@ -205,10 +208,15 @@ class _ArcadeHomePageState extends State<ArcadeHomePage> {
 }
 
 class _ArcadeHeader extends StatelessWidget {
-  const _ArcadeHeader({required this.active, required this.total});
+  const _ArcadeHeader({
+    required this.active,
+    required this.total,
+    required this.onFeedbackSettings,
+  });
 
   final int active;
   final int total;
+  final VoidCallback onFeedbackSettings;
 
   @override
   Widget build(BuildContext context) => Row(
@@ -261,6 +269,11 @@ class _ArcadeHeader extends StatelessWidget {
         ],
       ),
       const Spacer(),
+      IconButton(
+        onPressed: onFeedbackSettings,
+        tooltip: 'Feedback settings',
+        icon: const Icon(Icons.tune_rounded, color: Color(0xFF8FEAFF)),
+      ),
       Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [

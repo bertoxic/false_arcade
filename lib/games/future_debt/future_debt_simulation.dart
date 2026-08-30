@@ -76,6 +76,7 @@ class _FutureDebtGame {
   static const playerRadius = 15.0;
   static const portalRadius = 25.0;
   static const _enemyFlow = .7;
+  static const _maxParticles = 180;
 
   final GeneratedGameLevel? _campaign;
   final int _campaignLevel;
@@ -219,7 +220,7 @@ class _FutureDebtGame {
     _buildMaze();
     _followCamera(immediate: true);
     _flash('THE LEDGER IS OPEN — every shortcut leaves a future predator.');
-    HapticFeedback.selectionClick();
+    GameFeedback.selection();
   }
 
   void cancelTransientInput() => moveDirection = Offset.zero;
@@ -229,7 +230,7 @@ class _FutureDebtGame {
     _flash(
       'MATURITY SET TO ${delay.round()} SECONDS — later credit costs more.',
     );
-    HapticFeedback.selectionClick();
+    GameFeedback.selection();
   }
 
   void update(double dt, Offset input, Offset aimInput, bool firing) {
@@ -366,7 +367,7 @@ class _FutureDebtGame {
         );
     }
     _burst(player, 13, _FutureParticleType.borrow);
-    HapticFeedback.selectionClick();
+    GameFeedback.selection();
   }
 
   void _schedule(_DebtKind kind, double duration) =>
@@ -401,7 +402,7 @@ class _FutureDebtGame {
       _flash(
         'TOTAL DEFAULT — all controls seized. Survive it for a ×6 payout.',
       );
-      HapticFeedback.heavyImpact();
+      GameFeedback.heavyImpact();
     }
   }
 
@@ -443,7 +444,7 @@ class _FutureDebtGame {
     _flash(
       'DEBT MATURED — ${bill.kind.name.toUpperCase()} seized for ${bill.duration.toStringAsFixed(1)}s.',
     );
-    HapticFeedback.mediumImpact();
+    GameFeedback.mediumImpact();
   }
 
   void forgiveDebt(double amount) {
@@ -488,7 +489,7 @@ class _FutureDebtGame {
     _flash(
       'BANKRUPTCY — immediate relief. THE COLLECTOR has arrived with ${collector!.maxHealth.toStringAsFixed(0)} HP.',
     );
-    HapticFeedback.heavyImpact();
+    GameFeedback.heavyImpact();
   }
 
   void dash() {
@@ -518,7 +519,7 @@ class _FutureDebtGame {
     if (borrowed) dashCharges--;
     screenShake = 4;
     _burst(player, 18, _FutureParticleType.dash);
-    HapticFeedback.lightImpact();
+    GameFeedback.lightImpact();
   }
 
   void _fire() {
@@ -539,6 +540,7 @@ class _FutureDebtGame {
       );
     }
     shotCooldown = shootBoost > 0 ? .085 : .18;
+    GameFeedback.shot();
     _burst(
       player + aimDirection * 25,
       shootBoost > 0 ? 7 : 2,
@@ -876,6 +878,7 @@ class _FutureDebtGame {
             ? _FutureParticleType.gold
             : _FutureParticleType.compound,
       );
+      GameFeedback.pickup();
       pickup.dead = true;
     }
     pickups.removeWhere((pickup) => pickup.dead);
@@ -899,7 +902,7 @@ class _FutureDebtGame {
       _burst(origin, 18, _FutureParticleType.portal);
       _burst(destination, 24, _FutureParticleType.portal);
       _flash('RIFT GATE — your repayment has been relocated.');
-      HapticFeedback.mediumImpact();
+      GameFeedback.mediumImpact();
       return;
     }
   }
@@ -915,7 +918,7 @@ class _FutureDebtGame {
     screenShake = math.max(screenShake, 8);
     _burst(position, 32, _FutureParticleType.gold);
     _flash('OBJECTIVE MET — no new claimants. Enter the NEXT LEVEL GATE.');
-    HapticFeedback.heavyImpact();
+    GameFeedback.heavyImpact();
   }
 
   Offset _exitPortalPosition() {
@@ -948,7 +951,7 @@ class _FutureDebtGame {
     screenShake = math.max(screenShake, 11);
     _burst(exit.position, 42, _FutureParticleType.gold);
     _flash('GATE CROSSED — ledger transferred to the next level.');
-    HapticFeedback.heavyImpact();
+    GameFeedback.heavyImpact();
   }
 
   void _updateCollector(double dt) {
@@ -975,7 +978,7 @@ class _FutureDebtGame {
       lifetime += 6;
       collector = null;
       _flash('COLLECTOR PAID OFF — +2800 and +6s lifetime.');
-      HapticFeedback.mediumImpact();
+      GameFeedback.mediumImpact();
     }
   }
 
@@ -1119,7 +1122,7 @@ class _FutureDebtGame {
     invulnerable = .6;
     screenShake = 9;
     _burst(player, 16, _FutureParticleType.hit);
-    HapticFeedback.lightImpact();
+    GameFeedback.lightImpact();
   }
 
   void _reflectDamage(Offset? source, double amount) {
@@ -1167,7 +1170,7 @@ class _FutureDebtGame {
     final side = Offset(-moveDirection.dy, moveDirection.dx);
     final count = moveBoost > 0 ? 2 : 1;
     for (var index = 0; index < count; index++) {
-      particles.add(
+      _addParticle(
         _FutureParticle(
           player - moveDirection * (9 + _random.nextDouble() * 8),
           -moveDirection * (42 + _random.nextDouble() * 65) +
@@ -1184,7 +1187,7 @@ class _FutureDebtGame {
     for (var index = 0; index < count; index++) {
       final angle = _random.nextDouble() * math.pi * 2;
       final speed = 45 + _random.nextDouble() * 210;
-      particles.add(
+      _addParticle(
         _FutureParticle(
           position,
           Offset(math.cos(angle), math.sin(angle)) * speed,
@@ -1194,6 +1197,13 @@ class _FutureDebtGame {
         ),
       );
     }
+  }
+
+  void _addParticle(_FutureParticle particle) {
+    // Effects are cosmetic. Keeping them bounded prevents a dense fight from
+    // making the renderer catch up on hundreds of expired sparks at once.
+    if (particles.length >= _maxParticles) particles.removeAt(0);
+    particles.add(particle);
   }
 
   void _flash(String text) => message = text;
@@ -1208,7 +1218,7 @@ class _FutureDebtGame {
         : 'D-';
     message =
         'Score ${score.floor()} · form $formName · borrowed ${totalBorrowed.toStringAsFixed(1)}s · rating $rating';
-    HapticFeedback.heavyImpact();
+    GameFeedback.heavyImpact();
   }
 
   void _followCamera({double dt = 0, bool immediate = false}) {
