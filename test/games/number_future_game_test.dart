@@ -1,6 +1,6 @@
 import 'package:fluga/games/future_debt/future_debt_game.dart';
-import 'package:fluga/main.dart';
 import 'package:fluga/games/numberfall/numberfall_game.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -30,7 +30,7 @@ void main() {
     test('campaign runs use an extended survival window and score target', () {
       expect(FutureDebtRules.startingLifetimeForLevel(1), 90);
       expect(FutureDebtRules.startingLifetimeForLevel(21), 105);
-      expect(FutureDebtRules.campaignTargetScore(650), 1950);
+      expect(FutureDebtRules.campaignTargetScore(650), 650);
     });
 
     test('interest increases only beyond the four-second base term', () {
@@ -92,29 +92,17 @@ void main() {
   testWidgets('Future Debt exposes a live bankruptcy encounter', (
     tester,
   ) async {
-    await tester.pumpWidget(const NotYetApp());
-    await tester.ensureVisible(find.text('FUTURE DEBT'));
-    await tester.tap(find.text('FUTURE DEBT'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 350));
-    await tester.tap(find.text('PLAY'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 350));
-    await tester.tap(find.text('START RUN'));
+    await tester.pumpWidget(const MaterialApp(home: FutureDebtPage()));
+    await tester.tap(find.text('ENTER THE LEDGER'));
     await tester.pump(const Duration(milliseconds: 100));
 
-    final rush = await tester.startGesture(tester.getCenter(find.text('RUSH')));
-    for (var frame = 0; frame < 14; frame++) {
-      await tester.pump(const Duration(milliseconds: 40));
-    }
-    await rush.up();
+    await tester.tap(find.text('1 — GHOST WAGE'));
     await tester.pump();
 
-    expect(find.text('DEFAULT'), findsOneWidget);
-    await tester.tap(find.text('DEFAULT'));
+    await tester.tap(find.textContaining('BANKRUPT').first);
     await tester.pump();
 
-    expect(find.textContaining('BANKRUPTCY:'), findsOneWidget);
+    expect(find.textContaining('BANKRUPTCY FEE POSTED'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

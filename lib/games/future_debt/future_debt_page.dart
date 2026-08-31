@@ -17,14 +17,19 @@ class FutureDebtPage extends StatefulWidget {
 }
 
 class _FutureDebtPageState extends State<FutureDebtPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final GameLoopController _loop;
+  late final FocusNode _gameFocus;
   late final _FutureDebtGame _game;
+  final Set<LogicalKeyboardKey> _pressedKeys = {};
   Offset _input = Offset.zero;
   Offset _aimInput = Offset.zero;
   bool _firing = false;
   bool _paused = false;
   bool _campaignComplete = false;
+  _FutureDebtPace _pace = _FutureDebtPace.standard;
+  _FutureDebtKeyboardLayout _keyboardLayout =
+      _FutureDebtKeyboardLayout.wasdMove;
   // A Next Level action pops this route and immediately launches another
   // Future Debt route. Do not restore portrait/orientation in the gap: the
   // platform can apply that asynchronous restore after the next route has
@@ -34,8 +39,11 @@ class _FutureDebtPageState extends State<FutureDebtPage>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     GamePresentation.enterLandscape();
     _game = _FutureDebtGame(campaign: widget.level);
+    _gameFocus = FocusNode(debugLabel: 'Future Debt controls')
+      ..addListener(_onFocusChanged);
     _loop = GameLoopController(
       vsync: this,
       onStep: (dt) => _game.update(dt, _input, _aimInput, _firing),
@@ -45,9 +53,52 @@ class _FutureDebtPageState extends State<FutureDebtPage>
       },
       onLifecyclePause: _clearInput,
     )..start();
+    _loadPace();
+  }
+
+  Future<void> _loadPace() async {
+    final preferences = await SharedPreferences.getInstance();
+    final savedPace = preferences.getString('future_debt.accessibility.pace');
+    final pace = _FutureDebtPace.values.where(
+      (value) => value.name == savedPace,
+    );
+    final savedLayout = preferences.getString(
+      'future_debt.accessibility.keyboard_layout',
+    );
+    final layout = _FutureDebtKeyboardLayout.values.where(
+      (value) => value.name == savedLayout,
+    );
+    if (!mounted) return;
+    setState(() {
+      if (pace.isNotEmpty) _pace = pace.first;
+      if (layout.isNotEmpty) _keyboardLayout = layout.first;
+      _game.setPace(_pace);
+    });
+  }
+
+  Future<void> _selectPace(_FutureDebtPace pace) async {
+    setState(() {
+      _pace = pace;
+      _game.setPace(pace);
+    });
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString('future_debt.accessibility.pace', pace.name);
+  }
+
+  Future<void> _selectKeyboardLayout(_FutureDebtKeyboardLayout layout) async {
+    setState(() {
+      _keyboardLayout = layout;
+      _clearInput();
+    });
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(
+      'future_debt.accessibility.keyboard_layout',
+      layout.name,
+    );
   }
 
   void _clearInput() {
+    _pressedKeys.clear();
     _input = Offset.zero;
     _aimInput = Offset.zero;
     _firing = false;
@@ -58,6 +109,7 @@ class _FutureDebtPageState extends State<FutureDebtPage>
     _clearInput();
     _campaignComplete = false;
     _game.start();
+    _gameFocus.requestFocus();
     setState(() {});
   }
 
@@ -65,6 +117,107 @@ class _FutureDebtPageState extends State<FutureDebtPage>
     _clearInput();
     _loop.setPaused(value);
     setState(() => _paused = value);
+    if (!value) _gameFocus.requestFocus();
+  }
+
+  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
+    final key = event.logicalKey;
+    if (!_controlKeys.contains(key)) return KeyEventResult.ignored;
+    final freshPress = event is KeyDownEvent && _pressedKeys.add(key);
+    if (event is KeyUpEvent) _pressedKeys.remove(key);
+    _input = _keyboardLayout == _FutureDebtKeyboardLayout.wasdMove
+        ? _directionalInput(
+            LogicalKeyboardKey.keyA,
+            LogicalKeyboardKey.keyD,
+            LogicalKeyboardKey.keyW,
+            LogicalKeyboardKey.keyS,
+          )
+        : _directionalInput(
+            LogicalKeyboardKey.arrowLeft,
+            LogicalKeyboardKey.arrowRight,
+            LogicalKeyboardKey.arrowUp,
+            LogicalKeyboardKey.arrowDown,
+          );
+    _aimInput = _keyboardLayout == _FutureDebtKeyboardLayout.wasdMove
+        ? _directionalInput(
+            LogicalKeyboardKey.arrowLeft,
+            LogicalKeyboardKey.arrowRight,
+            LogicalKeyboardKey.arrowUp,
+            LogicalKeyboardKey.arrowDown,
+          )
+        : _directionalInput(
+            LogicalKeyboardKey.keyJ,
+            LogicalKeyboardKey.keyL,
+            LogicalKeyboardKey.keyI,
+            LogicalKeyboardKey.keyK,
+          );
+    _firing = _isPressed(LogicalKeyboardKey.space);
+    if (freshPress &&
+        (key == LogicalKeyboardKey.shiftLeft ||
+            key == LogicalKeyboardKey.shiftRight)) {
+      _game.dash();
+    } else if (freshPress && key == LogicalKeyboardKey.digit1) {
+      _game.borrow(_DebtKind.move);
+    } else if (freshPress && key == LogicalKeyboardKey.digit2) {
+      _game.borrow(_DebtKind.shoot);
+    } else if (freshPress && key == LogicalKeyboardKey.digit3) {
+      _game.borrow(_DebtKind.dash);
+    } else if (freshPress && key == LogicalKeyboardKey.digit4) {
+      _game.borrow(_DebtKind.life);
+    } else if (freshPress && key == LogicalKeyboardKey.keyB) {
+      _game.bankrupt();
+    } else if (freshPress && key == LogicalKeyboardKey.escape) {
+      _pause(!_paused);
+    }
+    setState(() {});
+    return KeyEventResult.handled;
+  }
+
+  bool _isPressed(LogicalKeyboardKey key) => _pressedKeys.contains(key);
+
+  Offset _directionalInput(
+    LogicalKeyboardKey left,
+    LogicalKeyboardKey right,
+    LogicalKeyboardKey up,
+    LogicalKeyboardKey down,
+  ) => Offset(
+    (_isPressed(right) ? 1 : 0) - (_isPressed(left) ? 1 : 0),
+    (_isPressed(down) ? 1 : 0) - (_isPressed(up) ? 1 : 0),
+  );
+
+  static final Set<LogicalKeyboardKey> _controlKeys = {
+    LogicalKeyboardKey.keyW,
+    LogicalKeyboardKey.keyA,
+    LogicalKeyboardKey.keyS,
+    LogicalKeyboardKey.keyD,
+    LogicalKeyboardKey.keyI,
+    LogicalKeyboardKey.keyJ,
+    LogicalKeyboardKey.keyK,
+    LogicalKeyboardKey.keyL,
+    LogicalKeyboardKey.arrowUp,
+    LogicalKeyboardKey.arrowDown,
+    LogicalKeyboardKey.arrowLeft,
+    LogicalKeyboardKey.arrowRight,
+    LogicalKeyboardKey.space,
+    LogicalKeyboardKey.shiftLeft,
+    LogicalKeyboardKey.shiftRight,
+    LogicalKeyboardKey.digit1,
+    LogicalKeyboardKey.digit2,
+    LogicalKeyboardKey.digit3,
+    LogicalKeyboardKey.digit4,
+    LogicalKeyboardKey.keyB,
+    LogicalKeyboardKey.escape,
+  };
+
+  void _onFocusChanged() {
+    if (!_gameFocus.hasFocus) _clearInput();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) return;
+    _clearInput();
+    if (!_paused && _game.isPlaying) _pause(true);
   }
 
   void _reportCompletion() {
@@ -96,8 +249,12 @@ class _FutureDebtPageState extends State<FutureDebtPage>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _clearInput();
     _loop.dispose();
+    _gameFocus
+      ..removeListener(_onFocusChanged)
+      ..dispose();
     if (!_continuingCampaign) GamePresentation.restore();
     super.dispose();
   }
@@ -106,149 +263,161 @@ class _FutureDebtPageState extends State<FutureDebtPage>
   Widget build(BuildContext context) {
     final game = _game;
     return Scaffold(
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment(0, -1),
-            radius: 1.34,
-            colors: [Color(0xFF1B2441), Color(0xFF080B13), Color(0xFF04060B)],
+      body: Focus(
+        focusNode: _gameFocus,
+        autofocus: true,
+        onKeyEvent: _onKeyEvent,
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment(0, -1),
+              radius: 1.34,
+              colors: [Color(0xFF1B2441), Color(0xFF080B13), Color(0xFF04060B)],
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(4),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(18),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFF2B3855)),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final compact = constraints.maxHeight < 520;
-                    return Stack(
-                      children: [
-                        Positioned.fill(
-                          child: RepaintBoundary(
-                            child: CustomPaint(
-                              key: const ValueKey('future-debt-playfield'),
-                              painter: _FuturePainter(game),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: const Color(0xFF2B3855)),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact = constraints.maxHeight < 520;
+                      return Stack(
+                        children: [
+                          Positioned.fill(
+                            child: RepaintBoundary(
+                              child: CustomPaint(
+                                key: const ValueKey('future-debt-playfield'),
+                                painter: _FuturePainter(game),
+                              ),
                             ),
                           ),
-                        ),
-                        Positioned(
-                          top: compact ? 7 : 10,
-                          left: compact ? 7 : 10,
-                          right: compact ? 7 : 10,
-                          child: _FutureTopHud(game: game, compact: compact),
-                        ),
-                        Positioned(
-                          top: compact ? 56 : 66,
-                          left: compact ? 10 : 14,
-                          right: compact ? 174 : 188,
-                          child: _MessageStrip(game: game, compact: compact),
-                        ),
-                        Positioned(
-                          left: compact ? 124 : 150,
-                          right: compact ? 166 : 210,
-                          bottom: compact ? 12 : 17,
-                          child: _FutureBorrowRail(
-                            game: game,
-                            compact: compact,
-                            onBorrow: (kind) =>
-                                setState(() => game.borrow(kind)),
-                            onDelay: (delay) =>
-                                setState(() => game.selectDelay(delay)),
-                            onBankruptcy: () => setState(game.bankrupt),
-                          ),
-                        ),
-                        Positioned(
-                          left: compact ? 10 : 16,
-                          bottom: compact ? 10 : 15,
-                          child: TouchStick(
-                            size: compact ? 100 : 124,
-                            onChanged: (value) =>
-                                setState(() => _input = value),
-                          ),
-                        ),
-                        Positioned(
-                          right: compact ? 10 : 16,
-                          bottom: compact ? 10 : 16,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              TapGameButton(
-                                label: 'DASH',
-                                icon: Icons.bolt_rounded,
-                                color: const Color(0xFFBA83FF),
-                                width: compact ? 56 : 67,
-                                onTap: () => setState(game.dash),
-                              ),
-                              const SizedBox(width: 8),
-                              AimGameButton(
-                                label: 'FIRE',
-                                icon: Icons.gps_fixed_rounded,
-                                color: const Color(0xFFB4F5FF),
-                                size: compact ? 92 : 110,
-                                onFiringChanged: (held) =>
-                                    setState(() => _firing = held),
-                                onAimChanged: (value) =>
-                                    setState(() => _aimInput = value),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Positioned(
-                          top: compact ? 7 : 10,
-                          left: compact ? 7 : 10,
-                          child: GameExitButton(
-                            onExit: () => Navigator.of(context).pop(),
-                          ),
-                        ),
-                        if (game.isPlaying)
                           Positioned(
-                            top: compact ? 8 : 11,
-                            right: compact ? 7 : 10,
-                            child: GamePauseButton(onTap: () => _pause(true)),
+                            top: compact ? 7 : 10,
+                            left: compact ? 52 : 62,
+                            width: constraints.maxWidth * .35,
+                            child: _FutureTopHud(game: game, compact: compact),
                           ),
-                        if (game.phase == _FuturePhase.intro)
-                          _FutureOverlay(onStart: _start),
-                        if (game.phase == _FuturePhase.dead)
-                          _FutureDeathOverlay(game: game, onRestart: _start),
-                        if (_campaignComplete)
-                          CampaignMissionClearOverlay(
-                            level: widget.level!,
-                            score: game.score.floor(),
-                            elapsedSeconds: game.time,
-                            accent: const Color(0xFF58E8FF),
-                            onNextLevel: _continueCampaign,
-                            onExit: () => Navigator.of(context).pop(),
+                          Positioned(
+                            top: compact ? 56 : 66,
+                            left: compact ? 10 : 14,
+                            right: compact ? 174 : 188,
+                            child: _MessageStrip(game: game, compact: compact),
                           ),
-                        if (_paused)
-                          GamePauseOverlay(
-                            gameName: 'FUTURE DEBT',
-                            onResume: () => _pause(false),
-                            onRestart: () {
-                              _loop.setPaused(false);
-                              _paused = false;
-                              _start();
-                            },
-                            onExit: () => Navigator.of(context).pop(),
-                          ),
-                        const Positioned(
-                          left: 0,
-                          top: 0,
-                          child: IgnorePointer(
-                            child: Opacity(
-                              opacity: 0,
-                              child: Text('BANKRUPTCY:'),
+                          Positioned(
+                            left: compact ? 124 : 150,
+                            right: compact ? 166 : 210,
+                            bottom: compact ? 12 : 17,
+                            child: _FutureBorrowRail(
+                              game: game,
+                              compact: compact,
+                              onBorrow: (kind) =>
+                                  setState(() => game.borrow(kind)),
+                              onDelay: (delay) =>
+                                  setState(() => game.selectDelay(delay)),
+                              onBankruptcy: () => setState(game.bankrupt),
                             ),
                           ),
-                        ),
-                      ],
-                    );
-                  },
+                          Positioned(
+                            left: compact ? 10 : 16,
+                            bottom: compact ? 10 : 15,
+                            child: TouchStick(
+                              size: compact ? 100 : 124,
+                              onChanged: (value) =>
+                                  setState(() => _input = value),
+                            ),
+                          ),
+                          Positioned(
+                            right: compact ? 10 : 16,
+                            bottom: compact ? 10 : 16,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                TapGameButton(
+                                  label: 'DASH',
+                                  icon: Icons.bolt_rounded,
+                                  color: const Color(0xFFBA83FF),
+                                  width: compact ? 56 : 67,
+                                  onTap: () => setState(game.dash),
+                                ),
+                                const SizedBox(width: 8),
+                                AimGameButton(
+                                  label: 'FIRE',
+                                  icon: Icons.gps_fixed_rounded,
+                                  color: const Color(0xFFB4F5FF),
+                                  size: compact ? 92 : 110,
+                                  onFiringChanged: (held) =>
+                                      setState(() => _firing = held),
+                                  onAimChanged: (value) =>
+                                      setState(() => _aimInput = value),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Positioned(
+                            top: compact ? 7 : 10,
+                            left: compact ? 7 : 10,
+                            child: GameExitButton(
+                              onExit: () => Navigator.of(context).pop(),
+                            ),
+                          ),
+                          if (game.isPlaying)
+                            Positioned(
+                              top: compact ? 8 : 11,
+                              right: compact ? 7 : 10,
+                              child: GamePauseButton(onTap: () => _pause(true)),
+                            ),
+                          if (game.phase == _FuturePhase.intro)
+                            _FutureOverlay(
+                              game: game,
+                              pace: _pace,
+                              onPaceChanged: _selectPace,
+                              keyboardLayout: _keyboardLayout,
+                              onKeyboardLayoutChanged: _selectKeyboardLayout,
+                              onStart: _start,
+                            ),
+                          if (game.phase == _FuturePhase.dead)
+                            _FutureDeathOverlay(game: game, onRestart: _start),
+                          if (_campaignComplete)
+                            CampaignMissionClearOverlay(
+                              level: widget.level!,
+                              score: game.score.floor(),
+                              elapsedSeconds: game.time,
+                              accent: const Color(0xFF58E8FF),
+                              onNextLevel: _continueCampaign,
+                              onExit: () => Navigator.of(context).pop(),
+                            ),
+                          if (_paused)
+                            GamePauseOverlay(
+                              gameName: 'FUTURE DEBT',
+                              onResume: () => _pause(false),
+                              onRestart: () {
+                                _loop.setPaused(false);
+                                _paused = false;
+                                _start();
+                              },
+                              onExit: () => Navigator.of(context).pop(),
+                            ),
+                          const Positioned(
+                            left: 0,
+                            top: 0,
+                            child: IgnorePointer(
+                              child: Opacity(
+                                opacity: 0,
+                                child: Text('BANKRUPTCY:'),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
@@ -265,99 +434,90 @@ class _FutureTopHud extends StatelessWidget {
   final bool compact;
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      // At narrower landscape widths, reserving room for the timeline matters
-      // more than repeating the title already shown by the game overlay.
-      final showBrand = !compact && constraints.maxWidth >= 740;
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) => SizedBox(
+    height: compact ? 48 : 58,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      child: Row(
         children: [
-          SizedBox(width: compact ? 42 : 48),
-          if (showBrand) ...[
-            const SizedBox(width: 210, child: _BrandCard()),
-            const SizedBox(width: 8),
-          ],
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _FutureStat(
-                label: 'LIFETIME',
-                value: game.lifetime.clamp(0, 999).toStringAsFixed(1) + 's',
-                color: game.lifetime < 10
-                    ? const Color(0xFFFF6279)
-                    : const Color(0xFFEEF4FF),
-                compact: compact,
-              ),
-              const SizedBox(width: 5),
-              _FutureStat(
-                label: 'DEBT / FORM',
-                value: game.debtAmount.toStringAsFixed(1) + 's',
-                detail: game.formName,
-                color: const Color(0xFFEEF4FF),
-                compact: compact,
-              ),
-              const SizedBox(width: 5),
-              _FutureStat(
-                label: 'SCORE',
-                value: game.score.floor().toString(),
-                color: const Color(0xFFEEF4FF),
-                compact: compact,
-              ),
-            ],
-          ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: FractionallySizedBox(
-                widthFactor: .6,
-                child: _FutureTimeline(game: game, compact: compact),
-              ),
+          Flexible(
+            flex: 3,
+            child: _FutureStat(
+              label: 'LIFETIME',
+              value: '${game.lifetime.clamp(0, 999).toStringAsFixed(1)}s',
+              color: game.lifetime < 10
+                  ? const Color(0xFFFF8097)
+                  : const Color(0xFFF4E9CA),
+              compact: compact,
             ),
           ),
-          const SizedBox(width: 106),
-          SizedBox(width: compact ? 39 : 44),
+          const SizedBox(width: 8),
+          Flexible(
+            flex: 3,
+            child: _FutureStat(
+              label: 'DEBT',
+              value: '${game.debtAmount.toStringAsFixed(1)}s',
+              detail: game.formName,
+              color: const Color(0xFFF4E9CA),
+              compact: compact,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 6,
+            child: _FutureObjectiveReadout(game: game, compact: compact),
+          ),
         ],
-      );
-    },
+      ),
+    ),
   );
 }
 
-class _BrandCard extends StatelessWidget {
-  const _BrandCard();
+class _FutureObjectiveReadout extends StatelessWidget {
+  const _FutureObjectiveReadout({required this.game, required this.compact});
+  final _FutureDebtGame game;
+  final bool compact;
 
   @override
-  Widget build(BuildContext context) => Container(
-    height: 52,
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-    decoration: _panelDecoration(const Color(0xFF2A3858)),
-    child: const Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'FUTURE DEBT',
-          style: TextStyle(
-            fontSize: 18,
-            height: .9,
-            letterSpacing: 2.2,
-            fontWeight: FontWeight.w900,
-          ),
+  Widget build(BuildContext context) => Column(
+    mainAxisAlignment: MainAxisAlignment.center,
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        game.caseTitle,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: const Color(0xFFF4E9CA),
+          fontSize: compact ? 7 : 9,
+          fontWeight: FontWeight.w900,
+          letterSpacing: compact ? .5 : .8,
         ),
-        SizedBox(height: 3),
-        Text(
-          'YOU ARE CREATING A PREDATOR THAT ARRIVES LATER.',
-          style: TextStyle(
-            color: Color(0xFF8996B4),
-            fontSize: 6,
-            letterSpacing: .55,
-            fontWeight: FontWeight.w800,
-          ),
+      ),
+      const SizedBox(height: 2),
+      Text(
+        '${game.objectiveProgress}  ·  ${game.score.floor()} / ${game.scoreTarget}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: game.objectiveComplete
+              ? const Color(0xFFAEDBB2)
+              : const Color(0xFFC6B98D),
+          fontSize: compact ? 6 : 7,
+          fontWeight: FontWeight.w800,
         ),
-      ],
-    ),
+      ),
+      const SizedBox(height: 3),
+      ClipRRect(
+        borderRadius: BorderRadius.circular(99),
+        child: LinearProgressIndicator(
+          value: (game.score / game.scoreTarget).clamp(0, 1).toDouble(),
+          minHeight: compact ? 3 : 4,
+          backgroundColor: const Color(0xFF2A3040),
+          valueColor: const AlwaysStoppedAnimation(Color(0xFFD8B35D)),
+        ),
+      ),
+    ],
   );
 }
 
@@ -411,126 +571,6 @@ class _FutureStat extends StatelessWidget {
           ),
         ),
     ],
-  );
-}
-
-class _FutureTimeline extends StatelessWidget {
-  const _FutureTimeline({required this.game, required this.compact});
-  final _FutureDebtGame game;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.fromLTRB(compact ? 6 : 9, 5, compact ? 6 : 9, 6),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              'THE LEDGER — NEXT 15 SECONDS',
-              style: TextStyle(
-                color: const Color(0xFFEAF2FF),
-                fontSize: compact ? 6 : 8,
-                fontWeight: FontWeight.w900,
-                letterSpacing: compact ? .6 : 1,
-              ),
-            ),
-            const Spacer(),
-            Text(
-              'NOW → MATURITY',
-              style: TextStyle(
-                color: const Color(0xFF8996B4),
-                fontSize: compact ? 5 : 6,
-                fontWeight: FontWeight.w800,
-                letterSpacing: .6,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: List.generate(8, (index) {
-            final start = index * 2;
-            final end = math.min(start + 2, 15);
-            final bills = game.bills
-                .where(
-                  (bill) =>
-                      bill.due < game.time + end &&
-                      bill.due + bill.duration > game.time + start,
-                )
-                .toList();
-            final kinds = bills.map((bill) => bill.kind).toSet();
-            final kind = kinds.isEmpty ? null : kinds.first;
-            final color = kinds.length >= 3
-                ? const Color(0xFFFF3E63)
-                : kind == _DebtKind.move
-                ? const Color(0xFF58E8FF)
-                : kind == _DebtKind.shoot
-                ? const Color(0xFFFF6B86)
-                : kind == _DebtKind.dash
-                ? const Color(0xFF9A78FF)
-                : kind == _DebtKind.life
-                ? const Color(0xFFFFD166)
-                : const Color(0xFF27334D);
-            final mark = kinds.length >= 3
-                ? '☠'
-                : kind == _DebtKind.move
-                ? 'R'
-                : kind == _DebtKind.shoot
-                ? 'A'
-                : kind == _DebtKind.dash
-                ? '⊗'
-                : kind == _DebtKind.life
-                ? r'$'
-                : '✓';
-            return Expanded(
-              child: Container(
-                height: compact ? 21 : 28,
-                margin: EdgeInsets.only(right: index == 7 ? 0 : 3),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: kinds.isEmpty
-                      ? const Color(0xFF141B2B)
-                      : color.withValues(alpha: .28),
-                  border: Border.all(color: color),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Stack(
-                  children: [
-                    Center(
-                      child: Text(
-                        mark,
-                        style: TextStyle(
-                          color: kinds.isEmpty
-                              ? const Color(0xFF9AA7C1)
-                              : Colors.white,
-                          fontSize: compact ? 7 : 9,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      right: 2,
-                      bottom: 1,
-                      child: Text(
-                        end.toString(),
-                        style: TextStyle(
-                          color: const Color(0xFF66728F),
-                          fontSize: compact ? 4 : 5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
-        ),
-      ],
-    ),
   );
 }
 
@@ -666,7 +706,7 @@ class _FutureBorrowRail extends StatelessWidget {
                 width: powerUpWidth,
                 child: _FutureBorrowButton(
                   label: '4 — CASH OUT',
-                  detail: '+12 seconds now',
+                  detail: '+8 seconds now',
                   color: const Color(0xFFFFD36A),
                   enabled: game.canBorrow(_DebtKind.life),
                   compact: compact,
@@ -717,7 +757,7 @@ class _DelayButton extends StatelessWidget {
           ),
         ),
         child: Text(
-          value.toStringAsFixed(0) + 's',
+          '${value.toStringAsFixed(0)}s',
           style: TextStyle(
             color: active ? const Color(0xFF58E8FF) : const Color(0xFFEAF2FF),
             fontSize: compact ? 5 : 6,
@@ -860,7 +900,19 @@ class _DefaultButton extends StatelessWidget {
 }
 
 class _FutureOverlay extends StatelessWidget {
-  const _FutureOverlay({required this.onStart});
+  const _FutureOverlay({
+    required this.game,
+    required this.pace,
+    required this.onPaceChanged,
+    required this.keyboardLayout,
+    required this.onKeyboardLayoutChanged,
+    required this.onStart,
+  });
+  final _FutureDebtGame game;
+  final _FutureDebtPace pace;
+  final ValueChanged<_FutureDebtPace> onPaceChanged;
+  final _FutureDebtKeyboardLayout keyboardLayout;
+  final ValueChanged<_FutureDebtKeyboardLayout> onKeyboardLayoutChanged;
   final VoidCallback onStart;
 
   @override
@@ -868,98 +920,189 @@ class _FutureOverlay extends StatelessWidget {
     child: ColoredBox(
       color: const Color(0xE8040713),
       child: Center(
-        child: Container(
-          width: 590,
-          margin: const EdgeInsets.all(20),
-          padding: const EdgeInsets.all(22),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0D1424),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF354667)),
-            boxShadow: const [
-              BoxShadow(color: Color(0xAA000000), blurRadius: 40),
-            ],
+        child: ConstrainedBox(
+          // I cap this briefing to the actual game viewport so compact
+          // landscape devices can scroll it instead of losing the start action.
+          constraints: BoxConstraints(
+            maxWidth: math.min(560, MediaQuery.sizeOf(context).width - 40),
+            maxHeight: math
+                .max(0.0, MediaQuery.sizeOf(context).height - 40)
+                .toDouble(),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 5,
-                runSpacing: 4,
-                children: const [
-                  _Tag('SCROLLING DEBT-MAZE'),
-                  _Tag('DESTRUCTIBLE ROOMS'),
-                  _Tag('FUTURE ECHOES'),
-                ],
-              ),
-              const SizedBox(height: 9),
-              RichText(
-                text: TextSpan(
-                  style: TextStyle(
-                    fontSize: 34,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2.4,
-                  ),
-                  children: [
-                    TextSpan(text: 'FUTURE '),
-                    TextSpan(
-                      text: 'DEBT',
-                      style: TextStyle(color: Color(0xFFFF4F78)),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 7),
-              const Text(
-                'You play THE DEBTOR — a masked time-runner with an hourglass heart. Borrow an ability now and a matching Future Echo is stamped into the room. When the debt matures, the ability is taken away and that Echo becomes a real hazard.',
-                style: TextStyle(
-                  color: Color(0xFFBDC8DF),
-                  fontSize: 12,
-                  height: 1.35,
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Wrap(
-                spacing: 16,
-                runSpacing: 4,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0D1424),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFF354667)),
+              boxShadow: const [
+                BoxShadow(color: Color(0xAA000000), blurRadius: 40),
+              ],
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _Rule('Move', 'left stick'),
-                  _Rule('Fire', 'hold FIRE'),
-                  _Rule('Dash', 'tap DASH'),
-                  _Rule('Borrow', 'credit rail'),
-                  _Rule('Walls', 'crack, breach, reveal shards'),
-                  _Rule('Camera', 'follows the Debtor through the maze'),
-                ],
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: onStart,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    backgroundColor: const Color(0xFF58E8FF),
-                    foregroundColor: const Color(0xFF061019),
-                  ),
-                  child: const Stack(
-                    alignment: Alignment.center,
+                  Wrap(
+                    spacing: 5,
+                    runSpacing: 4,
                     children: [
-                      Text(
-                        'ENTER THE LEDGER',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: .9,
-                        ),
+                      _Tag(
+                        'CASE ${game._plan.levelNumber.toString().padLeft(2, '0')}',
                       ),
-                      IgnorePointer(
-                        child: Opacity(opacity: 0, child: Text('START RUN')),
-                      ),
+                      _Tag(game._plan.mutator),
+                      const _Tag('NO DEBT LEAVES THE FLOOR'),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 9),
+                  RichText(
+                    text: TextSpan(
+                      style: TextStyle(
+                        fontSize: 34,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2.4,
+                      ),
+                      children: [
+                        const TextSpan(text: 'FUTURE '),
+                        TextSpan(
+                          text: 'DEBT',
+                          style: TextStyle(color: Color(0xFFFF4F78)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    game.caseTitle,
+                    style: const TextStyle(
+                      color: Color(0xFFE6C36D),
+                      fontSize: 11,
+                      letterSpacing: 1.1,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    'The Directorate owns a version of you that has not happened yet. ${game.caseInstruction}',
+                    style: TextStyle(
+                      color: Color(0xFFBDC8DF),
+                      fontSize: 12,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 11),
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 4,
+                    children: [
+                      _Rule('Move', 'stick / ${keyboardLayout.label}'),
+                      _Rule(
+                        'Aim',
+                        'FIRE stick / ${keyboardLayout.description}',
+                      ),
+                      const _Rule('Fire', 'hold FIRE / Space'),
+                      const _Rule('Dash', 'DASH / Shift'),
+                      const _Rule('Credit', 'rail / 1–4'),
+                      const _Rule('Default', 'BANKRUPT / B'),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Extraction appears only after the score target, case objective, and every outstanding contract are settled.',
+                    style: TextStyle(
+                      color: Color(0xFF9FACC5),
+                      fontSize: 9,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 11),
+                  Text(
+                    'RUN PACE — ${pace.label}',
+                    style: const TextStyle(
+                      color: Color(0xFFE6C36D),
+                      fontSize: 8,
+                      letterSpacing: .9,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      for (final option in _FutureDebtPace.values)
+                        ChoiceChip(
+                          label: Text(option.label),
+                          selected: option == pace,
+                          onSelected: (_) => onPaceChanged(option),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    pace.description,
+                    style: const TextStyle(
+                      color: Color(0xFF9FACC5),
+                      fontSize: 8,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'KEYBOARD LAYOUT',
+                    style: const TextStyle(
+                      color: Color(0xFFE6C36D),
+                      fontSize: 8,
+                      letterSpacing: .9,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Wrap(
+                    spacing: 6,
+                    children: [
+                      for (final option in _FutureDebtKeyboardLayout.values)
+                        ChoiceChip(
+                          label: Text(option.label),
+                          selected: option == keyboardLayout,
+                          onSelected: (_) => onKeyboardLayoutChanged(option),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: onStart,
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        backgroundColor: const Color(0xFF58E8FF),
+                        foregroundColor: const Color(0xFF061019),
+                      ),
+                      child: const Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Text(
+                            'ENTER THE LEDGER',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: .9,
+                            ),
+                          ),
+                          IgnorePointer(
+                            child: Opacity(
+                              opacity: 0,
+                              child: Text('START RUN'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1040,91 +1183,6 @@ class _FutureDeathOverlay extends StatelessWidget {
   );
 }
 
-class _FutureCampaignClearOverlay extends StatelessWidget {
-  const _FutureCampaignClearOverlay({
-    required this.level,
-    required this.score,
-    required this.onReplay,
-    required this.onExit,
-  });
-
-  final GeneratedGameLevel level;
-  final int score;
-  final VoidCallback onReplay;
-  final VoidCallback onExit;
-
-  @override
-  Widget build(BuildContext context) => Positioned.fill(
-    child: ColoredBox(
-      color: const Color(0xDE040713),
-      child: Center(
-        child: Container(
-          width: 390,
-          margin: const EdgeInsets.all(20),
-          padding: const EdgeInsets.all(22),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0D1424),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF58E8FF)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'LEVEL ${level.number.toString().padLeft(2, '0')} CLEARED',
-                style: const TextStyle(
-                  color: Color(0xFF58E8FF),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'THE LEDGER YIELDED',
-                style: TextStyle(
-                  fontSize: 27,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${level.mutator} · $score score\nStars are saved to this campaign level.',
-                style: const TextStyle(
-                  color: Color(0xFFC3D0E7),
-                  fontSize: 12,
-                  height: 1.35,
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: onReplay,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF58E8FF),
-                    foregroundColor: const Color(0xFF07111A),
-                  ),
-                  child: const Text(
-                    'RUN LEVEL AGAIN',
-                    style: TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: onExit,
-                child: const Text('RETURN TO LEVELS'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
 class _Tag extends StatelessWidget {
   const _Tag(this.value);
   final String value;
@@ -1157,7 +1215,7 @@ class _Rule extends StatelessWidget {
       style: const TextStyle(color: Color(0xFFCAD5EB), fontSize: 9),
       children: [
         TextSpan(
-          text: keyText + ': ',
+          text: '$keyText: ',
           style: const TextStyle(fontWeight: FontWeight.w900),
         ),
         TextSpan(text: value),
@@ -1165,9 +1223,3 @@ class _Rule extends StatelessWidget {
     ),
   );
 }
-
-BoxDecoration _panelDecoration(Color border) => BoxDecoration(
-  color: const Color(0xED0D1320),
-  border: Border.all(color: border),
-  borderRadius: BorderRadius.circular(10),
-);

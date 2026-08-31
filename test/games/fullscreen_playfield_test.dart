@@ -37,4 +37,18 @@ void main() {
     expect(find.byType(GameStageProgressMenu), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('Future Debt briefing scrolls on compact landscape devices', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 360);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MaterialApp(home: FutureDebtPage()));
+
+    expect(find.text('ENTER THE LEDGER'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

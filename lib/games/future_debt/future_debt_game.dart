@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/canvas_text.dart';
 import '../../core/game_feedback.dart';
@@ -13,5 +14,7 @@ import '../../core/logical_viewport.dart';
 import '../../ui/game_controls.dart';
 
 part 'future_debt_page.dart';
+part 'future_debt_case_plan.dart';
+part 'future_debt_settings.dart';
 part 'future_debt_simulation.dart';
 part 'future_debt_painter.dart';

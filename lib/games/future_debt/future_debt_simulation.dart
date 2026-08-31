@@ -8,7 +8,7 @@ enum _FutureEnemyType { hound, auditor, interest, bailiff }
 
 enum _FutureEchoType { runner, auditor, anchor, claim }
 
-enum _FuturePickupKind { time, writeoff, ghost, compound, reverse }
+enum _FuturePickupKind { time, writeoff, ghost, compound, reverse, caseFile }
 
 enum _FutureShotType { player, audit, echo, collector }
 
@@ -29,7 +29,7 @@ enum _FutureParticleType {
 
 /// Pure helpers kept public for gameplay-rule regression tests.
 abstract final class FutureDebtRules {
-  static const campaignScoreMultiplier = 3;
+  static const campaignScoreMultiplier = 1;
 
   static double interestForDelay(double delay) =>
       1 + math.max(0, delay - 4) * .11;
@@ -62,6 +62,7 @@ abstract final class FutureDebtRules {
 class _FutureDebtGame {
   _FutureDebtGame({GeneratedGameLevel? campaign})
     : _campaign = campaign,
+      _plan = _FutureDebtCasePlan.fromCampaign(campaign),
       _campaignLevel = campaign?.number ?? 1,
       _layoutSeed = campaign?.seed ?? math.Random().nextInt(0x7fffffff) {
     _random = math.Random(_layoutSeed ^ 0x39AB71);
@@ -75,13 +76,18 @@ class _FutureDebtGame {
   static const worldHeight = 1900.0;
   static const playerRadius = 15.0;
   static const portalRadius = 25.0;
-  static const _enemyFlow = .7;
   static const _maxParticles = 180;
+  static const _maxPickups = 42;
+  static const _maxPlayerShots = 84;
+  static const _maxEnemyShots = 72;
+  static const _maximumLifetime = 120.0;
 
   final GeneratedGameLevel? _campaign;
+  final _FutureDebtCasePlan _plan;
   final int _campaignLevel;
   final int _layoutSeed;
-  late final math.Random _random;
+  _FutureDebtPace _pace = _FutureDebtPace.standard;
+  late math.Random _random;
   final walls = <_FutureWall>[];
   final pickups = <_FuturePickup>[];
   final enemies = <_FutureEnemy>[];
@@ -114,8 +120,8 @@ class _FutureDebtGame {
   double time = 0;
   double lifetime = FutureDebtRules.startingLifetimeForLevel(1);
   double score = 0;
-  double spawnTimer = .45 / _enemyFlow;
-  double eliteTimer = 11 / _enemyFlow;
+  double spawnTimer = .45 / .7;
+  double eliteTimer = 11 / .7;
   double shotCooldown = 0;
   double dashCooldown = 0;
   double invulnerable = 0;
@@ -132,6 +138,12 @@ class _FutureDebtGame {
   int defaults = 0;
   int bankruptcies = 0;
   int dashCharges = 0;
+  int claimsDefeated = 0;
+  int wallsBreached = 0;
+  int recordsRecovered = 0;
+  int auditReturns = 0;
+  int maturitiesSurvived = 0;
+  bool collectorSettled = false;
   bool _defaultWasActive = false;
   bool _manualAimActive = false;
   bool levelExitReached = false;
@@ -142,13 +154,120 @@ class _FutureDebtGame {
   };
 
   bool get isPlaying => phase == _FuturePhase.playing;
+  _FutureDebtPace get pace => _pace;
+  double get _enemyFlow => .7 * _pace.enemyFlow;
   bool get totalDefaultActive => locks[_DebtKind.life] == -1;
   bool get hasAnyLock =>
       totalDefaultActive || locks.values.any((value) => value > 0);
   bool get hasCollector => collector != null;
   bool get levelExitOpen => levelExit != null;
+  bool get canDash =>
+      isPlaying && !isLocked(_DebtKind.dash) && dashCooldown <= 0;
+  int get scoreTarget => _plan.scoreTarget;
+  String get caseTitle => _plan.title;
+  String get caseInstruction => _plan.instruction;
+  String get objectiveProgress => switch (_plan.objective) {
+    _FutureObjectiveKind.clearClaims =>
+      '$claimsDefeated / ${_plan.objectiveTarget} CLAIMS CLEARED',
+    _FutureObjectiveKind.recoverRecords =>
+      '$recordsRecovered / ${_plan.objectiveTarget} CASE FILES RECOVERED',
+    _FutureObjectiveKind.breachLien =>
+      '$wallsBreached / ${_plan.objectiveTarget} LIENS BREACHED',
+    _FutureObjectiveKind.reflectAudit =>
+      '$auditReturns / ${_plan.objectiveTarget} AUDIT SHOTS RETURNED',
+    _FutureObjectiveKind.surviveMaturities =>
+      '$maturitiesSurvived / ${_plan.objectiveTarget} MATURITIES SURVIVED',
+    _FutureObjectiveKind.settleCollector =>
+      collectorSettled
+          ? 'COLLECTOR SETTLED'
+          : 'DECLARE BANKRUPTCY, THEN SETTLE THE COLLECTOR',
+    _FutureObjectiveKind.closeLedger =>
+      hasOutstandingDebt ? 'WAIT FOR EVERY BILL TO CLEAR' : 'LEDGER CLEAR',
+  };
+  bool get hasOutstandingDebt =>
+      bills.isNotEmpty ||
+      locks.values.any((value) => value != 0) ||
+      echoes.any((echo) => !echo.dead) ||
+      collector != null;
+  int get outstandingContractCount =>
+      bills.length +
+      locks.values.where((value) => value > 0).length +
+      echoes.where((echo) => !echo.dead).length +
+      (collector == null ? 0 : 1);
+  bool get objectiveComplete => switch (_plan.objective) {
+    _FutureObjectiveKind.clearClaims => claimsDefeated >= _plan.objectiveTarget,
+    _FutureObjectiveKind.recoverRecords =>
+      recordsRecovered >= _plan.objectiveTarget,
+    _FutureObjectiveKind.breachLien => wallsBreached >= _plan.objectiveTarget,
+    _FutureObjectiveKind.reflectAudit => auditReturns >= _plan.objectiveTarget,
+    _FutureObjectiveKind.surviveMaturities =>
+      maturitiesSurvived >= _plan.objectiveTarget,
+    _FutureObjectiveKind.settleCollector => collectorSettled,
+    _FutureObjectiveKind.closeLedger => !hasOutstandingDebt,
+  };
   bool isLocked(_DebtKind kind) => totalDefaultActive || (locks[kind] ?? 0) > 0;
-  bool canBorrow(_DebtKind kind) => isPlaying && !isLocked(kind);
+  bool canBorrow(_DebtKind kind) =>
+      isPlaying &&
+      !isLocked(kind) &&
+      collector == null &&
+      !_hasOutstandingCredit(kind) &&
+      outstandingContractCount < _plan.contractLimit;
+
+  bool _hasOutstandingCredit(_DebtKind kind) {
+    if (bills.any((bill) => bill.kind == kind)) return true;
+    if ((locks[kind] ?? 0) > 0) return true;
+    if (kind == _DebtKind.move && moveBoost > 0) return true;
+    if (kind == _DebtKind.shoot && shootBoost > 0) return true;
+    if (kind == _DebtKind.dash && reversalBoost > 0) return true;
+    return switch (kind) {
+      _DebtKind.move => echoes.any(
+        (echo) => !echo.dead && echo.type == _FutureEchoType.runner,
+      ),
+      _DebtKind.shoot => echoes.any(
+        (echo) => !echo.dead && echo.type == _FutureEchoType.auditor,
+      ),
+      _DebtKind.dash => echoes.any(
+        (echo) => !echo.dead && echo.type == _FutureEchoType.anchor,
+      ),
+      _DebtKind.life => echoes.any(
+        (echo) => !echo.dead && echo.type == _FutureEchoType.claim,
+      ),
+    };
+  }
+
+  bool _canSpawnClaim() => FutureDebtRules.canSpawnEnemy(
+    kills: claimsDefeated,
+    alive: enemies.where((enemy) => !enemy.dead).length,
+    goal: _plan.encounterBudget,
+    maximumAlive: _plan.maximumAlive,
+  );
+
+  void _grantLifetime(double amount) {
+    lifetime = math.min(_maximumLifetime, lifetime + amount);
+  }
+
+  void _addPickup(_FuturePickup pickup) {
+    // I keep rewards bounded so a long encounter cannot turn into a growing
+    // pile of off-screen work for the simulation and painter.
+    if (pickups.length >= _maxPickups) {
+      final discard = pickups.indexWhere(
+        (candidate) => candidate.kind != _FuturePickupKind.caseFile,
+      );
+      if (discard >= 0) pickups.removeAt(discard);
+    }
+    if (pickups.length < _maxPickups) pickups.add(pickup);
+  }
+
+  void _addPlayerShot(_FutureShot shot) {
+    if (shots.length >= _maxPlayerShots) shots.removeAt(0);
+    shots.add(shot);
+  }
+
+  void _addEnemyShot(_FutureShot shot) {
+    if (enemyShots.length >= _maxEnemyShots) enemyShots.removeAt(0);
+    enemyShots.add(shot);
+  }
+
   double get debtAmount =>
       bills.fold(0.0, (sum, bill) => sum + bill.duration) +
       locks.values.fold(
@@ -176,6 +295,7 @@ class _FutureDebtGame {
   }
 
   void start() {
+    _random = math.Random(_layoutSeed ^ 0x39AB71);
     phase = _FuturePhase.playing;
     player = const Offset(1515, 1010);
     camera = Offset.zero;
@@ -183,7 +303,11 @@ class _FutureDebtGame {
     aimDirection = const Offset(1, 0);
     dashDirection = const Offset(1, 0);
     time = 0;
-    lifetime = FutureDebtRules.startingLifetimeForLevel(_campaignLevel);
+    lifetime =
+        (FutureDebtRules.startingLifetimeForLevel(_campaignLevel) +
+                _pace.lifetimeAdjustment)
+            .clamp(35, _maximumLifetime)
+            .toDouble();
     score = 0;
     spawnTimer = .45 / _enemyFlow;
     eliteTimer = 11 / _enemyFlow;
@@ -202,6 +326,12 @@ class _FutureDebtGame {
     defaults = 0;
     bankruptcies = 0;
     dashCharges = 0;
+    claimsDefeated = 0;
+    wallsBreached = 0;
+    recordsRecovered = 0;
+    auditReturns = 0;
+    maturitiesSurvived = 0;
+    collectorSettled = false;
     _totalDefaultTime = 0;
     _defaultWasActive = false;
     _manualAimActive = false;
@@ -219,11 +349,16 @@ class _FutureDebtGame {
     }
     _buildMaze();
     _followCamera(immediate: true);
-    _flash('THE LEDGER IS OPEN — every shortcut leaves a future predator.');
+    _flash('$caseTitle — $caseInstruction');
     GameFeedback.selection();
   }
 
   void cancelTransientInput() => moveDirection = Offset.zero;
+
+  void setPace(_FutureDebtPace pace) {
+    if (phase != _FuturePhase.intro) return;
+    _pace = pace;
+  }
 
   void selectDelay(double delay) {
     selectedDelay = delay;
@@ -235,6 +370,7 @@ class _FutureDebtGame {
 
   void update(double dt, Offset input, Offset aimInput, bool firing) {
     if (!isPlaying) return;
+    final ghostWasActive = moveBoost > 0;
     time += dt;
     lifetime -= dt;
     shotCooldown = math.max(0, shotCooldown - dt);
@@ -253,10 +389,11 @@ class _FutureDebtGame {
       if (_totalDefaultTime == 0) locks[_DebtKind.life] = 0;
     }
     if (_defaultWasActive && !totalDefaultActive) {
-      score += 900;
-      _flash('DEFAULT SURVIVED — +900. The ledger hates resilience.');
+      score += 900 + _plan.act * 180;
+      _flash('DEFAULT SURVIVED — settlement bonus posted.');
       _defaultWasActive = false;
     }
+    if (ghostWasActive && moveBoost == 0) _reconcileAfterPhase();
     _collectDueBills();
     _openLevelExitIfReady();
 
@@ -286,16 +423,11 @@ class _FutureDebtGame {
       eliteTimer -= dt;
       if (spawnTimer <= 0) {
         _spawnEnemy();
-        spawnTimer = math.max(.22, .95 - time / 130) / _enemyFlow;
+        spawnTimer =
+            math.max(.38, _plan.spawnInterval - time / 340) / _enemyFlow;
       }
-      if (eliteTimer <= 0) {
-        enemies.add(
-          _FutureEnemy(
-            _clampWorld(player + const Offset(520, -420), 24),
-            _FutureEnemyType.bailiff,
-            1,
-          ),
-        );
+      if (eliteTimer <= 0 && _canSpawnClaim()) {
+        _spawnEnemy(force: _FutureEnemyType.bailiff);
         eliteTimer = (16 + _random.nextDouble() * 8) / _enemyFlow;
       }
     }
@@ -323,18 +455,19 @@ class _FutureDebtGame {
 
   void borrow(_DebtKind kind) {
     if (!canBorrow(kind)) {
-      _flash(
-        totalDefaultActive
-            ? 'TOTAL DEFAULT BLOCKS NEW CREDIT.'
-            : '${kind.name.toUpperCase()} CREDIT IS LOCKED.',
-      );
+      final reason = totalDefaultActive
+          ? 'TOTAL DEFAULT BLOCKS NEW CREDIT.'
+          : collector != null
+          ? 'SETTLE THE COLLECTOR BEFORE BORROWING AGAIN.'
+          : _hasOutstandingCredit(kind)
+          ? '${kind.name.toUpperCase()} CREDIT IS STILL OUTSTANDING.'
+          : outstandingContractCount >= _plan.contractLimit
+          ? 'CREDIT LIMIT ${_plan.contractLimit} REACHED — LET A BILL CLEAR.'
+          : '${kind.name.toUpperCase()} CREDIT IS LOCKED.';
+      _flash(reason);
       return;
     }
-    final interest = selectedDelay >= 15
-        ? 1.6
-        : selectedDelay >= 10
-        ? 1.4
-        : 1.0;
+    final interest = FutureDebtRules.interestForDelay(selectedDelay);
     switch (kind) {
       case _DebtKind.move:
         moveBoost = math.max(moveBoost, 2.4);
@@ -359,11 +492,11 @@ class _FutureDebtGame {
           'REVERSE PAYMENT — hostile bullets and damage rebound. An Anchor Echo matures in ${selectedDelay.round()}s.',
         );
       case _DebtKind.life:
-        lifetime += 12;
-        _schedule(kind, 12 * interest);
-        totalBorrowed += 12;
+        _grantLifetime(8);
+        _schedule(kind, 8 * interest);
+        totalBorrowed += 8;
         _flash(
-          'CASH OUT TOMORROW — +12 seconds now. A Maturity Claim is waiting.',
+          'CASH OUT TOMORROW — +8 seconds now. A Maturity Claim is waiting.',
         );
     }
     _burst(player, 13, _FutureParticleType.borrow);
@@ -408,20 +541,20 @@ class _FutureDebtGame {
 
   void _applyBill(_FutureBill bill) {
     if (bill.kind == _DebtKind.life) {
+      locks[_DebtKind.life] = math.max(locks[_DebtKind.life]!, bill.duration);
+      totalRepaid += bill.duration;
       echoes.add(
         _FutureEcho(
           _FutureEchoType.claim,
           bill.origin,
           radius: 17,
           health: 7,
-          life: 7,
+          life: bill.duration + 3,
           value: bill.duration,
         ),
       );
       screenShake = 7;
-      _flash(
-        'MATURITY CLAIM — destroy the gold claimant before it reaches you.',
-      );
+      _flash('MATURITY CLAIM — destroy it to release your time credit.');
       return;
     }
     locks[bill.kind] = math.max(locks[bill.kind]!, bill.duration);
@@ -449,7 +582,7 @@ class _FutureDebtGame {
 
   void forgiveDebt(double amount) {
     if (bills.isEmpty) {
-      lifetime += 1.5;
+      _grantLifetime(1.5);
       _flash('WRITE-OFF had no debt to erase — converted to +1.5s lifetime.');
       return;
     }
@@ -465,7 +598,7 @@ class _FutureDebtGame {
   }
 
   void bankrupt() {
-    if (!isPlaying) return;
+    if (!isPlaying || collector != null) return;
     final amount = debtAmount;
     if (amount < .15) {
       _flash('No meaningful debt to bankrupt. Keep your powder dry.');
@@ -478,22 +611,31 @@ class _FutureDebtGame {
     for (final kind in _DebtKind.values) {
       locks[kind] = 0;
     }
+    moveBoost = 0;
+    shootBoost = 0;
+    reversalBoost = 0;
+    // I charge an immediate time fee so Bankruptcy is a risky conversion, not
+    // a way to keep borrowed life while erasing every consequence.
+    lifetime = math.max(1, lifetime - math.min(8, amount * .32));
     collector = _FutureCollector(
       Offset(
         math.max(70, player.dx - 420).toDouble(),
         math.max(70, player.dy - 300).toDouble(),
       ),
-      math.max(12, amount * 2.7).toDouble(),
+      math.max(14, amount * 3.2).toDouble(),
     );
     screenShake = 14;
     _flash(
-      'BANKRUPTCY — immediate relief. THE COLLECTOR has arrived with ${collector!.maxHealth.toStringAsFixed(0)} HP.',
+      'BANKRUPTCY FEE POSTED — defeat THE COLLECTOR before new credit opens.',
     );
     GameFeedback.heavyImpact();
   }
 
   void dash() {
-    if (!isPlaying || isLocked(_DebtKind.dash) || dashCooldown > 0) return;
+    if (!canDash) {
+      if (isPlaying) _flash('DASH IS NOT AVAILABLE.');
+      return;
+    }
     final direction = FutureDebtRules.dashVector(
       moveDirection: moveDirection,
       storedDirection: dashDirection,
@@ -529,7 +671,7 @@ class _FutureDebtGame {
     for (final offset in spread) {
       final angle = math.atan2(aimDirection.dy, aimDirection.dx) + offset;
       final direction = Offset(math.cos(angle), math.sin(angle));
-      shots.add(
+      _addPlayerShot(
         _FutureShot(
           player + direction * 25,
           direction * 610,
@@ -564,6 +706,7 @@ class _FutureDebtGame {
       final distance = vector.distance;
       if (distance < 1) continue;
       final direction = vector / distance;
+      if (!_hasClearShot(player, target)) continue;
       final alignment =
           manualAim.dx * direction.dx + manualAim.dy * direction.dy;
       // A pushed fire stick chooses the lane; a released stick acquires the
@@ -586,14 +729,63 @@ class _FutureDebtGame {
         : bestDirection;
   }
 
-  void _spawnEnemy() {
-    var type = _FutureEnemyType.hound;
+  bool _hasClearShot(Offset origin, Offset target) {
+    final vector = target - origin;
+    final distance = vector.distance;
+    if (distance < 1) return true;
+    final direction = vector / distance;
+    for (final wall in walls) {
+      if (wall.destructible && wall.health <= 0) continue;
+      final hit = _rayRectDistance(origin, direction, wall.bounds.inflate(2));
+      if (hit != null && hit > 0 && hit < distance) return false;
+    }
+    return true;
+  }
+
+  void _reconcileAfterPhase() {
+    if (!_blocked(player, playerRadius)) return;
+    // I search from the player's last position first so phasing through a
+    // barricade never arbitrarily teleports a run across the whole map.
+    for (var ring = 1; ring <= 8; ring++) {
+      final radius = ring * 18.0;
+      for (var step = 0; step < 16; step++) {
+        final angle = step / 16 * math.pi * 2;
+        final candidate = _clampWorld(
+          player + Offset(math.cos(angle), math.sin(angle)) * radius,
+          playerRadius,
+        );
+        if (!_blocked(candidate, playerRadius)) {
+          player = candidate;
+          _flash('GHOST WAGE EXPIRED — position reconciled outside the lien.');
+          return;
+        }
+      }
+    }
+    player =
+        _randomOpenPoint(player, minimumDistance: 0) ??
+        const Offset(1515, 1010);
+    _flash('GHOST WAGE EXPIRED — emergency relocation posted.');
+  }
+
+  bool _spawnEnemy({_FutureEnemyType? force}) {
+    if (!_canSpawnClaim()) return false;
+    var type = force ?? _FutureEnemyType.hound;
     final roll = _random.nextDouble();
-    if (time > 12 && roll > .58) type = _FutureEnemyType.auditor;
-    if (time > 28 && roll > .8) type = _FutureEnemyType.interest;
-    if (time > 48 && roll > .92) type = _FutureEnemyType.bailiff;
+    if (force == null) {
+      if ((_plan.objective == _FutureObjectiveKind.reflectAudit || time > 10) &&
+          roll > .5) {
+        type = _FutureEnemyType.auditor;
+      }
+      if ((time > 24 || _plan.act > 0) && roll > .78) {
+        type = _FutureEnemyType.interest;
+      }
+      if ((time > 46 || _plan.act > 1) && roll > .94) {
+        type = _FutureEnemyType.bailiff;
+      }
+    }
     final radius = _enemyRadius(type);
     Offset position = const Offset(60, 60);
+    var found = false;
     for (var attempt = 0; attempt < 30; attempt++) {
       final angle = _random.nextDouble() * math.pi * 2;
       final distance = 560 + _random.nextDouble() * 650;
@@ -602,11 +794,18 @@ class _FutureDebtGame {
         radius,
       );
       if (!_pointInWall(position, radius) &&
-          (position - player).distance > 500) {
+          (position - player).distance > 500 &&
+          !portals.any(
+            (portal) =>
+                (position - portal.position).distance < portal.radius + radius,
+          )) {
+        found = true;
         break;
       }
     }
+    if (!found) return false;
     enemies.add(_FutureEnemy(position, type, _random.nextBool() ? 1 : -1));
+    return true;
   }
 
   void _updateShots(double dt) {
@@ -772,7 +971,7 @@ class _FutureDebtGame {
     _FutureShotType type,
   ) {
     final direction = Offset(math.cos(angle), math.sin(angle));
-    enemyShots.add(
+    _addEnemyShot(
       _FutureShot(
         position,
         direction * speed,
@@ -833,6 +1032,7 @@ class _FutureDebtGame {
               lifetime -= echo.value;
               _burst(player, 26, _FutureParticleType.gold);
               echo.dead = true;
+              locks[_DebtKind.life] = 0;
               screenShake = 13;
               _flash(
                 'CLAIM COLLECTED — paid ${echo.value.toStringAsFixed(1)}s of borrowed life.',
@@ -840,7 +1040,19 @@ class _FutureDebtGame {
             }
           }
       }
-      if (echo.life <= 0) echo.dead = true;
+      if (echo.life <= 0 && !echo.dead) {
+        if (echo.type == _FutureEchoType.claim) {
+          lifetime -= echo.value;
+          locks[_DebtKind.life] = 0;
+          echo.dead = true;
+          _burst(echo.position, 26, _FutureParticleType.gold);
+          _flash(
+            'MATURITY CLAIM ENFORCED — paid ${echo.value.toStringAsFixed(1)}s of borrowed life.',
+          );
+        } else {
+          _settleEcho(echo);
+        }
+      }
     }
     echoes.removeWhere((echo) => echo.dead);
   }
@@ -854,7 +1066,7 @@ class _FutureDebtGame {
       }
       switch (pickup.kind) {
         case _FuturePickupKind.time:
-          lifetime += 3.5;
+          _grantLifetime(3.5);
           score += 160;
           _flash('LIFE SHARD — +3.5s lifetime.');
         case _FuturePickupKind.writeoff:
@@ -868,6 +1080,12 @@ class _FutureDebtGame {
         case _FuturePickupKind.reverse:
           reversalBoost = math.max(reversalBoost, 3.6);
           _flash('REVERSE DROP — incoming fire rebounds.');
+        case _FuturePickupKind.caseFile:
+          recordsRecovered++;
+          score += 240;
+          _flash(
+            'CASE FILE RECOVERED — $recordsRecovered / ${_plan.objectiveTarget} sealed records.',
+          );
       }
       _burst(
         pickup.position,
@@ -898,6 +1116,7 @@ class _FutureDebtGame {
       final origin = player;
       player = destination;
       portalCooldown = .8;
+      invulnerable = math.max(invulnerable, .35);
       screenShake = math.max(screenShake, 6);
       _burst(origin, 18, _FutureParticleType.portal);
       _burst(destination, 24, _FutureParticleType.portal);
@@ -908,25 +1127,31 @@ class _FutureDebtGame {
   }
 
   void _openLevelExitIfReady() {
-    final campaign = _campaign;
-    if (campaign == null || levelExitOpen || levelExitReached) return;
-    if (score < FutureDebtRules.campaignTargetScore(campaign.targetScore)) {
-      return;
-    }
+    if (_campaign == null || levelExitOpen || levelExitReached) return;
+    if (score < scoreTarget || !objectiveComplete || hasOutstandingDebt) return;
     final position = _exitPortalPosition();
     levelExit = _FutureLevelExit(position);
     screenShake = math.max(screenShake, 8);
     _burst(position, 32, _FutureParticleType.gold);
-    _flash('OBJECTIVE MET — no new claimants. Enter the NEXT LEVEL GATE.');
+    _flash('CASE CLOSED — no contracts remain. Enter the NEXT LEVEL GATE.');
     GameFeedback.heavyImpact();
   }
 
   Offset _exitPortalPosition() {
+    final anchor = _plan.exitAnchor;
+    if (!_pointInWall(anchor, _FutureLevelExit.portalRadius + 5) &&
+        !portals.any(
+          (portal) =>
+              (anchor - portal.position).distance <
+              portal.radius + _FutureLevelExit.portalRadius + 56,
+        )) {
+      return anchor;
+    }
     for (var attempt = 0; attempt < 32; attempt++) {
       final angle = _random.nextDouble() * math.pi * 2;
       final distance = 150 + _random.nextDouble() * 130;
       final candidate = _clampWorld(
-        player + Offset(math.cos(angle), math.sin(angle)) * distance,
+        anchor + Offset(math.cos(angle), math.sin(angle)) * distance,
         _FutureLevelExit.portalRadius,
       );
       if (_pointInWall(candidate, _FutureLevelExit.portalRadius + 5) ||
@@ -939,7 +1164,7 @@ class _FutureDebtGame {
       }
       return candidate;
     }
-    return _randomOpenPoint(player, minimumDistance: 120) ?? player;
+    return _randomOpenPoint(anchor, minimumDistance: 120) ?? anchor;
   }
 
   void _updateLevelExit(double dt) {
@@ -975,8 +1200,9 @@ class _FutureDebtGame {
     }
     if (target.health <= 0) {
       score += 2800;
-      lifetime += 6;
+      _grantLifetime(6);
       collector = null;
+      collectorSettled = true;
       _flash('COLLECTOR PAID OFF — +2800 and +6s lifetime.');
       GameFeedback.mediumImpact();
     }
@@ -994,7 +1220,6 @@ class _FutureDebtGame {
     if (echo.health > 0) return;
     score += echo.type == _FutureEchoType.claim ? 1000 : 350;
     if (echo.type == _FutureEchoType.claim) {
-      lifetime += 2;
       _flash(
         'MATURITY CLAIM DESTROYED — escaped the big payment and recovered +2s.',
       );
@@ -1006,17 +1231,31 @@ class _FutureDebtGame {
           ? _FutureParticleType.gold
           : _FutureParticleType.debt,
     );
+    _settleEcho(echo, recoveredClaim: echo.type == _FutureEchoType.claim);
+  }
+
+  void _settleEcho(_FutureEcho echo, {bool recoveredClaim = false}) {
+    if (echo.dead) return;
     echo.dead = true;
+    maturitiesSurvived++;
+    if (echo.type == _FutureEchoType.claim) {
+      locks[_DebtKind.life] = 0;
+      if (recoveredClaim) _grantLifetime(2);
+    }
   }
 
   void _killEnemy(_FutureEnemy enemy) {
     enemy.dead = true;
-    score += enemy.value;
-    lifetime += enemy.type == _FutureEnemyType.bailiff
-        ? 3.6
-        : enemy.type == _FutureEnemyType.interest
-        ? 2.4
-        : 1.2;
+    claimsDefeated++;
+    score += (enemy.value * _plan.rewardMultiplier).round();
+    _grantLifetime(
+      (enemy.type == _FutureEnemyType.bailiff
+              ? 3.6
+              : enemy.type == _FutureEnemyType.interest
+              ? 2.4
+              : 1.2) *
+          _plan.rewardMultiplier,
+    );
     _burst(
       enemy.position,
       enemy.type == _FutureEnemyType.bailiff ? 28 : 14,
@@ -1026,7 +1265,7 @@ class _FutureDebtGame {
     );
     _dropEnemyReward(enemy);
     if (enemy.type == _FutureEnemyType.interest && _random.nextDouble() < .35) {
-      pickups.add(_FuturePickup(enemy.position, _FuturePickupKind.writeoff, 0));
+      _addPickup(_FuturePickup(enemy.position, _FuturePickupKind.writeoff, 0));
     }
   }
 
@@ -1044,7 +1283,7 @@ class _FutureDebtGame {
       _FutureEnemyType.bailiff => .55,
     };
     if (_random.nextDouble() < lifeChance) {
-      pickups.add(
+      _addPickup(
         _FuturePickup(
           enemy.position + const Offset(10, 0),
           _FuturePickupKind.time,
@@ -1058,7 +1297,7 @@ class _FutureDebtGame {
         _FuturePickupKind.compound,
         _FuturePickupKind.reverse,
       ][_random.nextInt(3)];
-      pickups.add(
+      _addPickup(
         _FuturePickup(
           enemy.position + const Offset(-10, 0),
           power,
@@ -1078,6 +1317,7 @@ class _FutureDebtGame {
     );
     if (wall.health > 0) return;
     wall.health = 0;
+    wallsBreached++;
     screenShake = math.max(screenShake, 7);
     _burst(
       wall.bounds.center,
@@ -1086,7 +1326,7 @@ class _FutureDebtGame {
     );
     score += wall.secret ? 420 : 70;
     if (wall.secret || _random.nextDouble() < .22) {
-      pickups.add(
+      _addPickup(
         _FuturePickup(
           wall.bounds.center,
           wall.secret ? _FuturePickupKind.writeoff : _FuturePickupKind.time,
@@ -1097,7 +1337,7 @@ class _FutureDebtGame {
   }
 
   void _reverseShot(_FutureShot shot) {
-    shots.add(
+    _addPlayerShot(
       _FutureShot(
         shot.position,
         -shot.velocity * 1.45,
@@ -1107,6 +1347,13 @@ class _FutureDebtGame {
         charged: true,
       ),
     );
+    if (shot.type == _FutureShotType.audit ||
+        shot.type == _FutureShotType.echo) {
+      auditReturns++;
+      _flash(
+        'AUDIT RETURN POSTED — $auditReturns / ${_plan.objectiveTarget} shots returned.',
+      );
+    }
     invulnerable = .18;
     _burst(player, 10, _FutureParticleType.compound);
   }
@@ -1144,7 +1391,10 @@ class _FutureDebtGame {
       }
       echo.health -= reflectedDamage;
       _burst(echo.position, 10, _FutureParticleType.compound);
-      if (echo.health <= 0) echo.dead = true;
+      if (echo.health <= 0) {
+        score += echo.type == _FutureEchoType.claim ? 1000 : 350;
+        _settleEcho(echo, recoveredClaim: echo.type == _FutureEchoType.claim);
+      }
       return;
     }
     if (collector != null &&
@@ -1342,7 +1592,20 @@ class _FutureDebtGame {
             (portal) =>
                 (candidate - portal.position).distance <
                 portal.radius + playerRadius + 64,
-          )) {
+          ) ||
+          enemies.any(
+            (enemy) =>
+                !enemy.dead &&
+                (candidate - enemy.position).distance < enemy.radius + 90,
+          ) ||
+          echoes.any(
+            (echo) =>
+                !echo.dead &&
+                (candidate - echo.position).distance < echo.radius + 90,
+          ) ||
+          (collector != null &&
+              (candidate - collector!.position).distance <
+                  collector!.radius + 120)) {
         continue;
       }
       return candidate;
@@ -1435,13 +1698,33 @@ class _FutureDebtGame {
         secret: true,
       );
     }
-    pickups.addAll([
+    for (final pickup in [
       _FuturePickup(const Offset(470, 480), _FuturePickupKind.time, 0),
       _FuturePickup(const Offset(1350, 420), _FuturePickupKind.time, 1),
       _FuturePickup(const Offset(2340, 1020), _FuturePickupKind.writeoff, 2),
       _FuturePickup(const Offset(810, 1600), _FuturePickupKind.time, 3),
       _FuturePickup(const Offset(1980, 1580), _FuturePickupKind.writeoff, 4),
-    ]);
+    ]) {
+      _addPickup(pickup);
+    }
+    if (_plan.objective == _FutureObjectiveKind.recoverRecords) {
+      const recordAnchors = [
+        Offset(720, 280),
+        Offset(1480, 530),
+        Offset(2290, 460),
+        Offset(520, 1070),
+        Offset(1740, 1510),
+      ];
+      for (var index = 0; index < _plan.objectiveTarget; index++) {
+        _addPickup(
+          _FuturePickup(
+            recordAnchors[index % recordAnchors.length],
+            _FuturePickupKind.caseFile,
+            10 + index.toDouble(),
+          ),
+        );
+      }
+    }
     _addCampaignGeometry();
     for (final position in const [
       Offset(290, 220),
@@ -1466,7 +1749,7 @@ class _FutureDebtGame {
     final random = math.Random(_layoutSeed);
     // Each campaign seed lays down a fresh set of destructible barricades
     // inside the rooms, instead of merely adding a few walls to one layout.
-    final targetWallCount = 8 + _campaignLevel ~/ 2;
+    final targetWallCount = 7 + _plan.act * 3 + _campaignLevel ~/ 3;
     var placed = 0;
     var attempts = 0;
     while (placed < targetWallCount && attempts < targetWallCount * 28) {
@@ -1512,7 +1795,8 @@ class _FutureDebtGame {
         130 + random.nextDouble() * (worldWidth - 260),
         130 + random.nextDouble() * (worldHeight - 260),
       );
-      pickups.add(
+      if (_pointInWall(point, 12)) continue;
+      _addPickup(
         _FuturePickup(
           point,
           index.isEven ? _FuturePickupKind.time : _FuturePickupKind.writeoff,

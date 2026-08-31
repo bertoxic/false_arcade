@@ -30,9 +30,11 @@ class _FuturePainter extends CustomPainter {
               ),
             ),
     );
+    // I derive camera shake from time so painting never consumes gameplay RNG
+    // and a replay keeps the same combat sequence on every frame rate.
     final shake = Offset(
-      (game._random.nextDouble() - .5) * game.screenShake,
-      (game._random.nextDouble() - .5) * game.screenShake,
+      math.sin(game.time * 71.3) * game.screenShake * .5,
+      math.cos(game.time * 89.7) * game.screenShake * .5,
     );
     canvas.save();
     canvas.translate(-game.camera.dx + shake.dx, -game.camera.dy + shake.dy);
@@ -98,16 +100,18 @@ class _FuturePainter extends CustomPainter {
       if (wall.health > 0 && wall.bounds.overlaps(visible)) _wall(canvas, wall);
     }
     for (final portal in game.portals) {
-      if (visible.inflate(48).contains(portal.position))
+      if (visible.inflate(48).contains(portal.position)) {
         _portal(canvas, portal);
+      }
     }
     if (game.levelExit != null &&
         visible.inflate(60).contains(game.levelExit!.position)) {
       _levelExit(canvas, game.levelExit!);
     }
     for (final pickup in game.pickups) {
-      if (visible.inflate(30).contains(pickup.position))
+      if (visible.inflate(30).contains(pickup.position)) {
         _pickup(canvas, pickup);
+      }
     }
     for (final particle in game.particles) {
       if (!visible.contains(particle.position)) continue;
@@ -450,6 +454,7 @@ class _FuturePainter extends CustomPainter {
       _FuturePickupKind.ghost => const Color(0xFF70F5FF),
       _FuturePickupKind.compound => const Color(0xFFFF70B3),
       _FuturePickupKind.reverse => const Color(0xFFC995FF),
+      _FuturePickupKind.caseFile => const Color(0xFFF2E3B3),
     };
     final mark = switch (pickup.kind) {
       _FuturePickupKind.time => '+',
@@ -457,6 +462,7 @@ class _FuturePainter extends CustomPainter {
       _FuturePickupKind.ghost => 'G',
       _FuturePickupKind.compound => 'F',
       _FuturePickupKind.reverse => 'R',
+      _FuturePickupKind.caseFile => '▣',
     };
     canvas.save();
     canvas.translate(pickup.position.dx, pickup.position.dy);
@@ -919,108 +925,13 @@ class _FuturePainter extends CustomPainter {
     final pulse = (math.sin(game.time * 7 + enemy.position.dx * .018) + 1) / 2;
     switch (enemy.type) {
       case _FutureEnemyType.hound:
-        canvas.drawCircle(
-          const Offset(-14, 0),
-          8 + pulse * 5,
-          Paint()..color = const Color(0xFFFF587D).withValues(alpha: .14),
-        );
-        final shape = Path()
-          ..moveTo(18, 0)
-          ..lineTo(2, -12)
-          ..lineTo(-15, -8)
-          ..lineTo(-8, 0)
-          ..lineTo(-15, 8)
-          ..lineTo(2, 12)
-          ..close();
-        canvas.drawPath(shape, Paint()..color = const Color(0xFFDF4465));
-        canvas.drawPath(
-          shape,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2
-            ..color = const Color(0xFFFF8AA1),
-        );
-        canvas.drawRect(
-          const Rect.fromLTWH(6, -2, 5, 4),
-          Paint()..color = const Color(0xFFFFF0F3),
-        );
+        _drawHound(canvas, pulse);
       case _FutureEnemyType.auditor:
-        canvas.save();
-        canvas.rotate(game.time * 1.7 + enemy.position.dy * .01);
-        canvas.drawOval(
-          Rect.fromCenter(center: Offset.zero, width: 34, height: 22),
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 3
-            ..color = const Color(0xFFBA83FF),
-        );
-        canvas.drawLine(
-          const Offset(-21, 0),
-          const Offset(21, 0),
-          Paint()
-            ..color = const Color(0xFFD9B6FF).withValues(alpha: .72)
-            ..strokeWidth = 1.4,
-        );
-        canvas.restore();
-        canvas.drawCircle(
-          Offset.zero,
-          5,
-          Paint()..color = const Color(0xFFBA83FF),
-        );
+        _drawAuditor(canvas, pulse);
       case _FutureEnemyType.interest:
-        final gear = Path();
-        for (var index = 0; index < 12; index++) {
-          final angle = index * math.pi / 6;
-          final point =
-              Offset(math.cos(angle), math.sin(angle)) *
-              (index.isEven ? 17 : 8);
-          if (index == 0) {
-            gear.moveTo(point.dx, point.dy);
-          } else {
-            gear.lineTo(point.dx, point.dy);
-          }
-        }
-        gear.close();
-        canvas.save();
-        canvas.rotate(-game.time * 2.2 - enemy.position.dx * .01);
-        canvas.drawPath(
-          gear,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 3
-            ..color = const Color(0xFFFFD36A),
-        );
-        canvas.restore();
-        _text(
-          canvas,
-          '%',
-          const Offset(0, 4),
-          12,
-          const Color(0xFFFFD36A),
-          center: true,
-          bold: true,
-        );
+        _drawInterestLeech(canvas, pulse);
       case _FutureEnemyType.bailiff:
-        canvas.drawCircle(
-          Offset.zero,
-          24 + pulse * 5,
-          Paint()..color = const Color(0xFFFF587D).withValues(alpha: .12),
-        );
-        canvas.drawRect(
-          const Rect.fromLTWH(-18, -15, 36, 30),
-          Paint()..color = const Color(0xFF772F45),
-        );
-        canvas.drawRect(
-          const Rect.fromLTWH(-18, -15, 36, 30),
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 3
-            ..color = const Color(0xFFFF6A8C),
-        );
-        canvas.drawRect(
-          const Rect.fromLTWH(3, -6, 26, 12),
-          Paint()..color = const Color(0xFF18111A),
-        );
+        _drawBailiff(canvas, pulse);
     }
     canvas.restore();
     if (enemy.health < enemy.maxHealth) {
@@ -1045,6 +956,391 @@ class _FuturePainter extends CustomPainter {
     }
   }
 
+  void _drawHound(Canvas canvas, double pulse) {
+    const flesh = Color(0xFF8E334A);
+    const rim = Color(0xFFFF8AA1);
+    final gait = math.sin(game.time * 12.5);
+    final spring = gait.abs();
+    final jawOpen = math
+        .pow(math.max(0.0, math.sin(game.time * 4.7)), 5)
+        .toDouble();
+    canvas.save();
+    canvas.translate(0, -spring * 2.4);
+    canvas.scale(1 + spring * .07, 1 - spring * .045);
+    final limb = Paint()
+      ..color = const Color(0xFFC34B68)
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+    for (var index = 0; index < 4; index++) {
+      final y = -11 + index * 7.3;
+      final side = index.isEven ? 1.0 : -1.0;
+      final kick = math.sin(game.time * 12.5 + index * math.pi * .72) * 7;
+      final leg = Path()
+        ..moveTo(-4, y)
+        ..cubicTo(-10, y + kick * .35, -17, y - kick, -25, y + kick * .4)
+        ..quadraticBezierTo(-29, y + kick * .55, -32, y + side * 2.2);
+      canvas.drawPath(leg, limb);
+    }
+    final tailWhip = math.sin(game.time * 8.5) * 7;
+    for (var index = 0; index < 4; index++) {
+      canvas.drawCircle(
+        Offset(
+          -16 - index * 6.4,
+          tailWhip * (index / 4) + math.sin(game.time * 7 + index) * 1.5,
+        ),
+        (7.2 - index * 1.25).toDouble(),
+        Paint()..color = flesh.withValues(alpha: .52 + index * .1),
+      );
+    }
+    final body = Path()
+      ..moveTo(-18, 0)
+      ..cubicTo(-14, -15, 8, -17, 18, -6)
+      ..cubicTo(25, 0, 20, 9 + pulse * 2, 10, 12)
+      ..cubicTo(-2, 16, -18, 10, -18, 0)
+      ..close();
+    canvas.drawPath(body, Paint()..color = flesh);
+    canvas.drawPath(
+      body,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2
+        ..color = rim,
+    );
+    canvas.drawOval(
+      const Rect.fromLTWH(-7, -11, 15, 22),
+      Paint()..color = const Color(0xFF632638),
+    );
+    final bristle = Paint()
+      ..color = const Color(0xFFFFA0B4)
+      ..strokeWidth = 1.8
+      ..strokeCap = StrokeCap.round;
+    for (var index = 0; index < 4; index++) {
+      final x = -8 + index * 6.0;
+      final shiver = math.sin(game.time * 17 + index) * 1.5;
+      canvas.drawLine(Offset(x, -13), Offset(x - 2, -19 - shiver), bristle);
+    }
+    for (final y in [-5.0, 0.0, 5.0]) {
+      _eye(canvas, Offset(14, y), const Color(0xFFFFF0D1), radius: 2.1);
+    }
+    final upperJaw = Path()
+      ..moveTo(18, -5)
+      ..quadraticBezierTo(29, -3 - jawOpen * 2, 19, -jawOpen * 1.2);
+    final lowerJaw = Path()
+      ..moveTo(19, jawOpen * 1.2)
+      ..quadraticBezierTo(29, 3 + jawOpen * 2, 18, 5);
+    canvas.drawPath(
+      upperJaw,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = const Color(0xFFFFD2D9),
+    );
+    canvas.drawPath(
+      lowerJaw,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = const Color(0xFFFFD2D9),
+    );
+    if (jawOpen > .12) {
+      canvas.drawCircle(
+        Offset(25, 0),
+        1.4 + jawOpen,
+        Paint()..color = const Color(0xFFFFF1C6),
+      );
+    }
+    canvas.restore();
+  }
+
+  void _drawAuditor(Canvas canvas, double pulse) {
+    const ectoplasm = Color(0xFF8F6AD0);
+    final hover = math.sin(game.time * 2.35) * 4;
+    final breathe = math.sin(game.time * 3.1) * 1.8;
+    final blink = math
+        .pow(math.max(0.0, math.sin(game.time * 1.15 - 1.05)), 18)
+        .toDouble();
+    canvas.save();
+    canvas.translate(0, hover);
+    final tentacle = Paint()
+      ..color = const Color(0xFFD7C1FF).withValues(alpha: .68)
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+    for (var index = 0; index < 5; index++) {
+      final origin = Offset(-10 + index * 5.0, 6);
+      final wave = math.sin(game.time * 5 + index * 1.7) * 8;
+      final strand = Path()
+        ..moveTo(origin.dx, origin.dy)
+        ..cubicTo(
+          -15 + index * 6,
+          15 + wave,
+          -20 + index * 8 + math.sin(game.time * 3.4 + index) * 4,
+          20 - wave,
+          -12 + index * 7 + math.sin(game.time * 4 + index) * 3,
+          27 + math.cos(game.time * 3 + index) * 3,
+        );
+      canvas.drawPath(strand, tentacle);
+    }
+    final domeRect = Rect.fromCenter(
+      center: const Offset(0, -3),
+      width: 31 - breathe * .5,
+      height: 25 + pulse * 2 + breathe,
+    );
+    canvas.drawOval(
+      domeRect,
+      Paint()..color = ectoplasm.withValues(alpha: .76),
+    );
+    canvas.drawArc(
+      domeRect,
+      math.pi,
+      math.pi,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2
+        ..color = const Color(0xFFE2D5FF),
+    );
+    canvas.drawCircle(
+      Offset.zero,
+      8 + pulse * 1.5,
+      Paint()..color = const Color(0xFF43245E),
+    );
+    canvas.save();
+    canvas.translate(3, -1);
+    canvas.scale(1, math.max(.08, 1 - blink));
+    _eye(canvas, Offset.zero, const Color(0xFFFFE6B0), radius: 2.8);
+    canvas.restore();
+    final tagFlutter = math.sin(game.time * 9) * 3;
+    final tag = Path()
+      ..moveTo(-18, -5)
+      ..quadraticBezierTo(-24, -10 + tagFlutter, -29, -12)
+      ..lineTo(-34, -6 + tagFlutter * .4)
+      ..quadraticBezierTo(-29, -1 - tagFlutter, -25, 1)
+      ..close();
+    canvas.drawPath(
+      tag,
+      Paint()..color = const Color(0xFFF1DEC0).withValues(alpha: .72),
+    );
+    canvas.drawLine(
+      const Offset(-29, -7),
+      Offset(-25, -5 + tagFlutter * .25),
+      Paint()
+        ..color = const Color(0xFF7E628D).withValues(alpha: .7)
+        ..strokeWidth = 1,
+    );
+    canvas.restore();
+  }
+
+  void _drawInterestLeech(Canvas canvas, double pulse) {
+    const skin = Color(0xFF9B7043);
+    const bile = Color(0xFFFFD36A);
+    final writhe = math.sin(game.time * 4.2) * .09;
+    canvas.save();
+    canvas.rotate(writhe);
+    for (var index = 0; index < 5; index++) {
+      final contraction = (math.sin(game.time * 5.4 - index * 1.05) + 1) / 2;
+      final x = -17 + index * 7.6 + math.sin(game.time * 5 - index) * 1.3;
+      final y = math.sin(game.time * 4.3 - index * .8) * 2.1;
+      final segmentWidth = 12.5 + contraction * 3.3;
+      final segmentHeight = 15.5 + (1 - contraction) * 7;
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(x, y),
+          width: segmentWidth,
+          height: segmentHeight,
+        ),
+        Paint()..color = skin.withValues(alpha: .62 + index * .07),
+      );
+      canvas.drawArc(
+        Rect.fromCenter(
+          center: Offset(x, y),
+          width: segmentWidth,
+          height: segmentHeight,
+        ),
+        -.9,
+        1.8,
+        false,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5
+          ..color = bile.withValues(alpha: .58),
+      );
+    }
+    final feeler = Paint()
+      ..color = bile.withValues(alpha: .75)
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    for (final y in [-6.0, 6.0]) {
+      final curl = math.sin(game.time * 8 + y) * 6;
+      canvas.drawPath(
+        Path()
+          ..moveTo(5, y)
+          ..quadraticBezierTo(18, y + curl, 25, y * 1.6),
+        feeler,
+      );
+    }
+    final sucker = 2.2 + pulse * 3.2;
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: const Offset(17, 0),
+        width: 13 + pulse * 3,
+        height: 13 + pulse * 3,
+      ),
+      Paint()..color = const Color(0xFF381D20),
+    );
+    canvas.drawCircle(
+      const Offset(18, 0),
+      sucker,
+      Paint()..color = bile.withValues(alpha: .9),
+    );
+    canvas.drawCircle(
+      const Offset(18, 0),
+      sucker * .45,
+      Paint()..color = const Color(0xFF3A1E1B),
+    );
+    for (var index = 0; index < 3; index++) {
+      final drift = (game.time * 18 + index * 11) % 28;
+      canvas.drawCircle(
+        Offset(10 - drift, -10 - index * 3 + math.sin(game.time * 4 + index)),
+        1.3 + index * .35,
+        Paint()..color = bile.withValues(alpha: .42 - index * .08),
+      );
+    }
+    canvas.restore();
+  }
+
+  void _drawBailiff(Canvas canvas, double pulse) {
+    const hide = Color(0xFF6D2E43);
+    const rim = Color(0xFFFF7D98);
+    final lumber = math.sin(game.time * 2.7);
+    final stomp = math
+        .pow(math.max(0.0, math.sin(game.time * 2.7)), 8)
+        .toDouble();
+    canvas.save();
+    canvas.translate(0, stomp * 3);
+    canvas.rotate(lumber * .055);
+    final limb = Paint()
+      ..color = const Color(0xFFB44864)
+      ..strokeWidth = 4.2
+      ..strokeCap = StrokeCap.round;
+    for (var index = 0; index < 4; index++) {
+      final y = -15 + index * 10.0;
+      final bend = math.sin(game.time * 5 + index) * 6;
+      canvas.drawPath(
+        Path()
+          ..moveTo(-8, y)
+          ..cubicTo(-22, y + bend, -27, y - bend, -35, y + bend * .3)
+          ..quadraticBezierTo(-39, y + bend * .2, -41, y),
+        limb,
+      );
+    }
+    canvas.drawCircle(
+      const Offset(-10, 0),
+      23 + pulse * 2,
+      Paint()..color = const Color(0xFFFF587D).withValues(alpha: .16),
+    );
+    final body = Path()
+      ..moveTo(-22, 0)
+      ..cubicTo(-19, -25, 5, -29, 23, -14)
+      ..cubicTo(34, -4, 30, 17, 14, 22)
+      ..cubicTo(-4, 28, -25, 18, -22, 0)
+      ..close();
+    canvas.drawPath(body, Paint()..color = hide);
+    canvas.drawPath(
+      body,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..color = rim,
+    );
+    for (final side in [-1.0, 1.0]) {
+      final sacPulse = math.sin(game.time * 3.4 + side * 1.7) * 1.8;
+      canvas.drawCircle(
+        Offset(-5, side * 16),
+        10 + sacPulse,
+        Paint()..color = const Color(0xFF8F4057),
+      );
+      canvas.drawArc(
+        Rect.fromCircle(center: Offset(-5, side * 16), radius: 7 + sacPulse),
+        -.8,
+        1.6,
+        false,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.4
+          ..color = const Color(0xFFFF9AAF).withValues(alpha: .48),
+      );
+    }
+    final arm = Path()
+      ..moveTo(7, -13)
+      ..cubicTo(16, -24, 29, -30 - lumber * 4, 35, -20)
+      ..quadraticBezierTo(39, -14, 34, -9);
+    canvas.drawPath(
+      arm,
+      Paint()
+        ..color = const Color(0xFFB44864)
+        ..strokeWidth = 7
+        ..strokeCap = StrokeCap.round,
+    );
+    for (var index = 0; index < 3; index++) {
+      final clawY = -13 + index * 4.0;
+      canvas.drawPath(
+        Path()
+          ..moveTo(34, -10)
+          ..quadraticBezierTo(43, clawY - 4, 46, clawY),
+        Paint()
+          ..color = const Color(0xFFF5B6C4)
+          ..strokeWidth = 2.2
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+    final mask = RRect.fromRectAndRadius(
+      const Rect.fromLTWH(7, -12, 23, 24),
+      const Radius.elliptical(12, 14),
+    );
+    canvas.drawRRect(mask, Paint()..color = const Color(0xFF241621));
+    canvas.drawRRect(
+      mask,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = const Color(0xFFF1B1C2),
+    );
+    for (final y in [-6.0, 0.0, 6.0]) {
+      _eye(canvas, Offset(20, y), const Color(0xFFFFE1A4), radius: 2.3);
+    }
+    if (stomp > .05) {
+      canvas.drawArc(
+        Rect.fromCenter(
+          center: const Offset(-10, 28),
+          width: 48 + stomp * 20,
+          height: 10 + stomp * 5,
+        ),
+        0,
+        math.pi,
+        false,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..color = rim.withValues(alpha: stomp * .5),
+      );
+    }
+    canvas.restore();
+  }
+
+  void _eye(Canvas canvas, Offset position, Color color, {double radius = 2}) {
+    canvas.drawCircle(
+      position,
+      radius * 1.9,
+      Paint()..color = color.withValues(alpha: .18),
+    );
+    canvas.drawCircle(position, radius, Paint()..color = color);
+    canvas.drawCircle(
+      position + const Offset(.6, 0),
+      radius * .35,
+      Paint()..color = const Color(0xFF180D16),
+    );
+  }
+
   void _echo(Canvas canvas, _FutureEcho echo) {
     canvas.save();
     canvas.translate(echo.position.dx, echo.position.dy);
@@ -1057,34 +1353,57 @@ class _FuturePainter extends CustomPainter {
           ),
         );
         final runner = Path()
-          ..moveTo(17, 0)
-          ..lineTo(-8, -10)
-          ..lineTo(-3, 0)
-          ..lineTo(-8, 10)
+          ..moveTo(-16, 0)
+          ..cubicTo(-8, -15, 12, -14, 18, -3)
+          ..cubicTo(23, 5, 9, 13, -5, 10)
+          ..cubicTo(-15, 8, -20, 4, -16, 0)
           ..close();
+        canvas.drawPath(
+          runner,
+          Paint()..color = const Color(0xFF58E8FF).withValues(alpha: .2),
+        );
         canvas.drawPath(
           runner,
           Paint()
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 3
-            ..color = const Color(0xFF58E8FF).withValues(alpha: .72),
+            ..strokeWidth = 2.5
+            ..color = const Color(0xFF9CEFFF).withValues(alpha: .8),
         );
+        for (final y in [-6.0, 0.0, 6.0]) {
+          canvas.drawLine(
+            const Offset(-5, 0) + Offset(0, y),
+            Offset(-18, y + math.sin(game.time * 8 + y) * 3),
+            Paint()
+              ..color = const Color(0xFF58E8FF).withValues(alpha: .65)
+              ..strokeWidth = 2,
+          );
+        }
+        _eye(canvas, const Offset(13, 0), const Color(0xFFE4FCFF), radius: 2);
       case _FutureEchoType.auditor:
-        canvas.drawCircle(
-          Offset.zero,
-          15,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 3
-            ..color = const Color(0xFFFF587D).withValues(alpha: .72),
+        canvas.drawOval(
+          Rect.fromCenter(center: const Offset(0, -3), width: 29, height: 22),
+          Paint()..color = const Color(0xFFFF587D).withValues(alpha: .17),
         );
-        canvas.drawLine(
-          const Offset(-20, 0),
-          const Offset(20, 0),
-          Paint()
-            ..color = const Color(0xFFFF587D).withValues(alpha: .72)
-            ..strokeWidth = 3,
-        );
+        for (var index = 0; index < 4; index++) {
+          final x = -8 + index * 5.0;
+          canvas.drawPath(
+            Path()
+              ..moveTo(x, 6)
+              ..cubicTo(
+                x - 10,
+                17,
+                x + 10,
+                20,
+                x + math.sin(game.time * 5 + index) * 6,
+                27,
+              ),
+            Paint()
+              ..color = const Color(0xFFFF90B4).withValues(alpha: .72)
+              ..strokeWidth = 2.2
+              ..strokeCap = StrokeCap.round,
+          );
+        }
+        _eye(canvas, const Offset(2, -2), const Color(0xFFFFE2EC), radius: 3);
       case _FutureEchoType.anchor:
         canvas.drawCircle(
           Offset.zero,
@@ -1099,28 +1418,50 @@ class _FuturePainter extends CustomPainter {
           echo.radius,
           Paint()..color = const Color(0xFFBA83FF).withValues(alpha: .12),
         );
-        canvas.drawRect(
-          const Rect.fromLTWH(-6, -16, 12, 32),
-          Paint()..color = const Color(0xFFBA83FF).withValues(alpha: .72),
+        final knot = Path()
+          ..moveTo(-14, 0)
+          ..cubicTo(-12, -15, 12, -18, 16, -2)
+          ..cubicTo(18, 12, -6, 20, -14, 7)
+          ..close();
+        canvas.drawPath(
+          knot,
+          Paint()..color = const Color(0xFFBA83FF).withValues(alpha: .45),
         );
-        canvas.drawRect(
-          const Rect.fromLTWH(-16, -6, 32, 12),
-          Paint()..color = const Color(0xFFBA83FF).withValues(alpha: .72),
-        );
+        for (var index = 0; index < 5; index++) {
+          final angle = index * math.pi * 2 / 5 + game.time * .7;
+          final start = Offset(math.cos(angle) * 9, math.sin(angle) * 9);
+          final end = Offset(math.cos(angle) * 25, math.sin(angle) * 25);
+          canvas.drawLine(
+            start,
+            end,
+            Paint()
+              ..color = const Color(0xFFDABEFF).withValues(alpha: .55)
+              ..strokeWidth = 2,
+          );
+        }
       case _FutureEchoType.claim:
-        canvas.rotate(game.time * 1.8);
-        canvas.drawRect(
-          const Rect.fromLTWH(-12, -12, 24, 24),
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 4
-            ..color = const Color(0xFFFFD36A),
+        canvas.rotate(math.sin(game.time * 3) * .18);
+        canvas.drawOval(
+          Rect.fromCenter(center: Offset.zero, width: 25, height: 18),
+          Paint()..color = const Color(0xFFB38337).withValues(alpha: .72),
         );
-        final gold = Paint()
-          ..color = const Color(0xFFFFD36A)
-          ..strokeWidth = 4;
-        canvas.drawLine(const Offset(-18, 0), const Offset(18, 0), gold);
-        canvas.drawLine(const Offset(0, -18), const Offset(0, 18), gold);
+        for (var index = 0; index < 5; index++) {
+          final angle = index * math.pi * 2 / 5 + game.time * .9;
+          canvas.drawLine(
+            Offset(math.cos(angle) * 7, math.sin(angle) * 7),
+            Offset(math.cos(angle) * 21, math.sin(angle) * 21),
+            Paint()
+              ..color = const Color(0xFFFFD36A).withValues(alpha: .8)
+              ..strokeWidth = 2.5
+              ..strokeCap = StrokeCap.round,
+          );
+        }
+        canvas.drawCircle(
+          Offset.zero,
+          5,
+          Paint()..color = const Color(0xFF372118),
+        );
+        _eye(canvas, const Offset(2, 0), const Color(0xFFFFF1BF), radius: 2);
     }
     canvas.restore();
   }
@@ -1128,31 +1469,104 @@ class _FuturePainter extends CustomPainter {
   void _collector(Canvas canvas, _FutureCollector collector) {
     canvas.save();
     canvas.translate(collector.position.dx, collector.position.dy);
-    canvas.rotate(game.time * .55);
-    final gear = Path();
-    for (var index = 0; index < 12; index++) {
-      final angle = index * math.pi / 6;
-      final point =
-          Offset(math.cos(angle), math.sin(angle)) * (index.isEven ? 31 : 20);
-      if (index == 0) {
-        gear.moveTo(point.dx, point.dy);
-      } else {
-        gear.lineTo(point.dx, point.dy);
-      }
+    final facing = math.atan2(
+      game.player.dy - collector.position.dy,
+      game.player.dx - collector.position.dx,
+    );
+    final breathe = math.sin(game.time * 2.1);
+    final contract = (breathe + 1) / 2;
+    canvas.rotate(facing + math.sin(game.time * 1.7) * .055);
+    final limb = Paint()
+      ..color = const Color(0xFFB787E8)
+      ..strokeWidth = 4.5
+      ..strokeCap = StrokeCap.round;
+    for (var index = 0; index < 7; index++) {
+      final baseAngle = index * math.pi * 2 / 7;
+      final sweep = math.sin(game.time * 2.4 + index * 1.27) * .28;
+      final angle = baseAngle + sweep;
+      final base = Offset(math.cos(angle) * 13, math.sin(angle) * 13);
+      final reach = 39 + math.sin(game.time * 3.1 + index * 1.6) * 6;
+      final tipAngle = angle + math.sin(game.time * 2.8 + index) * .18;
+      final tip = Offset(
+        math.cos(tipAngle) * reach,
+        math.sin(tipAngle) * reach,
+      );
+      canvas.drawPath(
+        Path()
+          ..moveTo(base.dx, base.dy)
+          ..cubicTo(
+            math.cos(angle + .5) * 24,
+            math.sin(angle + .5) * 24,
+            math.cos(tipAngle - .45) * 34,
+            math.sin(tipAngle - .45) * 34,
+            tip.dx,
+            tip.dy,
+          ),
+        limb,
+      );
+      canvas.drawCircle(
+        tip,
+        2.4 + contract * 1.3,
+        Paint()..color = const Color(0xFFE5C9FF).withValues(alpha: .7),
+      );
     }
-    gear.close();
+    canvas.save();
+    canvas.scale(1 + contract * .045, 1 - contract * .025);
+    final carcass = Path()
+      ..moveTo(-26, 0)
+      ..cubicTo(-19, -29, 13, -32, 29, -10)
+      ..cubicTo(39, 9, 16, 31, -9, 26)
+      ..cubicTo(-29, 22, -36, 8, -26, 0)
+      ..close();
+    canvas.drawPath(carcass, Paint()..color = const Color(0xFF48265F));
     canvas.drawPath(
-      gear,
+      carcass,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 4
-        ..color = const Color(0xFFC995FF),
+        ..strokeWidth = 3.5
+        ..color = const Color(0xFFD4B1FF),
     );
-    canvas.rotate(-game.time * 1.1);
-    canvas.drawRect(
-      Rect.fromCenter(center: Offset.zero, width: 14, height: 14),
-      Paint()..color = const Color(0xFFC995FF),
+    canvas.drawOval(
+      const Rect.fromLTWH(4, -16, 25, 32),
+      Paint()..color = const Color(0xFF180D22),
     );
+    for (var index = 0; index < 4; index++) {
+      final y = -9.0 + index * 6;
+      final blink = math
+          .pow(
+            math.max(0.0, math.sin(game.time * 1.35 + index * 1.8 - 1.1)),
+            20,
+          )
+          .toDouble();
+      canvas.save();
+      canvas.translate(20, y);
+      canvas.scale(1, math.max(.08, 1 - blink));
+      _eye(canvas, Offset.zero, const Color(0xFFFFE7A8), radius: 2.5);
+      canvas.restore();
+    }
+    for (final y in [-13.0, 13.0]) {
+      final gill = Path()
+        ..moveTo(-6, y)
+        ..quadraticBezierTo(-13 - contract * 3, y * .8, -17, y * .55);
+      canvas.drawPath(
+        gill,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..strokeCap = StrokeCap.round
+          ..color = const Color(0xFFE1B7FF).withValues(alpha: .7),
+      );
+    }
+    final mawWidth = 7 + contract * 4;
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: const Offset(29, 0),
+        width: mawWidth,
+        height: 13 - contract * 3,
+      ),
+      Paint()..color = const Color(0xFF100815),
+    );
+    canvas.restore();
     canvas.restore();
     final bar = Rect.fromCenter(
       center: collector.position + const Offset(0, -42),
@@ -1266,7 +1680,7 @@ class _FuturePainter extends CustomPainter {
     if (seized.isNotEmpty) {
       _text(
         canvas,
-        'SEIZED: ' + seized.join(' / '),
+        'SEIZED: ${seized.join(' / ')}',
         const Offset(_FutureDebtGame.width / 2, 30),
         17,
         const Color(0xFFFF6C86),
@@ -1288,10 +1702,7 @@ class _FuturePainter extends CustomPainter {
     final zone = game.currentZone;
     _text(
       canvas,
-      (zone?.name ?? 'BETWEEN ACCOUNTS') +
-          '  •  ' +
-          game.enemies.length.toString() +
-          ' CLAIMANTS',
+      '${zone?.name ?? 'BETWEEN ACCOUNTS'}  •  ${game.enemies.length} CLAIMANTS',
       const Offset(16, _FutureDebtGame.height - 16),
       12,
       const Color(0xFF93A0BB),
