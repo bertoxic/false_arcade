@@ -44,7 +44,7 @@ class _EdgeLoadPainter extends CustomPainter {
     _drawWalls(canvas);
     _drawCovers(canvas);
     _drawCoins(canvas);
-    for (final guard in game.guards)
+    for (final guard in game.guards) {
       _drawPerson(
         canvas,
         guard.position,
@@ -53,6 +53,7 @@ class _EdgeLoadPainter extends CustomPainter {
         guard.moveAmount,
         guard: guard,
       );
+    }
     _drawPerson(
       canvas,
       game.player.position,
@@ -72,7 +73,9 @@ class _EdgeLoadPainter extends CustomPainter {
             ? const Color(0xFF6ED8FF)
             : const Color(0xBFF3BD58),
     );
-    for (var i = 0; i < game.cargoCount; i++) _drawCargoTag(canvas, v, i);
+    for (var i = 0; i < game.cargoCount; i++) {
+      _drawCargoTag(canvas, v, i);
+    }
   }
 
   void _drawGround(Canvas canvas, Rect visible) {
@@ -88,8 +91,9 @@ class _EdgeLoadPainter extends CustomPainter {
         y < visible.bottom + 64;
         y += 64
       ) {
-        if (((x / 64 + y / 64).floor() & 2) == 0)
+        if (((x / 64 + y / 64).floor() & 2) == 0) {
           canvas.drawRect(Rect.fromLTWH(x, y, 64, 64), checker);
+        }
       }
     }
   }
@@ -123,14 +127,16 @@ class _EdgeLoadPainter extends CustomPainter {
     final grid = Paint()
       ..color = const Color(0xFF7390B5).withValues(alpha: .05)
       ..strokeWidth = 1;
-    for (double x = 0; x <= _MansionGame.mansionWidth; x += 32)
+    for (double x = 0; x <= _MansionGame.mansionWidth; x += 32) {
       canvas.drawLine(
         Offset(x, 0),
         Offset(x, _MansionGame.mansionHeight),
         grid,
       );
-    for (double y = 0; y <= _MansionGame.mansionHeight; y += 32)
+    }
+    for (double y = 0; y <= _MansionGame.mansionHeight; y += 32) {
       canvas.drawLine(Offset(0, y), Offset(_MansionGame.mansionWidth, y), grid);
+    }
     _drawWalls(canvas);
   }
 
@@ -266,6 +272,12 @@ class _EdgeLoadPainter extends CustomPainter {
     }
     if (!game.vaultTaken) {
       final scale = 1 + math.sin(game.time * 4) * .08;
+      // Radiant diamond flare
+      final diamondGlow = Paint()
+        ..color = const Color(0xFF7FE3FF).withValues(alpha: .28)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+      canvas.drawCircle(game.vault, 28 * scale, diamondGlow);
+
       final diamond = Path()
         ..moveTo(game.vault.dx, game.vault.dy - 17 * scale)
         ..lineTo(game.vault.dx + 13 * scale, game.vault.dy)
@@ -280,6 +292,16 @@ class _EdgeLoadPainter extends CustomPainter {
           ..strokeWidth = 2
           ..color = const Color(0xFFD8F8FF),
       );
+      // Sparkling cross rays
+      final sparkleAngle = game.time * 1.5;
+      for (var s = 0; s < 4; s++) {
+        final a = sparkleAngle + s * math.pi / 2;
+        canvas.drawLine(
+          game.vault + Offset(math.cos(a) * 6, math.sin(a) * 6),
+          game.vault + Offset(math.cos(a) * (20 * scale), math.sin(a) * (20 * scale)),
+          Paint()..color = const Color(0xFFE2F9FF).withValues(alpha: .75)..strokeWidth = 1.3,
+        );
+      }
       canvas.drawCircle(
         game.vault,
         35 + math.sin(game.time * 3) * 4,
@@ -292,12 +314,20 @@ class _EdgeLoadPainter extends CustomPainter {
       canvas.drawCircle(
         k.position,
         22 * pulse,
-        Paint()..color = const Color(0xFF86FFBE).withValues(alpha: .12),
+        Paint()..color = const Color(0xFF65F69F).withValues(alpha: .12),
       );
-      final r = Rect.fromCenter(center: k.position, width: 16, height: 16);
-      canvas.drawRect(r, Paint()..color = const Color(0xFF86FFBE));
-      canvas.drawRect(
-        r,
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: k.position, width: 22, height: 16),
+          const Radius.circular(4),
+        ),
+        Paint()..color = const Color(0xFF65F69F),
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: k.position, width: 22, height: 16),
+          const Radius.circular(4),
+        ),
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.5
@@ -335,19 +365,29 @@ class _EdgeLoadPainter extends CustomPainter {
       }
       path.close();
       final alert = g.state == _GuardState.alert;
+      final coneColor = alert ? const Color(0xFFFF4F5E) : const Color(0xFFFFCD69);
+      final visionShader = RadialGradient(
+        center: Alignment.center,
+        radius: 1.0,
+        colors: [
+          coneColor.withValues(alpha: alert ? .22 : .12),
+          coneColor.withValues(alpha: alert ? .08 : .04),
+          coneColor.withValues(alpha: .01),
+        ],
+        stops: const [0.0, 0.7, 1.0],
+      ).createShader(Rect.fromCircle(center: g.position, radius: vision));
+
       canvas.drawPath(
         path,
-        Paint()
-          ..color = (alert ? const Color(0xFFFF4F5E) : const Color(0xFFFFCD69))
-              .withValues(alpha: alert ? .14 : .055),
+        Paint()..shader = visionShader,
       );
       canvas.drawPath(
         path,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1
+          ..strokeWidth = 1.2
           ..color = (alert ? const Color(0xFFFF5F69) : const Color(0xFFFFDC82))
-              .withValues(alpha: .1),
+              .withValues(alpha: .22),
       );
     }
   }
@@ -398,7 +438,7 @@ class _EdgeLoadPainter extends CustomPainter {
               : const Color(0xFFB9C0CB));
     final bob = math.sin(walk).abs() * 1.7 * move,
         swing = math.sin(walk) * 6 * move;
-    if (alert)
+    if (alert) {
       canvas.drawCircle(
         at,
         18 + math.sin(game.time * 8 + at.dx) * 3,
@@ -407,6 +447,7 @@ class _EdgeLoadPainter extends CustomPainter {
           ..strokeWidth = 2
           ..color = const Color(0xFFFF4F5E).withValues(alpha: .55),
       );
+    }
     canvas.save();
     canvas.translate(at.dx, at.dy - bob);
     canvas.rotate(face);
@@ -430,15 +471,63 @@ class _EdgeLoadPainter extends CustomPainter {
       Rect.fromCenter(center: Offset.zero, width: 19, height: 15),
       Paint()..color = color,
     );
+
+    if (guard == null) {
+      // Tactical backpack harness
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: const Offset(-5, 0), width: 8, height: 11),
+          const Radius.circular(2),
+        ),
+        Paint()..color = const Color(0xFF131D28),
+      );
+    } else {
+      // Guard armored vest
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: const Offset(1, 0), width: 13, height: 11),
+          const Radius.circular(3),
+        ),
+        Paint()..color = const Color(0xFF161F2E),
+      );
+      // Handheld security flashlight
+      canvas.drawRect(
+        const Rect.fromLTWH(7, 6, 7, 3),
+        Paint()..color = const Color(0xFF354457),
+      );
+      canvas.drawCircle(
+        const Offset(14, 7.5),
+        2.2,
+        Paint()..color = const Color(0xFFFFF2C2),
+      );
+    }
+
+    // Head
     canvas.drawCircle(
       const Offset(9, 0),
       5.1,
       Paint()..color = const Color(0xFFD9C7B0),
     );
-    canvas.drawRect(
-      const Rect.fromLTWH(9, -4, 4, 8),
-      Paint()..color = const Color(0xFF0B0F15),
-    );
+
+    if (guard == null) {
+      // Operative night-vision dual sensor lenses
+      canvas.drawCircle(
+        const Offset(11, -2.2),
+        1.5,
+        Paint()..color = const Color(0xFF67FFD8),
+      );
+      canvas.drawCircle(
+        const Offset(11, 2.2),
+        1.5,
+        Paint()..color = const Color(0xFF67FFD8),
+      );
+    } else {
+      canvas.drawRect(
+        const Rect.fromLTWH(9, -4, 4, 8),
+        Paint()..color = const Color(0xFF0B0F15),
+      );
+    }
+
     if (advanced) {
       canvas.drawRect(
         const Rect.fromLTWH(-5, -7, 8, 14),
@@ -456,14 +545,15 @@ class _EdgeLoadPainter extends CustomPainter {
       final streak = Paint()
         ..color = const Color(0xFF72D6FF).withValues(alpha: .28)
         ..strokeWidth = 2;
-      for (var i = 0; i < 3; i++)
+      for (var i = 0; i < 3; i++) {
         canvas.drawLine(
           Offset(-12 - i * 6, -5 + i * 5),
           Offset(-25 - i * 8, -5 + i * 5),
           streak,
         );
+      }
     }
-    if (guard == null && game.player.disguise > 0)
+    if (guard == null && game.player.disguise > 0) {
       canvas.drawCircle(
         Offset.zero,
         15 + math.sin(game.time * 10) * 2,
@@ -472,8 +562,9 @@ class _EdgeLoadPainter extends CustomPainter {
           ..strokeWidth = 2
           ..color = const Color(0xFF86FFBE).withValues(alpha: .8),
       );
+    }
     canvas.restore();
-    if (guard != null && guard.state != _GuardState.patrol)
+    if (guard != null && guard.state != _GuardState.patrol) {
       paintGameText(
         canvas,
         guard.state == _GuardState.alert
@@ -487,6 +578,7 @@ class _EdgeLoadPainter extends CustomPainter {
         align: TextAlign.center,
         bold: true,
       );
+    }
   }
 
   void _drawPrompt(Canvas canvas) {
@@ -503,13 +595,14 @@ class _EdgeLoadPainter extends CustomPainter {
       text = 'STEAL DIAMOND';
       at = game.vault + const Offset(0, -36);
     }
-    if (text.isEmpty)
+    if (text.isEmpty) {
       for (final l in game.loot) {
         if (!l.taken && (l.position - p).distance < 50) {
           text = 'LOOT \$${l.value}';
           at = l.position + const Offset(0, -30);
         }
       }
+    }
     if (text.isEmpty && (game.exit - p).distance < 62) {
       text = game.extractionReady
           ? 'EXTRACT'
@@ -565,7 +658,7 @@ class _EdgeLoadPainter extends CustomPainter {
       ..color = index == 0 && game.vaultTaken
           ? const Color(0xFF72D6FF)
           : const Color(0xFFF3BD58);
-    if (side == 0)
+    if (side == 0) {
       canvas.drawRect(
         Rect.fromCenter(
           center: Offset(v.left + 16 + (v.width - 32) * t, v.top),
@@ -574,7 +667,8 @@ class _EdgeLoadPainter extends CustomPainter {
         ),
         paint,
       );
-    if (side == 1)
+    }
+    if (side == 1) {
       canvas.drawRect(
         Rect.fromCenter(
           center: Offset(v.right, v.top + 16 + (v.height - 32) * t),
@@ -583,7 +677,8 @@ class _EdgeLoadPainter extends CustomPainter {
         ),
         paint,
       );
-    if (side == 2)
+    }
+    if (side == 2) {
       canvas.drawRect(
         Rect.fromCenter(
           center: Offset(v.right - 16 - (v.width - 32) * t, v.bottom),
@@ -592,7 +687,8 @@ class _EdgeLoadPainter extends CustomPainter {
         ),
         paint,
       );
-    if (side == 3)
+    }
+    if (side == 3) {
       canvas.drawRect(
         Rect.fromCenter(
           center: Offset(v.left, v.bottom - 16 - (v.height - 32) * t),
@@ -601,6 +697,7 @@ class _EdgeLoadPainter extends CustomPainter {
         ),
         paint,
       );
+    }
   }
 
   void _drawHud(Canvas canvas) {
@@ -622,7 +719,7 @@ class _EdgeLoadPainter extends CustomPainter {
           (r.height - 4) / _MansionGame.mansionHeight,
         ),
         o = Offset(r.left + 2, r.top + 2);
-    for (final room in game.rooms)
+    for (final room in game.rooms) {
       canvas.drawRect(
         Rect.fromLTWH(
           o.dx + room.rect.left * s,
@@ -632,6 +729,7 @@ class _EdgeLoadPainter extends CustomPainter {
         ),
         Paint()..color = const Color(0xFF2C394D),
       );
+    }
     for (final g in game.guards) {
       if (g.state != _GuardState.patrol || g.advanced) {
         canvas.drawCircle(
@@ -649,11 +747,30 @@ class _EdgeLoadPainter extends CustomPainter {
       3,
       Paint()..color = Colors.white,
     );
-    if (!game.vaultTaken)
+    // Exit extraction portal on minimap
+    final exitPos = o + game.exit * s;
+    final exitColor = game.vaultTaken ? const Color(0xFF6EF0B7) : const Color(0xFFFFAA55);
+    final exitPulse = game.vaultTaken ? (math.sin(game.time * 8) * 1.2).abs() : 0.0;
+    canvas.drawCircle(
+      exitPos,
+      3.2 + exitPulse,
+      Paint()..color = exitColor,
+    );
+    canvas.drawCircle(
+      exitPos,
+      5.0 + exitPulse * 1.5,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0
+        ..color = exitColor.withValues(alpha: 0.7),
+    );
+
+    if (!game.vaultTaken) {
       canvas.drawRect(
         Rect.fromCenter(center: o + game.vault * s, width: 4, height: 4),
         Paint()..color = const Color(0xFF72D6FF),
       );
+    }
   }
 
   @override

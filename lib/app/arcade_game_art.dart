@@ -52,23 +52,47 @@ class _ArcadeGridFieldPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..strokeWidth = 1;
-    const step = 32.0;
-    for (var x = -step; x < size.width + step; x += step) {
-      paint.color = const Color(0xFF19404A).withValues(alpha: .23);
+    const step = 36.0;
+    for (var x = 0.0; x <= size.width; x += step) {
+      paint.color = const Color(0xFF133644).withValues(alpha: .28);
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
     }
-    for (var y = -step; y < size.height + step; y += step) {
-      paint.color = const Color(0xFF19404A).withValues(alpha: .21);
+    for (var y = 0.0; y <= size.height; y += step) {
+      paint.color = const Color(0xFF133644).withValues(alpha: .25);
       canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
     }
-    paint
+
+    // Glowing grid intersection crosses
+    final crossPaint = Paint()
+      ..color = const Color(0xFF48F2C1).withValues(alpha: .18)
+      ..strokeWidth = 1.2;
+    for (var x = step; x < size.width; x += step * 2) {
+      for (var y = step; y < size.height; y += step * 2) {
+        canvas.drawLine(Offset(x - 3, y), Offset(x + 3, y), crossPaint);
+        canvas.drawLine(Offset(x, y - 3), Offset(x, y + 3), crossPaint);
+      }
+    }
+
+    // Outer cybernetic border and corner brackets
+    final cornerPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..color = const Color(0xFF2DEAC6).withValues(alpha: .16);
-    canvas.drawRect(
-      Rect.fromLTWH(16, 16, size.width - 32, size.height - 32),
-      paint,
-    );
+      ..strokeWidth = 2.0
+      ..color = const Color(0xFF48F2C1).withValues(alpha: .32);
+
+    const cornerLen = 16.0;
+    const margin = 14.0;
+    // Top-left
+    canvas.drawLine(const Offset(margin, margin), const Offset(margin + cornerLen, margin), cornerPaint);
+    canvas.drawLine(const Offset(margin, margin), const Offset(margin, margin + cornerLen), cornerPaint);
+    // Top-right
+    canvas.drawLine(Offset(size.width - margin, margin), Offset(size.width - margin - cornerLen, margin), cornerPaint);
+    canvas.drawLine(Offset(size.width - margin, margin), Offset(size.width - margin, margin + cornerLen), cornerPaint);
+    // Bottom-left
+    canvas.drawLine(Offset(margin, size.height - margin), Offset(margin + cornerLen, size.height - margin), cornerPaint);
+    canvas.drawLine(Offset(margin, size.height - margin), Offset(margin, size.height - margin - cornerLen), cornerPaint);
+    // Bottom-right
+    canvas.drawLine(Offset(size.width - margin, size.height - margin), Offset(size.width - margin - cornerLen, size.height - margin), cornerPaint);
+    canvas.drawLine(Offset(size.width - margin, size.height - margin), Offset(size.width - margin, size.height - margin - cornerLen), cornerPaint);
   }
 
   @override

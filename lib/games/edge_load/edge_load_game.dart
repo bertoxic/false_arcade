@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/canvas_text.dart';
 import '../../core/game_feedback.dart';
+import '../../core/game_input.dart';
 import '../../core/game_loop.dart';
 import '../../core/level_campaign.dart';
 import '../../core/game_presentation.dart';

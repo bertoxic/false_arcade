@@ -659,8 +659,27 @@ class _FutureDebtGame {
     invulnerable = .3;
     dashCooldown = borrowed ? .12 : 1.15;
     if (borrowed) dashCharges--;
-    screenShake = 4;
-    _burst(player, 18, _FutureParticleType.dash);
+    screenShake = 6;
+    _burst(player, 22, _FutureParticleType.dash);
+
+    // KINETIC DISCHARGE: Dash shockwave destroys close enemy bullets and repels enemies
+    enemyShots.removeWhere((shot) {
+      final hit = (shot.position - player).distance < 64;
+      if (hit) _burst(shot.position, 6, _FutureParticleType.spark);
+      return hit;
+    });
+    for (final e in enemies) {
+      final delta = e.position - player;
+      final dist = delta.distance;
+      if (dist < 75 && dist > 0.01) {
+        final push = (delta / dist) * 120.0;
+        e.position = _clampWorld(e.position + push, e.radius);
+        e.health -= 0.6;
+        if (e.health <= 0) _killEnemy(e);
+        _burst(e.position, 8, _FutureParticleType.hit);
+      }
+    }
+    ArcadeShake.shake(0.3);
     GameFeedback.lightImpact();
   }
 

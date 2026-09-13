@@ -11,6 +11,7 @@ import '../../core/game_math.dart';
 import '../../core/game_presentation.dart';
 import '../../core/logical_viewport.dart';
 import '../../ui/game_controls.dart';
+import '../../ui/screen_shake.dart';
 
 part 'numberfall_page.dart';
 part 'numberfall_simulation.dart';

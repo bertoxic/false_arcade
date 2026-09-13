@@ -53,6 +53,16 @@ class _MansionGame {
   int get requiredLootCount => 3 + campaignLevel ~/ 4;
   bool get extractionReady =>
       vaultTaken && player.lootCount >= requiredLootCount;
+  String get objectiveReadout {
+    if (!vaultTaken) {
+      return 'DIAMOND 0/1 · LOOT ${player.lootCount}/$requiredLootCount';
+    }
+    if (player.lootCount < requiredLootCount) {
+      return 'DIAMOND SECURED · LOOT ${player.lootCount}/$requiredLootCount';
+    }
+    return 'EXTRACTION READY · RETURN TO ENTRY';
+  }
+
   double get cargoInset =>
       12 + math.min(92, player.lootCount * 9 + (vaultTaken ? 10 : 0));
   Rect get world => const Rect.fromLTWH(0, 0, mansionWidth, mansionHeight);
@@ -388,9 +398,13 @@ class _MansionGame {
       }
     }
     coins.removeWhere((coin) => coin.timer < -1.2);
-    for (final n in noises) n.life -= dt;
+    for (final n in noises) {
+      n.life -= dt;
+    }
     noises.removeWhere((n) => n.life <= 0);
-    for (final guard in guards) _updateGuard(guard, dt);
+    for (final guard in guards) {
+      _updateGuard(guard, dt);
+    }
     _updateCamera(dt);
   }
 
@@ -439,8 +453,9 @@ class _MansionGame {
     if (p.dx < r ||
         p.dy < r ||
         p.dx > mansionWidth - r ||
-        p.dy > mansionHeight - r)
+        p.dy > mansionHeight - r) {
       return false;
+    }
     return !covers.any((cover) => cover.bounds.inflate(r + 1).contains(p)) &&
         !walls.any((wall) => _pointSegmentDistance(p, wall) < r + 1);
   }
@@ -503,6 +518,9 @@ class _MansionGame {
         distance < vision &&
         inCone.abs() < (g.advanced ? .8 : .95) &&
         _clearSight(g.position, player.position)) {
+      if (g.state != _GuardState.alert) {
+        GameFeedback.alarm();
+      }
       g.state = _GuardState.alert;
       g.target = player.position;
       g.alert = 2.5;
@@ -545,8 +563,9 @@ class _MansionGame {
     } else {
       final target = g.route[g.routeIndex];
       _guardMove(g, target, 72 * dt);
-      if ((g.position - target).distance < 12)
+      if ((g.position - target).distance < 12) {
         g.routeIndex = (g.routeIndex + 1) % g.route.length;
+      }
     }
   }
 
@@ -612,7 +631,7 @@ class _MansionGame {
         k.taken = true;
         player.kits++;
         _message('DISGUISE KIT ACQUIRED · TAP MASK TO USE');
-        GameFeedback.selection();
+        GameFeedback.pickup();
         return;
       }
     }
@@ -621,7 +640,7 @@ class _MansionGame {
       player.loot += 300;
       player.lootCount++;
       _message('VAULT DIAMOND SECURED · REACH EXTRACTION');
-      GameFeedback.mediumImpact();
+      GameFeedback.pickup();
       return;
     }
     for (final l in loot.where((e) => !e.taken)) {
@@ -630,7 +649,7 @@ class _MansionGame {
         player.loot += l.value;
         player.lootCount++;
         _message('LOOT SECURED · YOUR VIEWPORT SHRINKS');
-        GameFeedback.selection();
+        GameFeedback.pickup();
         return;
       }
     }
@@ -638,7 +657,7 @@ class _MansionGame {
       if (extractionReady) {
         phase = _MansionPhase.extracted;
         _message('EXTRACTION COMPLETE');
-        GameFeedback.mediumImpact();
+        GameFeedback.victory();
       } else if (vaultTaken) {
         _message(
           'EXTRACTION NEEDS ${requiredLootCount - player.lootCount} MORE LOOT ITEM${requiredLootCount - player.lootCount == 1 ? '' : 'S'}',

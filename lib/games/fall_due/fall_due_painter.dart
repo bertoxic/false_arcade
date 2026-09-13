@@ -128,30 +128,51 @@ class _FallPainter extends CustomPainter {
         ? nearestEmitter?.position
         : nearestTarget?.center;
     if (recipient != null) {
+      final tetherColor = game.debt >= 3
+          ? const Color(0xFFFFD86E)
+          : const Color(0xFF8DE1FF);
       canvas.drawLine(
         game.player.center,
         recipient,
         Paint()
-          ..color =
-              (game.debt >= 3
-                      ? const Color(0xFFFFD86E)
-                      : const Color(0xFF8DE1FF))
-                  .withValues(alpha: .45)
-          ..strokeWidth = 1.5,
+          ..color = tetherColor.withValues(alpha: .22)
+          ..strokeWidth = 6.0,
+      );
+      canvas.drawLine(
+        game.player.center,
+        recipient,
+        Paint()
+          ..color = tetherColor.withValues(alpha: .82)
+          ..strokeWidth = 1.8,
       );
       canvas.drawCircle(
         recipient,
-        25,
+        26 + math.sin(game.time * 6) * 3,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.4
-          ..color = const Color(0xFF8DE1FF).withValues(alpha: .6),
+          ..strokeWidth = 1.8
+          ..color = tetherColor.withValues(alpha: .75),
       );
     }
     final player = game.player;
     final playerColor = game.inPayback
         ? const Color(0xFFFFD86E)
         : const Color(0xFF8DE1FF);
+
+    // Gravity distortion rings
+    if (game._antiGravityActive) {
+      final pulseRadius = 26.0 + (game.time * 40) % 20.0;
+      final pulseAlpha = (1.0 - (pulseRadius - 26) / 20.0).clamp(0.0, 1.0);
+      canvas.drawCircle(
+        player.center,
+        pulseRadius,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5
+          ..color = const Color(0xFF8DE1FF).withValues(alpha: pulseAlpha * 0.6),
+      );
+    }
+
     canvas.drawCircle(
       player.center,
       game._antiGravityActive ? 32 : 22,
@@ -525,38 +546,177 @@ class _FallPainter extends CustomPainter {
   }
 
   void _drawGate(Canvas canvas, _DueGate gate) {
-    final color = gate.open ? const Color(0xFF8CFFB1) : const Color(0xFFFF7186);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(gate.rect, const Radius.circular(5)),
-      Paint()..color = color.withValues(alpha: gate.open ? .08 : .22),
-    );
-    canvas.drawRect(
-      gate.rect,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = color,
-    );
-    if (!gate.open) {
-      for (var y = gate.rect.top + 12; y < gate.rect.bottom; y += 18) {
-        canvas.drawLine(
-          Offset(gate.rect.left + 4, y),
-          Offset(gate.rect.right - 4, y),
-          Paint()
-            ..color = color.withValues(alpha: .6)
-            ..strokeWidth = 2,
-        );
+    final rect = gate.rect;
+    final isOpen = gate.open;
+    final accentColor = isOpen ? const Color(0xFF6EF0B7) : const Color(0xFFFF4868);
+    final coreGlow = isOpen ? const Color(0xFFB4FFD8) : const Color(0xFFFF94A8);
+    final steelDark = const Color(0xFF131A26);
+    final steelPlate = const Color(0xFF243348);
+
+    // 1. Structural Steel Wall Anchors (Top & Bottom hydraulic mount blocks)
+    final topAnchor = Rect.fromLTWH(rect.left - 4, rect.top - 6, rect.width + 8, 14);
+    final bottomAnchor = Rect.fromLTWH(rect.left - 4, rect.bottom - 8, rect.width + 8, 14);
+
+    void drawMount(Rect mount) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(mount, const Radius.circular(3)),
+        Paint()..color = steelDark,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(mount, const Radius.circular(3)),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5
+          ..color = const Color(0xFF435875),
+      );
+      // Industrial bolts / rivets
+      for (final bx in [mount.left + 4, mount.right - 4]) {
+        canvas.drawCircle(Offset(bx, mount.center.dy), 1.8, Paint()..color = const Color(0xFF7A93B4));
       }
     }
-    _text(
-      canvas,
-      gate.open ? 'OPEN' : 'LIFT',
-      gate.rect.center + const Offset(0, 4),
-      8,
-      color,
-      center: true,
-      bold: true,
-    );
+
+    drawMount(topAnchor);
+    drawMount(bottomAnchor);
+
+    if (isOpen) {
+      // --- UNLOCKED / OPEN STATE ---
+      // Retracted side guide rails
+      canvas.drawRect(
+        Rect.fromLTWH(rect.left + 1, rect.top + 8, 4, rect.height - 16),
+        Paint()..color = steelPlate,
+      );
+      canvas.drawRect(
+        Rect.fromLTWH(rect.right - 5, rect.top + 8, 4, rect.height - 16),
+        Paint()..color = steelPlate,
+      );
+      // Glowing green laser safe-zone wireframes
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect.deflate(2), const Radius.circular(4)),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5
+          ..color = accentColor.withValues(alpha: 0.5),
+      );
+      // Soft green interior path field
+      canvas.drawRect(
+        rect.deflate(4),
+        Paint()..color = accentColor.withValues(alpha: 0.08),
+      );
+      // Center illuminated status badge
+      final badge = Rect.fromCenter(center: rect.center, width: 28, height: 16);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(badge, const Radius.circular(4)),
+        Paint()..color = steelDark,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(badge, const Radius.circular(4)),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2
+          ..color = accentColor,
+      );
+      _text(
+        canvas,
+        'OPEN',
+        rect.center,
+        7,
+        accentColor,
+        center: true,
+        bold: true,
+      );
+    } else {
+      // --- LOCKED / ACTIVE LIFT BLOCKER BARRIER ---
+      // Heavy solid backing plate
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, const Radius.circular(4)),
+        Paint()..color = steelDark,
+      );
+
+      // Heavy vertical hydraulic shaft rails
+      canvas.drawRect(
+        Rect.fromLTWH(rect.left + 2, rect.top + 6, 3, rect.height - 12),
+        Paint()..color = const Color(0xFF5D7699),
+      );
+      canvas.drawRect(
+        Rect.fromLTWH(rect.right - 5, rect.top + 6, 3, rect.height - 12),
+        Paint()..color = const Color(0xFF5D7699),
+      );
+
+      // Solid heavy barrier louvers with hazard stripes
+      const louverHeight = 16.0;
+      final count = ((rect.height - 20) / louverHeight).floor();
+      for (var i = 0; i < count; i++) {
+        final ly = rect.top + 10 + i * louverHeight;
+        final louverRect = Rect.fromLTWH(rect.left + 5, ly, rect.width - 10, louverHeight - 3);
+        
+        // Dark metal louver plate
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(louverRect, const Radius.circular(2)),
+          Paint()..color = steelPlate,
+        );
+
+        // Caution diagonal hazard stripes (alternating amber/dark)
+        final hazardPaint = Paint()
+          ..color = const Color(0xFFFFD36A).withValues(alpha: 0.85)
+          ..strokeWidth = 2.0;
+        for (var hx = louverRect.left - 4; hx < louverRect.right + 4; hx += 8) {
+          canvas.drawLine(
+            Offset(hx, louverRect.bottom),
+            Offset(hx + 5, louverRect.top),
+            hazardPaint,
+          );
+        }
+
+        // Louver border
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(louverRect, const Radius.circular(2)),
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.0
+            ..color = const Color(0xFF101724),
+        );
+      }
+
+      // Outer energized force barrier border
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, const Radius.circular(4)),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.5
+          ..color = accentColor,
+      );
+
+      // Center heavy security lock terminal badge
+      final badge = Rect.fromCenter(center: rect.center, width: 34, height: 26);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(badge, const Radius.circular(5)),
+        Paint()..color = const Color(0xFF0C131D),
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(badge, const Radius.circular(5)),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.8
+          ..color = accentColor,
+      );
+
+      // Pulsing lock indicator light
+      canvas.drawCircle(
+        badge.center + const Offset(0, -5),
+        3.5,
+        Paint()..color = coreGlow,
+      );
+
+      _text(
+        canvas,
+        'LOCKED',
+        badge.center + const Offset(0, 4),
+        6,
+        accentColor,
+        center: true,
+        bold: true,
+      );
+    }
   }
 
   void _drawCheckpoint(Canvas canvas, _DueCheckpoint checkpoint) {
@@ -699,32 +859,66 @@ class _FallPainter extends CustomPainter {
         bold: true,
       );
     } else {
+      // Industrial reinforced heavy gravity crate
       canvas.drawRRect(
-        RRect.fromRectAndRadius(target.rect, const Radius.circular(3)),
+        RRect.fromRectAndRadius(target.rect, const Radius.circular(4)),
+        Paint()..color = const Color(0xFF1F180F),
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(target.rect.deflate(2), const Radius.circular(3)),
         Paint()..color = color,
       );
-      canvas.drawRect(
-        Rect.fromLTWH(target.x + 3, target.y + 17, target.w - 6, 4),
-        Paint()..color = const Color(0xFF7D4C1B),
+
+      // Industrial hazard warning stripes across middle
+      canvas.save();
+      final hazardBand = Rect.fromLTWH(
+        target.x + 2,
+        target.y + target.h * 0.32,
+        target.w - 4,
+        target.h * 0.36,
       );
-      final stroke = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = const Color(0xFFFFE4A3);
-      canvas.drawLine(target.rect.topLeft, target.rect.bottomRight, stroke);
-      canvas.drawLine(target.rect.topRight, target.rect.bottomLeft, stroke);
-      for (final corner in [
-        target.rect.topLeft + const Offset(5, 5),
-        target.rect.topRight + const Offset(-5, 5),
-        target.rect.bottomLeft + const Offset(5, -5),
-        target.rect.bottomRight + const Offset(-5, -5),
-      ]) {
-        canvas.drawCircle(
-          corner,
-          1.5,
-          Paint()..color = const Color(0xFF593813),
+      canvas.clipRect(hazardBand);
+      canvas.drawRect(hazardBand, Paint()..color = const Color(0xFFFFD166));
+      final stripePaint = Paint()
+        ..color = const Color(0xFF221606)
+        ..strokeWidth = 3.5;
+      for (double x = -20; x <= target.w + 20; x += 8) {
+        canvas.drawLine(
+          Offset(target.x + x, hazardBand.top - 2),
+          Offset(target.x + x + 8, hazardBand.bottom + 2),
+          stripePaint,
         );
       }
+      canvas.restore();
+
+      // Steel perimeter frame & corner brackets
+      final framePaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6
+        ..color = const Color(0xFF332011);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(target.rect.deflate(2), const Radius.circular(3)),
+        framePaint,
+      );
+
+      // Central gravity core socket
+      final isHeavy = target.debt > 1;
+      final isLight = target.debt < -1;
+      final coreColor = isLight
+          ? const Color(0xFF7BE5FF)
+          : isHeavy
+          ? const Color(0xFFFF5277)
+          : const Color(0xFFFFE082);
+      canvas.drawCircle(
+        target.center,
+        5.5,
+        Paint()..color = const Color(0xFF1A130B),
+      );
+      canvas.drawCircle(
+        target.center,
+        3.5,
+        Paint()..color = coreColor,
+      );
     }
     if (target.anchored) {
       _text(

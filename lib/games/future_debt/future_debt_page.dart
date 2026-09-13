@@ -435,40 +435,49 @@ class _FutureTopHud extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    height: compact ? 48 : 58,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-      child: Row(
-        children: [
-          Flexible(
-            flex: 3,
-            child: _FutureStat(
-              label: 'LIFETIME',
-              value: '${game.lifetime.clamp(0, 999).toStringAsFixed(1)}s',
-              color: game.lifetime < 10
-                  ? const Color(0xFFFF8097)
-                  : const Color(0xFFF4E9CA),
-              compact: compact,
-            ),
+    height: compact ? 46 : 54,
+    child: Row(
+      children: [
+        Flexible(
+          flex: 3,
+          child: _FutureStat(
+            label: 'LIFETIME',
+            value: '${game.lifetime.clamp(0, 999).toStringAsFixed(1)}s',
+            color: game.lifetime < 10
+                ? const Color(0xFFFF5277)
+                : const Color(0xFF64F6DB),
+            compact: compact,
           ),
-          const SizedBox(width: 8),
-          Flexible(
-            flex: 3,
-            child: _FutureStat(
-              label: 'DEBT',
-              value: '${game.debtAmount.toStringAsFixed(1)}s',
-              detail: game.formName,
-              color: const Color(0xFFF4E9CA),
-              compact: compact,
-            ),
+        ),
+        Container(
+          width: 1,
+          height: compact ? 26 : 34,
+          margin: const EdgeInsets.symmetric(horizontal: 6),
+          color: const Color(0xFF1E3557),
+        ),
+        Flexible(
+          flex: 3,
+          child: _FutureStat(
+            label: 'DEBT',
+            value: '${game.debtAmount.toStringAsFixed(1)}s',
+            detail: game.formName,
+            color: game.debtAmount > 16
+                ? const Color(0xFFFF5277)
+                : (game.debtAmount > 8 ? const Color(0xFFFFD36A) : const Color(0xFFA5FFF4)),
+            compact: compact,
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            flex: 6,
-            child: _FutureObjectiveReadout(game: game, compact: compact),
-          ),
-        ],
-      ),
+        ),
+        Container(
+          width: 1,
+          height: compact ? 26 : 34,
+          margin: const EdgeInsets.symmetric(horizontal: 6),
+          color: const Color(0xFF1E3557),
+        ),
+        Expanded(
+          flex: 6,
+          child: _FutureObjectiveReadout(game: game, compact: compact),
+        ),
+      ],
     ),
   );
 }
@@ -488,8 +497,8 @@ class _FutureObjectiveReadout extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          color: const Color(0xFFF4E9CA),
-          fontSize: compact ? 7 : 9,
+          color: const Color(0xFFE5F4FF),
+          fontSize: compact ? 8 : 10,
           fontWeight: FontWeight.w900,
           letterSpacing: compact ? .5 : .8,
         ),
@@ -501,9 +510,9 @@ class _FutureObjectiveReadout extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: game.objectiveComplete
-              ? const Color(0xFFAEDBB2)
-              : const Color(0xFFC6B98D),
-          fontSize: compact ? 6 : 7,
+              ? const Color(0xFF6EF0B7)
+              : const Color(0xFFFFD36A),
+          fontSize: compact ? 7 : 8,
           fontWeight: FontWeight.w800,
         ),
       ),
@@ -513,8 +522,10 @@ class _FutureObjectiveReadout extends StatelessWidget {
         child: LinearProgressIndicator(
           value: (game.score / game.scoreTarget).clamp(0, 1).toDouble(),
           minHeight: compact ? 3 : 4,
-          backgroundColor: const Color(0xFF2A3040),
-          valueColor: const AlwaysStoppedAnimation(Color(0xFFD8B35D)),
+          backgroundColor: const Color(0xFF132035),
+          valueColor: AlwaysStoppedAnimation(
+            game.objectiveComplete ? const Color(0xFF6EF0B7) : const Color(0xFF64F6DB),
+          ),
         ),
       ),
     ],
@@ -538,6 +549,7 @@ class _FutureStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisAlignment: MainAxisAlignment.center,
     mainAxisSize: MainAxisSize.min,
     children: [
       Text(
@@ -545,7 +557,7 @@ class _FutureStat extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          color: const Color(0xFF8996B4),
+          color: const Color(0xFF7E97B8),
           fontSize: compact ? 6 : 7,
           fontWeight: FontWeight.w900,
           letterSpacing: .8,
@@ -555,7 +567,7 @@ class _FutureStat extends StatelessWidget {
         value,
         style: TextStyle(
           color: color,
-          fontSize: compact ? 14 : 17,
+          fontSize: compact ? 13 : 16,
           height: 1.05,
           fontWeight: FontWeight.w900,
         ),
@@ -564,7 +576,7 @@ class _FutureStat extends StatelessWidget {
         Text(
           detail!,
           style: const TextStyle(
-            color: Color(0xFF8996B4),
+            color: Color(0xFF64F6DB),
             fontSize: 6,
             height: .8,
             fontWeight: FontWeight.w800,
@@ -581,17 +593,18 @@ class _MessageStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
     child: Text(
       game.message,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
         color: game.hasAnyLock
-            ? const Color(0xFFFF8097)
-            : const Color(0xFFFFD36A),
-        fontSize: compact ? 6 : 8,
+            ? const Color(0xFFFF718E)
+            : const Color(0xFFFFE599),
+        fontSize: compact ? 7 : 9,
         fontWeight: FontWeight.w800,
+        letterSpacing: 0.4,
       ),
     ),
   );

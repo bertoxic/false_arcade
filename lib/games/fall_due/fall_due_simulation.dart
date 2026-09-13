@@ -865,6 +865,7 @@ class _FallDueGame {
   final Cooldown _transferCooldown = Cooldown();
   double _spawnGrace = 0;
   double camera = 0;
+  double time = 0;
   int score = 0;
   int lives = 5;
   int _stageStartScore = 0;
@@ -893,6 +894,16 @@ class _FallDueGame {
   int get collectedSeals => seals.where((seal) => seal.collected).length;
   int get activeLevers => levers.where((lever) => lever.active).length;
   int get lockedGates => gates.where((gate) => !gate.open).length;
+  String get objectiveReadout {
+    final sealsDue = seals.length - collectedSeals;
+    if (sealsDue > 0 && lockedGates > 0) {
+      return 'SEALS $collectedSeals/${seals.length} · LOCKS $lockedGates';
+    }
+    if (sealsDue > 0) return 'SEALS $collectedSeals/${seals.length}';
+    if (lockedGates > 0) return 'GRAVITY LOCKS $lockedGates';
+    return 'EXIT OPEN · SETTLE THE LEDGER';
+  }
+
   int get activatedCheckpoints => _checkpointIndex + 1;
   List<_DueSectionSpec> get routeSections => level.route?.sections ?? const [];
   int get visibleCollectors => targets
@@ -1109,7 +1120,7 @@ class _FallDueGame {
         player.vy = -FallDueTuning.borrowLaunchImpulse;
         player.grounded = false;
         player.coyote = 0;
-        GameFeedback.lightImpact();
+        GameFeedback.jump();
       }
     }
     if (!value && _borrowHeld) {
@@ -1157,6 +1168,7 @@ class _FallDueGame {
   }
 
   void update(double dt) {
+    time += dt;
     _updateEffects(dt);
     if (phase != _DuePhase.playing) return;
     _spawnGrace = math.max(0, _spawnGrace - dt);
@@ -1475,7 +1487,7 @@ class _FallDueGame {
       message = '${level.title} settled. Next: ${next.title}.';
     }
     _burst(exit.center, const Color(0xFF8CFFB1), 32);
-    GameFeedback.mediumImpact();
+    GameFeedback.victory();
   }
 
   void _updateEffects(double dt) {
@@ -2342,6 +2354,18 @@ class _FallDueGame {
       recipient
         ..vx *= .22
         ..vy = math.min(recipient.vy, -470);
+      // MOMENTUM SLINGSHOT: If player is standing on or right beside the crate being lifted, catapult player upward!
+      final pRect = player.rect;
+      final cRect = recipient.rect;
+      if ((pRect.bottom - cRect.top).abs() < 16 &&
+          pRect.right > cRect.left - 6 &&
+          pRect.left < cRect.right + 6) {
+        player.vy = math.min(player.vy, -560.0);
+        player.grounded = false;
+        _burst(player.center, const Color(0xFF6EF0B7), 16);
+        ArcadeShake.shake(0.35);
+        GameFeedback.jump();
+      }
     } else {
       recipient.vx += pushDirection * (245 + amount * 11);
     }

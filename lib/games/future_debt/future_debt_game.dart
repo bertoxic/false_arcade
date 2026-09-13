@@ -12,6 +12,7 @@ import '../../core/game_math.dart';
 import '../../core/game_presentation.dart';
 import '../../core/logical_viewport.dart';
 import '../../ui/game_controls.dart';
+import '../../ui/screen_shake.dart';
 
 part 'future_debt_page.dart';
 part 'future_debt_case_plan.dart';

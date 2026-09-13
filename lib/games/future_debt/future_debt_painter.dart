@@ -456,32 +456,111 @@ class _FuturePainter extends CustomPainter {
       _FuturePickupKind.reverse => const Color(0xFFC995FF),
       _FuturePickupKind.caseFile => const Color(0xFFF2E3B3),
     };
-    final mark = switch (pickup.kind) {
-      _FuturePickupKind.time => '+',
-      _FuturePickupKind.writeoff => r'$',
-      _FuturePickupKind.ghost => 'G',
-      _FuturePickupKind.compound => 'F',
-      _FuturePickupKind.reverse => 'R',
-      _FuturePickupKind.caseFile => '▣',
-    };
     canvas.save();
     canvas.translate(pickup.position.dx, pickup.position.dy);
     canvas.rotate(pickup.spin);
-    final diamond = Path()
-      ..moveTo(0, -11)
-      ..lineTo(8, 0)
-      ..lineTo(0, 11)
-      ..lineTo(-8, 0)
-      ..close();
-    canvas.drawPath(diamond, Paint()..color = color.withValues(alpha: .16));
+    if (pickup.kind == _FuturePickupKind.writeoff) {
+      final diamond = Path()
+        ..moveTo(0, -11)
+        ..lineTo(8, 0)
+        ..lineTo(0, 11)
+        ..lineTo(-8, 0)
+        ..close();
+      canvas.drawPath(diamond, Paint()..color = color.withValues(alpha: .16));
+      canvas.drawPath(
+        diamond,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3
+          ..color = color,
+      );
+      _text(canvas, r'$', Offset.zero, 8, color, center: true, bold: true);
+      canvas.restore();
+      return;
+    }
+    final pulse = 1 + math.sin(game.time * 5 + pickup.position.dx) * .12;
+    canvas.drawCircle(
+      Offset.zero,
+      16 * pulse,
+      Paint()..color = color.withValues(alpha: .1),
+    );
+    final body = switch (pickup.kind) {
+      _FuturePickupKind.time =>
+        Path()
+          ..moveTo(0, -11)
+          ..cubicTo(9, -6, 6, -2, 3, 0)
+          ..cubicTo(7, 4, 8, 8, 0, 12)
+          ..cubicTo(-8, 8, -7, 4, -3, 0)
+          ..cubicTo(-6, -3, -9, -7, 0, -11)
+          ..close(),
+      _FuturePickupKind.writeoff =>
+        Path()
+          ..moveTo(-10, -3)
+          ..cubicTo(-4, -12, 7, -11, 11, -3)
+          ..cubicTo(8, 9, -4, 12, -11, 4)
+          ..cubicTo(-13, 1, -12, -1, -10, -3)
+          ..close(),
+      _FuturePickupKind.ghost =>
+        Path()
+          ..moveTo(0, -12)
+          ..cubicTo(10, -8, 10, 5, 3, 11)
+          ..cubicTo(1, 13, -2, 13, -4, 10)
+          ..cubicTo(-12, 2, -8, -8, 0, -12)
+          ..close(),
+      _FuturePickupKind.compound =>
+        Path()..addOval(
+          Rect.fromCenter(center: Offset.zero, width: 18, height: 20),
+        ),
+      _FuturePickupKind.reverse =>
+        Path()
+          ..moveTo(-12, 0)
+          ..cubicTo(-5, -12, 6, -12, 13, 0)
+          ..cubicTo(6, 12, -5, 12, -12, 0)
+          ..close(),
+      _FuturePickupKind.caseFile =>
+        Path()
+          ..moveTo(-9, -10)
+          ..cubicTo(2, -12, 11, -6, 9, 5)
+          ..cubicTo(5, 13, -8, 10, -10, 2)
+          ..cubicTo(-12, -3, -11, -7, -9, -10)
+          ..close(),
+    };
+    canvas.drawPath(body, Paint()..color = color.withValues(alpha: .22));
     canvas.drawPath(
-      diamond,
+      body,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
+        ..strokeWidth = 2
         ..color = color,
     );
-    _text(canvas, mark, Offset.zero, 8, color, center: true, bold: true);
+    if (pickup.kind == _FuturePickupKind.reverse ||
+        pickup.kind == _FuturePickupKind.ghost) {
+      canvas.drawCircle(
+        Offset.zero,
+        4.4,
+        Paint()..color = const Color(0xFF08101C),
+      );
+      canvas.drawCircle(Offset.zero, 1.8, Paint()..color = color);
+    } else if (pickup.kind == _FuturePickupKind.caseFile) {
+      final fold = Paint()
+        ..color = color.withValues(alpha: .72)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2;
+      canvas.drawPath(
+        Path()
+          ..moveTo(-5, -4)
+          ..quadraticBezierTo(0, -1, 5, -3)
+          ..moveTo(-4, 2)
+          ..quadraticBezierTo(0, 5, 4, 3),
+        fold,
+      );
+    } else {
+      canvas.drawCircle(
+        Offset.zero,
+        3.1,
+        Paint()..color = color.withValues(alpha: .85),
+      );
+    }
     canvas.restore();
   }
 
@@ -554,21 +633,33 @@ class _FuturePainter extends CustomPainter {
       exit.radius * 1.2 * pulse,
       Paint()..color = cyan.withValues(alpha: .14),
     );
-    canvas.save();
-    canvas.rotate(exit.phase);
-    final outer = Rect.fromCircle(
-      center: Offset.zero,
-      radius: exit.radius * pulse,
-    );
-    final ring = Paint()
+    final petal = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4
-      ..strokeCap = StrokeCap.round
-      ..color = gold;
-    canvas.drawArc(outer, -.18, math.pi * .7, false, ring);
-    ring.color = cyan;
-    canvas.drawArc(outer, math.pi * .9, math.pi * .7, false, ring);
-    canvas.restore();
+      ..strokeCap = StrokeCap.round;
+    for (var index = 0; index < 7; index++) {
+      final angle = exit.phase * .55 + index * math.pi * 2 / 7;
+      final start = Offset(
+        math.cos(angle) * exit.radius * .44,
+        math.sin(angle) * exit.radius * .44,
+      );
+      final end = Offset(
+        math.cos(angle) * exit.radius * 1.16,
+        math.sin(angle) * exit.radius * 1.16,
+      );
+      petal.color = (index.isEven ? gold : cyan).withValues(alpha: .9);
+      canvas.drawPath(
+        Path()
+          ..moveTo(start.dx, start.dy)
+          ..quadraticBezierTo(
+            (start.dx + end.dx) * .5 + math.sin(angle) * 9,
+            (start.dy + end.dy) * .5 - math.cos(angle) * 9,
+            end.dx,
+            end.dy,
+          ),
+        petal,
+      );
+    }
     canvas.drawCircle(
       Offset.zero,
       exit.radius * .66,
@@ -580,16 +671,16 @@ class _FuturePainter extends CustomPainter {
               Rect.fromCircle(center: Offset.zero, radius: exit.radius * .66),
             ),
     );
-    final arrow = Path()
-      ..moveTo(-10, -10)
-      ..lineTo(4, -10)
-      ..lineTo(4, -16)
-      ..lineTo(16, 0)
-      ..lineTo(4, 16)
-      ..lineTo(4, 10)
-      ..lineTo(-10, 10)
-      ..close();
-    canvas.drawPath(arrow, Paint()..color = const Color(0xFFF7FEFF));
+    canvas.drawCircle(
+      Offset.zero,
+      exit.radius * .26,
+      Paint()..color = const Color(0xFF07111A),
+    );
+    canvas.drawCircle(
+      Offset.zero,
+      exit.radius * .12,
+      Paint()..color = const Color(0xFFF7FEFF),
+    );
     _text(
       canvas,
       'NEXT',
@@ -606,16 +697,17 @@ class _FuturePainter extends CustomPainter {
     final direction = normalizedOr(shot.velocity);
     final normal = Offset(-direction.dy, direction.dx);
     final pulse = 1 + math.sin(game.time * 24 + shot.position.dx * .04) * .12;
-    final trailLength = shot.charged ? 38.0 : 27.0;
-    final flareRadius = shot.radius * (shot.charged ? 3.2 : 2.25) * pulse;
-    // Layered trails keep the original shot colors, but give each bullet the
-    // bright flare and velocity streak of an arcade projectile.
+    final isEnemy = shot.damage == 0; // Enemy and echo shots have damage == 0
+    final trailLength = isEnemy ? 34.0 : (shot.charged ? 38.0 : 27.0);
+    final flareRadius = shot.radius * (isEnemy ? 2.8 : (shot.charged ? 3.2 : 2.25)) * pulse;
+
+    // Layered trails for retro arcade projectile feel
     canvas.drawLine(
       shot.position - direction * trailLength,
       shot.position + direction * shot.radius,
       Paint()
-        ..color = color.withValues(alpha: .1)
-        ..strokeWidth = shot.radius * 2.8
+        ..color = color.withValues(alpha: isEnemy ? .25 : .1)
+        ..strokeWidth = shot.radius * (isEnemy ? 3.2 : 2.8)
         ..strokeCap = StrokeCap.round
         ..blendMode = BlendMode.screen,
     );
@@ -623,69 +715,96 @@ class _FuturePainter extends CustomPainter {
       shot.position - direction * trailLength * .82,
       shot.position + direction * shot.radius * 1.5,
       Paint()
-        ..color = color.withValues(alpha: .62)
-        ..strokeWidth = shot.radius * .95
+        ..color = color.withValues(alpha: .75)
+        ..strokeWidth = shot.radius * (isEnemy ? 1.6 : .95)
         ..strokeCap = StrokeCap.round
         ..blendMode = BlendMode.screen,
     );
+
+    // Glowing energy halo
     canvas.drawCircle(
       shot.position,
       flareRadius * 1.55,
       Paint()
-        ..shader =
-            RadialGradient(
-              colors: [
-                color.withValues(alpha: .44),
-                color.withValues(alpha: .1),
-                Colors.transparent,
-              ],
-            ).createShader(
-              Rect.fromCircle(
-                center: shot.position,
-                radius: flareRadius * 1.55,
-              ),
-            )
+        ..shader = RadialGradient(
+          colors: [
+            color.withValues(alpha: .5),
+            color.withValues(alpha: .15),
+            Colors.transparent,
+          ],
+        ).createShader(
+          Rect.fromCircle(
+            center: shot.position,
+            radius: flareRadius * 1.55,
+          ),
+        )
         ..blendMode = BlendMode.screen,
     );
-    if (shot.charged) {
+
+    if (isEnemy) {
+      // Menacing enemy plasma orb with rotating spiked energy aura
+      final spin = game.time * 12.0;
+      final orbPaint = Paint()
+        ..color = color.withValues(alpha: 0.9)
+        ..strokeWidth = 1.6
+        ..style = PaintingStyle.stroke;
+      for (var i = 0; i < 4; i++) {
+        final angle = spin + i * math.pi / 2;
+        final spike = Offset(math.cos(angle) * (shot.radius + 3.5), math.sin(angle) * (shot.radius + 3.5));
+        canvas.drawLine(shot.position, shot.position + spike, orbPaint);
+      }
+      // Fiery inner core
       canvas.drawCircle(
         shot.position,
-        shot.radius * 3.2,
-        Paint()..color = const Color(0xFFFF5AA7).withValues(alpha: .16),
+        shot.radius * 1.3,
+        Paint()..color = color,
+      );
+      canvas.drawCircle(
+        shot.position,
+        shot.radius * 0.65,
+        Paint()..color = const Color(0xFFFFF7E6),
+      );
+    } else {
+      if (shot.charged) {
+        canvas.drawCircle(
+          shot.position,
+          shot.radius * 3.2,
+          Paint()..color = const Color(0xFFFF5AA7).withValues(alpha: .16),
+        );
+        canvas.drawLine(
+          shot.position - direction * 28,
+          shot.position + direction * 4,
+          Paint()
+            ..color = const Color(0xFFFF80C0).withValues(alpha: .72)
+            ..strokeWidth = shot.radius * 1.25,
+        );
+      }
+      canvas.drawLine(
+        shot.position - direction * flareRadius * 1.8,
+        shot.position + direction * flareRadius * 2.1,
+        Paint()
+          ..color = color.withValues(alpha: .82)
+          ..strokeWidth = shot.radius * .65
+          ..strokeCap = StrokeCap.round
+          ..blendMode = BlendMode.screen,
       );
       canvas.drawLine(
-        shot.position - direction * 28,
-        shot.position + direction * 4,
+        shot.position - normal * flareRadius * .72,
+        shot.position + normal * flareRadius * .72,
         Paint()
-          ..color = const Color(0xFFFF80C0).withValues(alpha: .72)
-          ..strokeWidth = shot.radius * 1.25,
+          ..color = color.withValues(alpha: .6)
+          ..strokeWidth = shot.radius * .45
+          ..strokeCap = StrokeCap.round
+          ..blendMode = BlendMode.screen,
+      );
+      canvas.drawCircle(
+        shot.position,
+        shot.radius * 1.2,
+        Paint()
+          ..color = color
+          ..blendMode = BlendMode.screen,
       );
     }
-    canvas.drawLine(
-      shot.position - direction * flareRadius * 1.8,
-      shot.position + direction * flareRadius * 2.1,
-      Paint()
-        ..color = color.withValues(alpha: .82)
-        ..strokeWidth = shot.radius * .65
-        ..strokeCap = StrokeCap.round
-        ..blendMode = BlendMode.screen,
-    );
-    canvas.drawLine(
-      shot.position - normal * flareRadius * .72,
-      shot.position + normal * flareRadius * .72,
-      Paint()
-        ..color = color.withValues(alpha: .6)
-        ..strokeWidth = shot.radius * .45
-        ..strokeCap = StrokeCap.round
-        ..blendMode = BlendMode.screen,
-    );
-    canvas.drawCircle(
-      shot.position,
-      shot.radius * 1.2,
-      Paint()
-        ..color = color
-        ..blendMode = BlendMode.screen,
-    );
   }
 
   void _player(Canvas canvas) {
@@ -802,115 +921,252 @@ class _FuturePainter extends CustomPainter {
     bool firing = false,
     double alpha = 1,
   }) {
-    final cyan = ghost ? const Color(0xFF58E8FF) : const Color(0xFF9FEEFF);
-    final outline = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..color = cyan.withValues(alpha: alpha);
-    final fill = (ghost ? const Color(0xFF3FCCE1) : const Color(0xFF17243A))
-        .withValues(alpha: ghost ? .14 * alpha : alpha);
+    final cyan = ghost ? const Color(0xFF58E8FF) : const Color(0xFF6DE8FF);
+    final accent = mutation > .55 ? const Color(0xFFFF5F82) : const Color(0xFF64F6DB);
+    final armorDark = const Color(0xFF162338).withValues(alpha: alpha);
+    final armorMid = const Color(0xFF263854).withValues(alpha: alpha);
+    final armorLight = const Color(0xFF3E5A84).withValues(alpha: alpha);
+    final fleshTone = const Color(0xFFD8AB82).withValues(alpha: alpha);
+    final bootColor = const Color(0xFF101724).withValues(alpha: alpha);
     final stride = moving ? walk : 0.0;
-    final limb = Paint()
-      ..color = cyan.withValues(alpha: alpha)
-      ..strokeWidth = 3.6
-      ..strokeCap = StrokeCap.round;
-    canvas.drawCircle(
-      const Offset(-2, 2),
-      18,
-      Paint()..color = const Color(0xFF02050C).withValues(alpha: .25 * alpha),
+
+    // Ground contact shadow
+    canvas.drawOval(
+      Rect.fromCenter(center: const Offset(0, 3), width: 34, height: 28),
+      Paint()..color = const Color(0xFF000000).withValues(alpha: .45 * alpha),
     );
-    // The player faces toward local +X. Keeping the head, pack, and feet on
-    // that axis makes the figure read from directly overhead.
-    canvas.drawLine(const Offset(-8, -6), Offset(-16 - stride * .35, -7), limb);
-    canvas.drawLine(const Offset(-8, 6), Offset(-16 + stride * .35, 7), limb);
-    final backpack = RRect.fromRectAndRadius(
-      const Rect.fromLTWH(-20, -9, 10, 18),
-      const Radius.circular(3),
-    );
-    canvas.drawRRect(backpack, Paint()..color = fill);
-    canvas.drawRRect(backpack, outline);
-    final coat = RRect.fromRectAndRadius(
-      const Rect.fromLTWH(-13, -12, 27, 24),
-      const Radius.circular(10),
-    );
-    canvas.drawRRect(coat, Paint()..color = fill);
-    canvas.drawRRect(coat, outline);
-    canvas.drawLine(
-      const Offset(-9, -7),
-      const Offset(7, 0),
-      Paint()
-        ..color = cyan.withValues(alpha: .55 * alpha)
-        ..strokeWidth = 1.4,
-    );
-    canvas.drawLine(
-      const Offset(-9, 7),
-      const Offset(7, 0),
-      Paint()
-        ..color = cyan.withValues(alpha: .55 * alpha)
-        ..strokeWidth = 1.4,
-    );
-    // The upper body pivots separately from travel, so strafing keeps the
-    // visor and weapon trained on the fire-stick / assisted-aim direction.
-    canvas.save();
-    canvas.rotate(aimOffset);
-    final helmet = RRect.fromRectAndRadius(
-      const Rect.fromLTWH(7, -10, 17, 20),
-      const Radius.circular(8),
+
+    // --- LEGS & BOOTS (Bird's-eye walking kinematics) ---
+    final leftLegOffset = Offset(-6 - stride * 1.8, -11);
+    final rightLegOffset = Offset(-6 + stride * 1.8, 11);
+
+    void drawBoot(Offset pos) {
+      // Boot heel to toe along travel vector
+      final bootRect = Rect.fromCenter(center: pos, width: 14, height: 7.5);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(bootRect, const Radius.circular(3)),
+        Paint()..color = bootColor,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(bootRect, const Radius.circular(3)),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2
+          ..color = cyan.withValues(alpha: 0.5 * alpha),
+      );
+      // Boot tip tread
+      canvas.drawLine(
+        Offset(pos.dx + 4, pos.dy - 2),
+        Offset(pos.dx + 4, pos.dy + 2),
+        Paint()
+          ..color = cyan.withValues(alpha: 0.8 * alpha)
+          ..strokeWidth = 1.5,
+      );
+    }
+
+    drawBoot(leftLegOffset);
+    drawBoot(rightLegOffset);
+
+    // --- TACTICAL BACKPACK / RIG POWERPACK ---
+    final packRect = const Rect.fromLTWH(-17, -9, 9, 18);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(packRect, const Radius.circular(3)),
+      Paint()..color = armorDark,
     );
     canvas.drawRRect(
-      helmet,
-      Paint()..color = const Color(0xFF080D17).withValues(alpha: alpha),
+      RRect.fromRectAndRadius(packRect, const Radius.circular(3)),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..color = cyan.withValues(alpha: 0.7 * alpha),
     );
-    canvas.drawRRect(helmet, outline);
+    // Power core battery cells on pack
+    for (var py in [-5.0, 0.0, 5.0]) {
+      canvas.drawCircle(
+        Offset(-12.5, py),
+        1.5,
+        Paint()..color = accent.withValues(alpha: 0.9 * alpha),
+      );
+    }
+
+    // --- TORSO & SHOULDERS (Ballistic plate carrier from top view) ---
+    final torsoPath = Path()
+      ..moveTo(-10, -11)
+      ..lineTo(3, -11) // Right collar
+      ..quadraticBezierTo(7, -8, 7, 0) // Front chest
+      ..quadraticBezierTo(7, 8, 3, 11) // Left collar
+      ..lineTo(-10, 11)
+      ..close();
+
+    canvas.drawPath(torsoPath, Paint()..color = armorMid);
+    canvas.drawPath(
+      torsoPath,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8
+        ..color = cyan.withValues(alpha: alpha),
+    );
+
+    // Shoulder armor pads (Pauldrons)
     canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        const Rect.fromLTWH(16, -6, 5, 12),
-        const Radius.circular(2),
-      ),
-      Paint()
-        ..color =
-            (mutation > .55 ? const Color(0xFFFF587D) : const Color(0xFF58E8FF))
-                .withValues(alpha: alpha),
+      RRect.fromRectAndRadius(const Rect.fromLTWH(-6, -15, 11, 7), const Radius.circular(2.5)),
+      Paint()..color = armorLight,
     );
-    canvas.drawLine(const Offset(-3, -8), const Offset(19, -4), limb);
-    canvas.drawLine(const Offset(-3, 8), const Offset(19, 4), limb);
-    final gun = RRect.fromRectAndRadius(
-      const Rect.fromLTWH(17, -6, 14, 12),
-      const Radius.circular(3),
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(-6, 8, 11, 7), const Radius.circular(2.5)),
+      Paint()..color = armorLight,
     );
-    final gunFill = mutation > .8
-        ? const Color(0xFF7A263D)
-        : const Color(0xFF253B58);
-    canvas.drawRRect(gun, Paint()..color = gunFill.withValues(alpha: alpha));
-    canvas.drawRRect(gun, outline);
-    canvas.drawRect(
-      const Rect.fromLTWH(28, -2.5, 5, 5),
-      Paint()..color = const Color(0xFFDFFCFF).withValues(alpha: alpha),
-    );
-    canvas.drawCircle(
-      const Offset(33, 0),
-      firing ? 5.5 : 3,
-      Paint()
-        ..color = (firing ? const Color(0xFFFFD36A) : const Color(0xFF58E8FF))
-            .withValues(alpha: firing ? .7 * alpha : .9 * alpha),
-    );
+
+    // Ballistic plate center seam
     canvas.drawLine(
-      const Offset(20, -2),
-      const Offset(27, -2),
+      const Offset(-8, 0),
+      const Offset(5, 0),
       Paint()
-        ..color = const Color(0xFF58E8FF).withValues(alpha: .7 * alpha)
+        ..color = cyan.withValues(alpha: 0.6 * alpha)
         ..strokeWidth = 1.2,
     );
+
+    // --- ROTATING UPPER BODY & WEAPON ASSEMBLY (Aims toward mouse/aim stick) ---
+    canvas.save();
+    canvas.rotate(aimOffset);
+
+    // 1. Operator Helmet & Tactical Visor
+    final headCenter = const Offset(0, 0);
+    // Outer helmet
+    canvas.drawCircle(
+      headCenter,
+      7.2,
+      Paint()..color = const Color(0xFF0F1725).withValues(alpha: alpha),
+    );
+    canvas.drawCircle(
+      headCenter,
+      7.2,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..color = cyan.withValues(alpha: 0.85 * alpha),
+    );
+    // Ballistic ridge atop helmet
+    canvas.drawLine(
+      const Offset(-4, 0),
+      const Offset(4, 0),
+      Paint()
+        ..color = armorLight
+        ..strokeWidth = 2.2,
+    );
+    // Glowing visor bar on front of helmet
+    final visorPath = Path()
+      ..moveTo(4, -4.5)
+      ..quadraticBezierTo(7.5, 0, 4, 4.5);
+    canvas.drawPath(
+      visorPath,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2
+        ..strokeCap = StrokeCap.round
+        ..color = accent.withValues(alpha: alpha),
+    );
+
+    // 2. Arms gripping the weapon
+    final armPaint = Paint()
+      ..color = armorDark
+      ..strokeWidth = 4.0
+      ..strokeCap = StrokeCap.round;
+    final sleeveHighlight = Paint()
+      ..color = cyan.withValues(alpha: 0.7 * alpha)
+      ..strokeWidth = 1.3
+      ..strokeCap = StrokeCap.round;
+
+    // Left arm reaching to forward handguard (Offset(19, -4))
+    canvas.drawLine(const Offset(-2, -9), const Offset(10, -8), armPaint);
+    canvas.drawLine(const Offset(10, -8), const Offset(19, -4), armPaint);
+    canvas.drawLine(const Offset(-2, -9), const Offset(10, -8), sleeveHighlight);
+
+    // Right arm holding pistol grip / trigger (Offset(13, 3))
+    canvas.drawLine(const Offset(-2, 9), const Offset(8, 7), armPaint);
+    canvas.drawLine(const Offset(8, 7), const Offset(13, 3), armPaint);
+    canvas.drawLine(const Offset(-2, 9), const Offset(8, 7), sleeveHighlight);
+
+    // Hands / Tactical gloves
+    canvas.drawCircle(const Offset(19, -4), 2.2, Paint()..color = fleshTone);
+    canvas.drawCircle(const Offset(13, 3), 2.2, Paint()..color = fleshTone);
+
+    // 3. Tactical Railgun / Assault Rifle
+    // Gun stock & receiver
+    final gunBody = Path()
+      ..moveTo(8, 1)
+      ..lineTo(26, 0)
+      ..lineTo(28, -2)
+      ..lineTo(35, -2) // Barrel tip
+      ..lineTo(35, 1)
+      ..lineTo(25, 2)
+      ..lineTo(14, 4) // Magazine
+      ..lineTo(11, 4)
+      ..lineTo(8, 2)
+      ..close();
+
+    final gunColor = mutation > 0.8 ? const Color(0xFF662035) : const Color(0xFF1B283A);
+    canvas.drawPath(gunBody, Paint()..color = gunColor.withValues(alpha: alpha));
+    canvas.drawPath(
+      gunBody,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4
+        ..color = const Color(0xFFA5F4FF).withValues(alpha: 0.85 * alpha),
+    );
+
+    // Barrel / heat vents
+    canvas.drawLine(
+      const Offset(22, -1),
+      const Offset(34, -1),
+      Paint()
+        ..color = accent.withValues(alpha: 0.75 * alpha)
+        ..strokeWidth = 1.0,
+    );
+
+    // Laser Sight Beam
+    canvas.drawLine(
+      const Offset(35, 0),
+      const Offset(110, 0),
+      Paint()
+        ..color = accent.withValues(alpha: 0.35 * alpha)
+        ..strokeWidth = 1.0,
+    );
+    canvas.drawCircle(
+      const Offset(110, 0),
+      1.8,
+      Paint()..color = accent.withValues(alpha: 0.8 * alpha),
+    );
+
+    // 4. Muzzle Flash & Energetic Discharge when firing
+    if (firing) {
+      // Expanding hot muzzle star
+      final flashPaint = Paint()
+        ..color = const Color(0xFFFFF0A0).withValues(alpha: 0.95 * alpha);
+      canvas.drawCircle(const Offset(37, 0), 4.5, flashPaint);
+      canvas.drawCircle(
+        const Offset(39, 0),
+        7.0,
+        Paint()..color = const Color(0xFFFF9540).withValues(alpha: 0.5 * alpha),
+      );
+      // Kinetic shock cones
+      canvas.drawLine(
+        const Offset(36, -3),
+        const Offset(43, -6),
+        Paint()
+          ..color = const Color(0xFFFFD36A).withValues(alpha: 0.9 * alpha)
+          ..strokeWidth = 1.8,
+      );
+      canvas.drawLine(
+        const Offset(36, 3),
+        const Offset(43, 6),
+        Paint()
+          ..color = const Color(0xFFFFD36A).withValues(alpha: 0.9 * alpha)
+          ..strokeWidth = 1.8,
+      );
+    }
+
     canvas.restore();
-    final glass = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..color =
-          (mutation > .45 ? const Color(0xFFFFD36A) : const Color(0xFF58E8FF))
-              .withValues(alpha: alpha);
-    canvas.drawCircle(const Offset(0, 0), 5, glass);
-    canvas.drawLine(const Offset(-3, -3), const Offset(3, 3), glass);
-    canvas.drawLine(const Offset(-3, 3), const Offset(3, -3), glass);
   }
 
   void _enemy(Canvas canvas, _FutureEnemy enemy) {
@@ -923,6 +1179,35 @@ class _FuturePainter extends CustomPainter {
       ),
     );
     final pulse = (math.sin(game.time * 7 + enemy.position.dx * .018) + 1) / 2;
+    
+    // Attack telegraph: If enemy is about to fire or pounce, draw a warning targeting laser
+    final isTelegraphing = enemy.shotTimer < 0.45;
+    if (isTelegraphing) {
+      final warningAlpha = ((0.45 - enemy.shotTimer) / 0.45).clamp(0.0, 1.0);
+      canvas.drawLine(
+        Offset.zero,
+        const Offset(140, 0),
+        Paint()
+          ..color = const Color(0xFFFF3355).withValues(alpha: warningAlpha * 0.7)
+          ..strokeWidth = 1.2
+          ..strokeCap = StrokeCap.round,
+      );
+      canvas.drawCircle(
+        const Offset(140, 0),
+        2.5 + math.sin(game.time * 25) * 1.5,
+        Paint()..color = const Color(0xFFFF3355).withValues(alpha: warningAlpha * 0.9),
+      );
+      // Charging energy gathering rings around the attacker
+      canvas.drawCircle(
+        const Offset(15, 0),
+        (enemy.shotTimer / 0.45) * 16.0 + 2.0,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5
+          ..color = const Color(0xFFFF8598).withValues(alpha: warningAlpha),
+      );
+    }
+
     switch (enemy.type) {
       case _FutureEnemyType.hound:
         _drawHound(canvas, pulse);

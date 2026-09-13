@@ -11,6 +11,12 @@ List<int> numberfallDisplayDigits(int value) {
 String numberfallDisplayString(int value) =>
     numberfallDisplayDigits(value).join();
 
+/// Test-visible access to Numberfall simulation internals.
+@visibleForTesting
+abstract final class NumberfallTestAccess {
+  static dynamic createGame() => _NumberfallGame();
+}
+
 class _NumberStageConfig {
   const _NumberStageConfig({
     required this.name,
@@ -54,16 +60,42 @@ class _NumBounceDash {
 
   final Rect rect;
   double _remaining = -1;
+  double _time = 0;
 
+  bool get isArmed => _remaining < 0;
   bool get isAvailable => _remaining != 0;
   bool get isFading => _remaining > 0;
-  double get opacity => _remaining < 0
-      ? 1
-      : (_remaining / _NumberfallGame._bounceDashLifetime).clamp(0.0, 1.0);
+  double get remaining => _remaining;
+  
+  /// In the final 1.5 seconds, platform blinks with accelerating cadence.
+  bool get isVisible {
+    if (_remaining == 0) return false;
+    if (_remaining < 0 || _remaining > 1.5) return true;
+    final speed = _remaining > 0.8 ? 16.0 : 28.0;
+    return math.sin(_time * speed) > -0.2;
+  }
 
-  void trigger() => _remaining = _NumberfallGame._bounceDashLifetime;
+  double get opacity {
+    if (_remaining == 0) return 0.0;
+    if (_remaining < 0) return 0.95;
+    if (_remaining > 1.5) return 0.95;
+    return isVisible ? 0.85 : 0.2;
+  }
+
+  void trigger() {
+    if (_remaining < 0) {
+      _remaining = _NumberfallGame._bounceDashLifetime;
+      _time = 0;
+    }
+  }
+
+  void reset() {
+    _remaining = -1;
+    _time = 0;
+  }
 
   void update(double dt) {
+    _time += dt;
     if (_remaining <= 0) return;
     _remaining = math.max(0, _remaining - dt);
   }
@@ -74,13 +106,13 @@ class _NumberfallGame {
   static const height = 540.0;
   static const _gravity = 1120.0;
   static const _jumpImpulse = 620.0;
-  static const _bounceDashImpulse = 750.0;
-  static const _bounceDashLifetime = 2.6;
+  static const _bounceJumpImpulse = 820.0;
+  static const _bounceDashLifetime = 3.0;
   static const _maxMoveSpeed = 275.0;
   static const _stageConfigs = [
     _NumberStageConfig(
       name: 'FOUNDATION',
-      pickupGoal: 6,
+      pickupGoal: 3,
       enemySpeed: 56,
       enemyRespawns: 0,
       rewriteLead: .28,
@@ -90,7 +122,7 @@ class _NumberfallGame {
     ),
     _NumberStageConfig(
       name: 'SPLIT ROUTE',
-      pickupGoal: 8,
+      pickupGoal: 4,
       enemySpeed: 66,
       enemyRespawns: 1,
       rewriteLead: .25,
@@ -100,7 +132,7 @@ class _NumberfallGame {
     ),
     _NumberStageConfig(
       name: 'RISKY SUMS',
-      pickupGoal: 10,
+      pickupGoal: 4,
       enemySpeed: 76,
       enemyRespawns: 1,
       rewriteLead: .22,
@@ -110,7 +142,7 @@ class _NumberfallGame {
     ),
     _NumberStageConfig(
       name: 'FAST REWRITE',
-      pickupGoal: 12,
+      pickupGoal: 5,
       enemySpeed: 88,
       enemyRespawns: 2,
       rewriteLead: .19,
@@ -120,7 +152,7 @@ class _NumberfallGame {
     ),
     _NumberStageConfig(
       name: 'FINAL EQUATION',
-      pickupGoal: 14,
+      pickupGoal: 6,
       enemySpeed: 102,
       enemyRespawns: 3,
       rewriteLead: .16,
@@ -148,6 +180,7 @@ class _NumberfallGame {
   _NumBody player = _NumBody(0, 0, 22, 33);
   _NumBody enemy = _NumBody(0, 0, 25, 25);
   final List<_NumPickup> pickupsOnField = [];
+  final List<_NumberfallParticle> particles = [];
   List<Rect> _activePlatforms = const [];
   List<Rect> _supportPlatforms = const [];
   List<Rect> _collisionPlatforms = const [];
@@ -169,6 +202,7 @@ class _NumberfallGame {
   int _enemyRespawnsRemaining = 0;
   double _enemyRespawnTimer = 0;
   String message = 'Collect +1. Do not trust the floor.';
+  double time = 0;
 
   _NumberfallGame({
     int campaignLevel = 1,
@@ -213,9 +247,10 @@ class _NumberfallGame {
       // The level needs enough rewrites to create a route-reading arc rather
       // than ending as soon as the player learns the first digit.
       pickupGoal:
-          ((base.pickupGoal + 14 + campaign.number * 3) *
+          ((base.pickupGoal + 2 + campaign.number) *
                   campaign.lengthMultiplier)
-              .round(),
+              .round()
+              .clamp(3, 8),
       enemySpeed: base.enemySpeed * campaign.enemyPressure,
       enemyRespawns: base.enemyRespawns + campaign.number ~/ 7,
       rewriteLead: (base.rewriteLead / campaign.difficulty)
@@ -360,11 +395,10 @@ class _NumberfallGame {
     };
   }
 
-  /// Some seven-segment digits form fully closed counters. Their original
-  /// joins were only 21 logical pixels tall, while the actor is 33 pixels
-  /// tall, making the visibly empty centre of 0 and 8 impossible to enter.
-  /// Opening a 48px doorway beside a counter keeps the glyph recognizable and
-  /// makes every visible interior a legitimate route.
+  /// Some seven-segment digits form fully closed counters or tight vertical columns
+  /// (such as digit 1 or parallel joints). Their joins were only 21 logical pixels wide,
+  /// while the actor is 22px wide and 33px tall, causing the actor to get trapped or blocked.
+  /// Opening a 48px passage ensures the actor can easily pass and jump between segments.
   Map<String, List<Rect>> _segmentsForDigit(int digit, double x, double y) {
     final raw = _rawSegments(x, y);
     final upperCounter = digit == 0 || digit == 8 || digit == 9;
@@ -390,21 +424,45 @@ class _NumberfallGame {
               entry.value.bottom,
             ),
           ],
+          // When displaying digit 1, ensure the vertical stem 'b' and 'c' have jump-through relief
+          'b' when digit == 1 => [
+            Rect.fromLTRB(
+              entry.value.left,
+              entry.value.top,
+              entry.value.right,
+              entry.value.bottom - 44,
+            ),
+          ],
+          'c' when digit == 1 => [
+            Rect.fromLTRB(
+              entry.value.left,
+              entry.value.top + 44,
+              entry.value.right,
+              entry.value.bottom,
+            ),
+          ],
           _ => [entry.value],
         },
     };
   }
 
-  List<_NumBounceDash> _buildBounceDashes() => List.generate(3, (index) {
-    final x = _startX + index * (_digitWidth + _gap) + _digitWidth / 2;
-    return _NumBounceDash(
-      Rect.fromCenter(
-        center: Offset(x, _top + _digitHeight + 76),
-        width: 80,
-        height: 8,
+  List<_NumBounceDash> _buildBounceDashes() {
+    // Spans across all 3 digits: from left of digit 0 to right of digit 2
+    final totalDigitsWidth = _digitWidth * 3 + _gap * 2;
+    const padding = 75.0;
+    final platformWidth = totalDigitsWidth + padding * 2;
+    final platformLeft = _startX - padding;
+    return [
+      _NumBounceDash(
+        Rect.fromLTWH(
+          platformLeft,
+          _top + _digitHeight + 72,
+          platformWidth,
+          14,
+        ),
       ),
-    );
-  });
+    ];
+  }
 
   void setJump(bool value) {
     if (phase != _NumberPhase.playing) return;
@@ -414,7 +472,14 @@ class _NumberfallGame {
   }
 
   void update(double dt) {
+    time += dt;
     _pulse = math.max(0, _pulse - dt * 3);
+    for (final p in particles) {
+      p.time += dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+    }
+    particles.removeWhere((p) => p.time >= p.life);
     if (phase != _NumberPhase.playing) return;
     _jumpBuffer = math.max(0, _jumpBuffer - dt);
     if (_pendingRewrite != null) {
@@ -428,8 +493,38 @@ class _NumberfallGame {
         _refreshCollisionPlatforms();
       }
     }
+    bool onBouncePlatform = false;
     for (final dash in _bounceDashes) {
+      final wasAvailable = dash.isAvailable;
       dash.update(dt);
+      // Check if player is standing on this dash
+      if (player.grounded &&
+          dash.isAvailable &&
+          (player.y + player.h - dash.rect.top).abs() < 6 &&
+          player.x + player.w > dash.rect.left &&
+          player.x < dash.rect.right) {
+        onBouncePlatform = true;
+      }
+      // If platform just expired / collapsed while player was on it
+      if (wasAvailable && !dash.isAvailable) {
+        if (player.grounded && (player.y + player.h - dash.rect.top).abs() < 8) {
+          player.grounded = false;
+          player.coyote = 0;
+        }
+        _burst(dash.rect.center.dx, dash.rect.center.dy, 32, const Color(0xFFFF5376), 140);
+        ArcadeShake.shake(0.65);
+        GameFeedback.explosion();
+        message = 'CATCH PLATFORM COLLAPSED!';
+      }
+    }
+    // If player reached a solid number platform, reset the bouncy platform
+    if (_activePlatforms.any((platform) =>
+        player.grounded && (player.y + player.h - platform.top).abs() < 6)) {
+      for (final dash in _bounceDashes) {
+        if (!dash.isArmed) {
+          dash.reset();
+        }
+      }
     }
     if (!enemy.alive && _enemyRespawnsRemaining > 0) {
       _enemyRespawnTimer -= dt;
@@ -446,11 +541,19 @@ class _NumberfallGame {
     if (_jumpCutRequested && player.vy < -80) player.vy *= .48;
     _jumpCutRequested = false;
     if (_jumpBuffer > 0 && player.coyote > 0) {
-      player.vy = -_jumpImpulse;
+      // Very bouncy super-jump from the catch platform!
+      if (onBouncePlatform) {
+        player.vy = -_bounceJumpImpulse;
+        _burst(player.center.dx, player.y + player.h, 16, const Color(0xFF64F6DB), 120);
+        ArcadeShake.shake(0.35);
+        message = 'SUPER REBOUND!';
+      } else {
+        player.vy = -_jumpImpulse;
+      }
       player.coyote = 0;
       player.grounded = false;
       _jumpBuffer = 0;
-      GameFeedback.lightImpact();
+      GameFeedback.jump();
     }
     _resolve(player, dt, enemyMode: false);
     if (_pendingRewrite == null && exitOpen && player.rect.overlaps(exitDoor)) {
@@ -462,7 +565,7 @@ class _NumberfallGame {
         message = 'DISPLAY $stageNumber STABLE. The next rewrite is waiting.';
       }
       clearInput();
-      GameFeedback.mediumImpact();
+      GameFeedback.victory();
       return;
     }
     if (enemy.alive) {
@@ -494,11 +597,19 @@ class _NumberfallGame {
     }
     if (collected != null) {
       pickups++;
+      _burst(
+        collected.position.dx,
+        collected.position.dy,
+        14,
+        collected.risky ? const Color(0xFFFF9F68) : const Color(0xFFFFE66D),
+        80,
+      );
       pickupsOnField.clear();
-      GameFeedback.mediumImpact();
-      _requestRewrite(
-        collected.delta,
-        collected.risky ? 'RISK ROUTE +${collected.delta}' : 'FRAGMENT +1',
+      GameFeedback.pickup();
+      final target = collected.applyTo(score);
+      _requestRewriteTarget(
+        target,
+        '${collected.label} ARITHMETIC',
         opensExit: pickups >= pickupGoal,
       );
     }
@@ -550,12 +661,12 @@ class _NumberfallGame {
         if (!dash.isAvailable || !body.rect.overlaps(dash.rect)) continue;
         if (body.vy >= 0 && previousBottom <= dash.rect.top + 7) {
           body.y = dash.rect.top - body.h;
-          body.vy = -_bounceDashImpulse;
-          body.grounded = false;
-          body.coyote = 0;
+          body.vy = 0;
+          body.grounded = true;
+          body.coyote = 0.12;
           dash.trigger();
           _pulse = 1;
-          message = 'CATCH DASH — REBOUNDING INTO THE DISPLAY.';
+          message = 'CATCH PLATFORM ACTIVE — 3 SECONDS TO REBOUND!';
           GameFeedback.lightImpact();
           break;
         }
@@ -736,9 +847,14 @@ class _NumberfallGame {
       if (biased.isNotEmpty) candidates = biased;
     }
     final safe = candidates[_random.nextInt(candidates.length)];
+
+    // Random safe arithmetic bonus: +1, +2, or +5
+    const safeOptions = [1, 2, 5];
+    final safeDelta = safeOptions[_random.nextInt(safeOptions.length)];
     pickupsOnField.add(
-      _NumPickup(Offset(safe.rect.center.dx, safe.rect.top - 17), delta: 1),
+      _NumPickup(Offset(safe.rect.center.dx, safe.rect.top - 17), delta: safeDelta),
     );
+
     if (stageConfig.riskyChoice) {
       final risky = [..._reachableSurfaces()]
         ..removeWhere(
@@ -752,10 +868,16 @@ class _NumberfallGame {
           ),
         );
       if (risky.isNotEmpty) {
+        // Random risky arithmetic bonus: +5, +8, or ×2 multiplier
+        final roll = _random.nextInt(3);
+        final isMult = roll == 2;
+        final delta = isMult ? 0 : (roll == 0 ? 5 : 8);
         pickupsOnField.add(
           _NumPickup(
             Offset(risky.first.rect.center.dx, risky.first.rect.top - 17),
-            delta: 2,
+            delta: delta,
+            isMultiplier: isMult,
+            multiplier: isMult ? 2 : 1,
             risky: true,
           ),
         );
@@ -763,22 +885,27 @@ class _NumberfallGame {
     }
   }
 
-  void _requestRewrite(int delta, String cause, {required bool opensExit}) {
+  void _requestRewriteTarget(int targetScore, String cause, {required bool opensExit}) {
     if (phase != _NumberPhase.playing) return;
     pickupsOnField.clear();
     if (_pendingRewrite != null) {
       _pendingRewrite!
-        ..targetScore += delta
+        ..targetScore = targetScore
         ..cause = cause
         ..opensExit = _pendingRewrite!.opensExit || opensExit;
       _rewriteTimer = math.max(_rewriteTimer, stageConfig.rewriteLead * .55);
     } else {
-      _pendingRewrite = _PendingNumberRewrite(score + delta, cause, opensExit);
+      _pendingRewrite = _PendingNumberRewrite(targetScore, cause, opensExit);
       _rewriteTimer = stageConfig.rewriteLead;
     }
     message =
         '${numberfallDisplayString(score)} → ${numberfallDisplayString(_pendingRewrite!.targetScore)} · $cause · REWRITE PRIMED';
     GameFeedback.selection();
+  }
+
+  void _requestRewrite(int delta, String cause, {required bool opensExit}) {
+    final currentPending = _pendingRewrite?.targetScore ?? score;
+    _requestRewriteTarget(currentPending + delta, cause, opensExit: opensExit);
   }
 
   void _commitRewrite() {
@@ -798,6 +925,7 @@ class _NumberfallGame {
     _depenetrateBody(player, _activePlatforms);
     if (enemy.alive) _depenetrateBody(enemy, _activePlatforms);
     _pulse = 1;
+    _burst(width / 2, 220, 22, const Color(0xFF64F6DB), 120);
     if (exitOpen) {
       message = 'THE NUMBER IS STABLE — reach the EXIT portal.';
     } else {
@@ -839,7 +967,22 @@ class _NumberfallGame {
     phase = _NumberPhase.dead;
     clearInput();
     message = reason;
-    GameFeedback.heavyImpact();
+    GameFeedback.explosion();
+  }
+  void _burst(double x, double y, int count, Color color, [double speed = 60]) {
+    if (particles.length > 80) particles.removeRange(0, particles.length - 80);
+    for (var i = 0; i < count; i++) {
+      final angle = _random.nextDouble() * math.pi * 2;
+      final spd = speed * (0.4 + _random.nextDouble() * 0.8);
+      particles.add(_NumberfallParticle(
+        x: x,
+        y: y,
+        vx: math.cos(angle) * spd,
+        vy: math.sin(angle) * spd,
+        color: color,
+        life: 0.35 + _random.nextDouble() * 0.35,
+      ));
+    }
   }
 }
 
@@ -859,9 +1002,47 @@ class _NumBody {
 }
 
 class _NumPickup {
-  _NumPickup(this.position, {required this.delta, this.risky = false});
+  _NumPickup(
+    this.position, {
+    required this.delta,
+    this.isMultiplier = false,
+    this.multiplier = 1,
+    this.risky = false,
+  });
+
   final Offset position;
   final int delta;
+  final bool isMultiplier;
+  final int multiplier;
   final bool risky;
+
+  String get label => isMultiplier ? '×$multiplier' : '+$delta';
+
+  int applyTo(int currentScore) {
+    if (isMultiplier) {
+      return currentScore * multiplier;
+    }
+    return currentScore + delta;
+  }
+
   Rect get rect => Rect.fromCircle(center: position, radius: 15);
+}
+
+class _NumberfallParticle {
+  _NumberfallParticle({
+    required this.x,
+    required this.y,
+    required this.vx,
+    required this.vy,
+    required this.color,
+    required this.life,
+  });
+
+  double x;
+  double y;
+  double vx;
+  double vy;
+  final Color color;
+  final double life;
+  double time = 0;
 }

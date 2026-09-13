@@ -231,16 +231,25 @@ class _LevelNode extends StatelessWidget {
         decoration: BoxDecoration(
           color: unlocked
               ? selected
-                    ? accent.withValues(alpha: .21)
-                    : const Color(0xFF0A1521)
+                    ? accent.withValues(alpha: .28)
+                    : const Color(0xFF0C1726)
               : const Color(0xFF080C14),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: unlocked
-                ? accent.withValues(alpha: selected ? .95 : .38)
+                ? accent.withValues(alpha: selected ? 1.0 : .45)
                 : const Color(0xFF2B3547),
-            width: selected ? 1.8 : 1,
+            width: selected ? 2.0 : 1,
           ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: accent.withValues(alpha: .35),
+                    blurRadius: 14,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : null,
         ),
         child: Stack(
           children: [
@@ -248,33 +257,43 @@ class _LevelNode extends StatelessWidget {
               child: unlocked
                   ? Text(
                       number.toString().padLeft(2, '0'),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 19,
                         fontWeight: FontWeight.w900,
                         letterSpacing: .8,
+                        color: selected ? Colors.white : const Color(0xFFE2EDFC),
+                        shadows: selected
+                            ? [
+                                Shadow(
+                                  color: accent.withValues(alpha: .8),
+                                  blurRadius: 10,
+                                ),
+                              ]
+                            : null,
                       ),
                     )
-                  : const Icon(Icons.lock_rounded, color: Color(0xFF536075)),
+                  : const Icon(Icons.lock_rounded, color: Color(0xFF435165)),
             ),
             if (unlocked)
               Positioned(
-                left: 5,
-                right: 5,
+                left: 0,
+                right: 0,
                 bottom: 5,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    3,
-                    (index) => Icon(
-                      index < stars
-                          ? Icons.star_rounded
-                          : Icons.star_outline_rounded,
-                      size: 12,
-                      color: index < stars
-                          ? const Color(0xFFFFD36A)
-                          : const Color(0xFF536075),
-                    ),
-                  ),
+                  children: [
+                    for (var i = 1; i <= 3; i++)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                        child: Icon(
+                          i <= stars ? Icons.star_rounded : Icons.star_outline_rounded,
+                          size: 11,
+                          color: i <= stars
+                              ? const Color(0xFFFFD700)
+                              : const Color(0xFF3B4F67),
+                        ),
+                      ),
+                  ],
                 ),
               ),
           ],
@@ -306,9 +325,16 @@ class _ChallengeCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xE80A111B),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accent.withValues(alpha: .55)),
+        color: const Color(0xEE09121D),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accent.withValues(alpha: .7), width: 1.4),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: .18),
+            blurRadius: 18,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -327,7 +353,7 @@ class _ChallengeCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${level.storyBeat}\nObjective: ${level.objective}\nFocus: ${level.gameplayFocus}\nTarget $targetScore · Par ${level.parSeconds.round()}s · ${existingStars}/3 stars',
+                  '${level.storyBeat}\nObjective: ${level.objective}\nFocus: ${level.gameplayFocus}\nTarget $targetScore · Par ${level.parSeconds.round()}s · $existingStars/3 stars',
                   style: const TextStyle(
                     color: Color(0xFFC0CDDF),
                     fontSize: 11,

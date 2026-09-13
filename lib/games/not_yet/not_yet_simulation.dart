@@ -204,6 +204,7 @@ class RealityGame {
   final List<Particle> _particles = [];
   final List<FloatingLabel> _labels = [];
   final List<Consequence> _stack = [];
+  final List<Shockwave> _shockwaves = [];
 
   GamePhase phase = GamePhase.title;
   int levelIndex = 0;
@@ -254,7 +255,7 @@ class RealityGame {
     }
     return LevelSpec(
       'Sector ${campaign.number.toString().padLeft(2, '0')} · ${campaign.chapterTitle}',
-      '${campaign.storyBeat} ${campaign.objective} A ${totalEnemies}-host breach.',
+      '${campaign.storyBeat} ${campaign.objective} A $totalEnemies-host breach.',
       roster,
       (base.spawnInterval / campaign.enemyPressure).clamp(.38, 1.15).toDouble(),
       (base.maxOnField + (campaign.number / 6).floor()).clamp(3, 10).toInt(),
@@ -271,6 +272,7 @@ class RealityGame {
   double get payoutMultiplier => 1 + debt / 100 * .85 + (chain - 1) * .06;
   double get holdPressure => (debt / maxDebt).clamp(0, 1);
   double get holdDuration => _holdTime;
+  double get elapsedSeconds => _levelTime;
   String get rank {
     if (score >= 9000) return 'PARADOX';
     if (score >= 6000) return 'BREACHER';
@@ -332,6 +334,7 @@ class RealityGame {
     _particles.clear();
     _labels.clear();
     _stack.clear();
+    _shockwaves.clear();
     _player
       ..position = const Offset(worldWidth / 2, worldHeight / 2)
       ..velocity = Offset.zero
@@ -364,9 +367,10 @@ class RealityGame {
           ? 'MARGIN CALL — the entire stack is resolving now.'
           : 'Newest consequence resolves first.';
       if (forced) {
-        GameFeedback.heavyImpact();
+        GameFeedback.alarm();
+        ArcadeShake.shake(0.75);
       } else {
-        GameFeedback.mediumImpact();
+        GameFeedback.settlement();
       }
     } else {
       debt = 0;
@@ -733,7 +737,9 @@ class RealityGame {
 
   void _detonate(Offset center) {
     _burst(center, 27, const Color(0xFFFF9C4E), .72);
-    GameFeedback.mediumImpact();
+    _shockwave(center, const Color(0xFFFF9C4E), 115);
+    GameFeedback.explosion();
+    ArcadeShake.shake(0.65);
     for (final enemy in _enemies) {
       if (enemy.alive &&
           !enemy.pending &&
@@ -748,6 +754,7 @@ class RealityGame {
     if (_player.invulnerable > 0 || phase != GamePhase.playing) return;
     _player.invulnerable = .55;
     GameFeedback.heavyImpact();
+    ArcadeShake.shake(0.4);
     if (holding) {
       _addConsequence(
         Consequence(
@@ -843,7 +850,7 @@ class RealityGame {
         return;
     }
     _burst(position, 15, _pickupColor(kind), .5);
-    GameFeedback.mediumImpact();
+    GameFeedback.pickup();
   }
 
   void _addConsequence(Consequence consequence) {
@@ -931,6 +938,21 @@ class RealityGame {
     _holdTime = 0;
     phase = GamePhase.playing;
     _player.invulnerable = math.max(_player.invulnerable, .45);
+
+    _shockwave(
+      _player.position,
+      clean ? const Color(0xFF48F2C1) : const Color(0xFFFF557D),
+      160,
+    );
+
+    if (clean && !_forcedSettlement && _settlementItems >= 4) {
+      _overdriveTimer = math.max(_overdriveTimer, 2.2);
+      _player.invulnerable = math.max(_player.invulnerable, 2.0);
+      _shockwave(_player.position, const Color(0xFF48F2C1), 220);
+      _label(_player.position, 'SETTLEMENT SURGE!', const Color(0xFF48F2C1));
+      GameFeedback.heavyImpact();
+    }
+
     statusText = clean && !_forcedSettlement && risk >= .35
         ? 'CLEAN RELEASE ×${chain.toStringAsFixed(1)} — +$bonus.'
         : _forcedSettlement
@@ -949,7 +971,7 @@ class RealityGame {
     lastClearBonus = (300 * chain).round() + timeBonus;
     score += lastClearBonus;
     statusText = 'Sector cleared.';
-    GameFeedback.mediumImpact();
+    GameFeedback.victory();
   }
 
   void _lose() {
@@ -957,7 +979,7 @@ class RealityGame {
     holding = false;
     phase = GamePhase.gameOver;
     statusText = 'Reality won this round.';
-    GameFeedback.heavyImpact();
+    GameFeedback.explosion();
   }
 
   void _cleanupWorld() {
@@ -979,6 +1001,15 @@ class RealityGame {
       label.position += const Offset(0, -26) * dt;
     }
     _labels.removeWhere((label) => label.time >= label.life);
+    for (final wave in _shockwaves) {
+      wave.time += dt;
+    }
+    _shockwaves.removeWhere((wave) => wave.time >= wave.life);
+  }
+
+  void _shockwave(Offset position, Color color, [double maxRadius = 130]) {
+    if (_shockwaves.length >= 8) _shockwaves.removeAt(0);
+    _shockwaves.add(Shockwave(position, color, maxRadius: maxRadius));
   }
 
   Drum _createDrum() {
@@ -999,7 +1030,9 @@ class RealityGame {
   }
 
   void _burst(Offset position, int amount, Color color, double life) {
-    for (var index = 0; index < amount; index++) {
+    // I cap transient effects so a large settlement cannot create frame debt.
+    final available = math.max(0, 240 - _particles.length);
+    for (var index = 0; index < math.min(amount, available); index++) {
       final angle = _random.nextDouble() * math.pi * 2;
       final speed = 35 + _random.nextDouble() * 160;
       _particles.add(
@@ -1014,6 +1047,7 @@ class RealityGame {
   }
 
   void _label(Offset position, String text, Color color) {
+    if (_labels.length >= 24) _labels.removeAt(0);
     _labels.add(FloatingLabel(position, text, color));
   }
 }
@@ -1158,4 +1192,14 @@ class Consequence {
   final int id;
   final String label;
   final int amount;
+}
+
+class Shockwave {
+  Shockwave(this.position, this.color, {this.maxRadius = 130, this.life = .45});
+
+  final Offset position;
+  final Color color;
+  final double maxRadius;
+  final double life;
+  double time = 0;
 }

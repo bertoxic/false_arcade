@@ -12,6 +12,7 @@ import '../../core/game_presentation.dart';
 import '../../core/gameplay.dart';
 import '../../core/logical_viewport.dart';
 import '../../ui/game_controls.dart';
+import '../../ui/screen_shake.dart';
 
 part 'fall_due_page.dart';
 part 'fall_due_simulation.dart';

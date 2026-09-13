@@ -17,9 +17,11 @@ class NumberfallPage extends StatefulWidget {
 }
 
 class _NumberfallPageState extends State<NumberfallPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final GameLoopController _loop;
   late final _NumberfallGame _game;
+  late final FocusNode _gameFocus;
+  final Set<LogicalKeyboardKey> _pressedKeys = {};
   bool _paused = false;
   bool _completionReported = false;
   bool _continuingCampaign = false;
@@ -28,12 +30,14 @@ class _NumberfallPageState extends State<NumberfallPage>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     GamePresentation.enterLandscape();
     _game = _NumberfallGame(
       campaignLevel: widget.level?.number ?? 1,
       random: math.Random(widget.level?.seed),
       campaign: widget.level,
     );
+    _gameFocus = FocusNode(debugLabel: 'Numberfall controls');
     _loop = GameLoopController(
       vsync: this,
       onStep: (dt) {
@@ -49,13 +53,53 @@ class _NumberfallPageState extends State<NumberfallPage>
   }
 
   void _setPaused(bool value) {
-    _game.clearInput();
+    _clearInput();
     _loop.setPaused(value);
     setState(() => _paused = value);
+    if (!value) _gameFocus.requestFocus();
   }
 
-  void _startRun() {
+  void _clearInput() {
+    _pressedKeys.clear();
     _game.clearInput();
+  }
+
+  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
+    final key = event.logicalKey;
+    if (!_controlKeys.contains(key)) return KeyEventResult.ignored;
+    final freshPress = event is KeyDownEvent && _pressedKeys.add(key);
+    if (event is KeyUpEvent) _pressedKeys.remove(key);
+    _game.left =
+        _pressedKeys.contains(LogicalKeyboardKey.arrowLeft) ||
+        _pressedKeys.contains(LogicalKeyboardKey.keyA);
+    _game.right =
+        _pressedKeys.contains(LogicalKeyboardKey.arrowRight) ||
+        _pressedKeys.contains(LogicalKeyboardKey.keyD);
+    _game.setJump(
+      _pressedKeys.contains(LogicalKeyboardKey.arrowUp) ||
+          _pressedKeys.contains(LogicalKeyboardKey.keyW) ||
+          _pressedKeys.contains(LogicalKeyboardKey.space),
+    );
+    if (freshPress && key == LogicalKeyboardKey.escape) {
+      _setPaused(!_paused);
+    }
+    setState(() {});
+    return KeyEventResult.handled;
+  }
+
+  static final Set<LogicalKeyboardKey> _controlKeys = {
+    LogicalKeyboardKey.arrowLeft,
+    LogicalKeyboardKey.keyA,
+    LogicalKeyboardKey.arrowRight,
+    LogicalKeyboardKey.keyD,
+    LogicalKeyboardKey.arrowUp,
+    LogicalKeyboardKey.keyW,
+    LogicalKeyboardKey.space,
+    LogicalKeyboardKey.escape,
+  };
+
+  void _startRun() {
+    _clearInput();
     _completionReported = false;
     _elapsedSeconds = 0;
     _game.start();
@@ -63,7 +107,7 @@ class _NumberfallPageState extends State<NumberfallPage>
   }
 
   void _nextStage() {
-    _game.clearInput();
+    _clearInput();
     _game.nextStage();
     setState(() {});
   }
@@ -97,8 +141,20 @@ class _NumberfallPageState extends State<NumberfallPage>
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) return;
+    _clearInput();
+    if (!_paused && _game.phase == _NumberPhase.playing) {
+      _loop.setPaused(true);
+      if (mounted) setState(() => _paused = true);
+    }
+  }
+
+  @override
   void dispose() {
-    _game.clearInput();
+    WidgetsBinding.instance.removeObserver(this);
+    _clearInput();
+    _gameFocus.dispose();
     _loop.dispose();
     if (!_continuingCampaign) GamePresentation.restore();
     super.dispose();
@@ -108,195 +164,208 @@ class _NumberfallPageState extends State<NumberfallPage>
   Widget build(BuildContext context) {
     final game = _game;
     return Scaffold(
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment(0, -1),
-            radius: 1.35,
-            colors: [Color(0xFF153947), Color(0xFF061018), Color(0xFF020508)],
+      body: Focus(
+        focusNode: _gameFocus,
+        autofocus: true,
+        onKeyEvent: _onKeyEvent,
+        onFocusChange: (focused) {
+          if (!focused) _clearInput();
+        },
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment(0, -1),
+              radius: 1.35,
+              colors: [Color(0xFF153947), Color(0xFF061018), Color(0xFF020508)],
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxHeight < 520;
-              return Column(
-                children: [
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: Center(
-                        child: SizedBox.expand(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: const Color(0xFF376A78),
+          child: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxHeight < 520;
+                return Column(
+                  children: [
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Center(
+                          child: SizedBox.expand(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: const Color(0xFF376A78),
+                                  ),
                                 ),
-                              ),
-                              child: Stack(
-                                children: [
-                                  Positioned.fill(
-                                    child: CustomPaint(
-                                      painter: _NumberPainter(game),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: 10,
-                                    left: 62,
-                                    right: 62,
-                                    child: IgnorePointer(
-                                      child: Center(
-                                        child: GameStageProgressMenu(
-                                          title: 'NUMBERFALL',
-                                          stageLabel: 'DISPLAY',
-                                          currentStage: game.stageNumber,
-                                          stageCount: game.stageCount,
-                                          accentColor: const Color(0xFF64F6DB),
-                                          compact: compact,
-                                        ),
+                                child: Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: CustomPaint(
+                                        painter: _NumberPainter(game),
                                       ),
                                     ),
-                                  ),
-                                  Positioned(
-                                    top: 60,
-                                    left: 12,
-                                    right: 12,
-                                    child: IgnorePointer(
-                                      child: _NumberArenaHud(game: game),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: 12,
-                                    left: 12,
-                                    child: GameExitButton(
-                                      onExit: () => Navigator.of(context).pop(),
-                                    ),
-                                  ),
-                                  if (game.phase == _NumberPhase.playing)
                                     Positioned(
-                                      top: 12,
-                                      right: 12,
-                                      child: GamePauseButton(
-                                        onTap: () => _setPaused(true),
-                                      ),
-                                    ),
-                                  Positioned(
-                                    left: 15,
-                                    bottom: 15,
-                                    child: Row(
-                                      children: [
-                                        HoldGameButton(
-                                          label: 'LEFT',
-                                          icon: Icons.chevron_left_rounded,
-                                          color: const Color(0xFF67D9ED),
-                                          size: compact ? 58 : 66,
-                                          onChanged: (value) =>
-                                              setState(() => game.left = value),
-                                        ),
-                                        const SizedBox(width: 7),
-                                        HoldGameButton(
-                                          label: 'RIGHT',
-                                          icon: Icons.chevron_right_rounded,
-                                          color: const Color(0xFF67D9ED),
-                                          size: compact ? 58 : 66,
-                                          onChanged: (value) => setState(
-                                            () => game.right = value,
+                                      top: 10,
+                                      left: 62,
+                                      right: 62,
+                                      child: IgnorePointer(
+                                        child: Center(
+                                          child: GameStageProgressMenu(
+                                            title: 'NUMBERFALL',
+                                            stageLabel: 'DISPLAY',
+                                            currentStage: game.stageNumber,
+                                            stageCount: game.stageCount,
+                                            accentColor: const Color(
+                                              0xFF64F6DB,
+                                            ),
+                                            compact: compact,
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                  Positioned(
-                                    right: 18,
-                                    bottom: 16,
-                                    child: HoldGameButton(
-                                      label: 'JUMP',
-                                      icon: Icons.arrow_upward_rounded,
-                                      color: const Color(0xFFFFE66D),
-                                      size: compact ? 70 : 80,
-                                      onChanged: (value) =>
-                                          setState(() => game.setJump(value)),
-                                    ),
-                                  ),
-                                  if (game.phase == _NumberPhase.intro)
-                                    _NumberOverlay(
-                                      title: 'NUMBERFALL',
-                                      copy:
-                                          'The glowing segments are solid platforms. Three faint catch dashes sit below the display: land on one to rebound back up before it fades. Read the preview, choose a reachable fragment, and move before the display commits its rewrite.',
-                                      button: 'ENTER THE NUMBER',
-                                      onTap: _startRun,
-                                    ),
-                                  if (game.phase == _NumberPhase.dead)
-                                    _NumberOverlay(
-                                      title: 'YOU FELL',
-                                      copy: game.message,
-                                      button: 'RESTART',
-                                      onTap: _startRun,
-                                      danger: true,
-                                    ),
-                                  if (game.phase == _NumberPhase.stageClear)
-                                    if (widget.level != null)
-                                      CampaignMissionClearOverlay(
-                                        level: widget.level!,
-                                        score: game.score,
-                                        elapsedSeconds: _elapsedSeconds,
-                                        accent: const Color(0xFF55F2D7),
-                                        onNextLevel: _continueCampaign,
-                                        onExit: () =>
-                                            Navigator.of(context).pop(),
-                                      )
-                                    else
-                                      _NumberOverlay(
-                                        title: 'DISPLAY STABLE',
-                                        copy:
-                                            'This number held together. The next display rewrites faster and asks for more pickups.',
-                                        button: 'NEXT DISPLAY',
-                                        onTap: _nextStage,
                                       ),
-                                  if (game.phase == _NumberPhase.won)
-                                    if (widget.level != null)
-                                      CampaignMissionClearOverlay(
-                                        level: widget.level!,
-                                        score: game.score,
-                                        elapsedSeconds: _elapsedSeconds,
-                                        accent: const Color(0xFF55F2D7),
-                                        onNextLevel: _continueCampaign,
+                                    ),
+                                    Positioned(
+                                      top: 60,
+                                      left: 12,
+                                      right: 12,
+                                      child: IgnorePointer(
+                                        child: _NumberArenaHud(game: game),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 12,
+                                      left: 12,
+                                      child: GameExitButton(
                                         onExit: () =>
                                             Navigator.of(context).pop(),
-                                      )
-                                    else
+                                      ),
+                                    ),
+                                    if (game.phase == _NumberPhase.playing)
+                                      Positioned(
+                                        top: 12,
+                                        right: 12,
+                                        child: GamePauseButton(
+                                          onTap: () => _setPaused(true),
+                                        ),
+                                      ),
+                                    Positioned(
+                                      left: 15,
+                                      bottom: 15,
+                                      child: Row(
+                                        children: [
+                                          HoldGameButton(
+                                            label: 'LEFT',
+                                            icon: Icons.chevron_left_rounded,
+                                            color: const Color(0xFF67D9ED),
+                                            size: compact ? 58 : 66,
+                                            onChanged: (value) => setState(
+                                              () => game.left = value,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 7),
+                                          HoldGameButton(
+                                            label: 'RIGHT',
+                                            icon: Icons.chevron_right_rounded,
+                                            color: const Color(0xFF67D9ED),
+                                            size: compact ? 58 : 66,
+                                            onChanged: (value) => setState(
+                                              () => game.right = value,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Positioned(
+                                      right: 18,
+                                      bottom: 16,
+                                      child: HoldGameButton(
+                                        label: 'JUMP',
+                                        icon: Icons.arrow_upward_rounded,
+                                        color: const Color(0xFFFFE66D),
+                                        size: compact ? 70 : 80,
+                                        onChanged: (value) =>
+                                            setState(() => game.setJump(value)),
+                                      ),
+                                    ),
+                                    if (game.phase == _NumberPhase.intro)
                                       _NumberOverlay(
-                                        title: 'EQUATION SOLVED',
+                                        title: 'NUMBERFALL',
                                         copy:
-                                            'You cleared every display, read its rewrites, and found a stable route through the equation.',
-                                        button: 'PLAY AGAIN',
+                                            'The glowing segments are solid platforms. Read the preview, choose a reachable fragment, and move before the rewrite commits. If you fall off, land on the wide bouncy safety platform below to move and super-rebound back up, but hurry—it blinks and collapses in 3 seconds!',
+                                        button: 'ENTER THE NUMBER',
                                         onTap: _startRun,
                                       ),
-                                  if (_paused)
-                                    GamePauseOverlay(
-                                      gameName: 'NUMBERFALL',
-                                      onResume: () => _setPaused(false),
-                                      onRestart: () {
-                                        _loop.setPaused(false);
-                                        _paused = false;
-                                        _startRun();
-                                      },
-                                      onExit: () => Navigator.of(context).pop(),
-                                    ),
-                                ],
+                                    if (game.phase == _NumberPhase.dead)
+                                      _NumberOverlay(
+                                        title: 'YOU FELL',
+                                        copy: game.message,
+                                        button: 'RESTART',
+                                        onTap: _startRun,
+                                        danger: true,
+                                      ),
+                                    if (game.phase == _NumberPhase.stageClear)
+                                      if (widget.level != null)
+                                        CampaignMissionClearOverlay(
+                                          level: widget.level!,
+                                          score: game.score,
+                                          elapsedSeconds: _elapsedSeconds,
+                                          accent: const Color(0xFF55F2D7),
+                                          onNextLevel: _continueCampaign,
+                                          onExit: () =>
+                                              Navigator.of(context).pop(),
+                                        )
+                                      else
+                                        _NumberOverlay(
+                                          title: 'DISPLAY STABLE',
+                                          copy:
+                                              'This number held together. The next display rewrites faster and asks for more pickups.',
+                                          button: 'NEXT DISPLAY',
+                                          onTap: _nextStage,
+                                        ),
+                                    if (game.phase == _NumberPhase.won)
+                                      if (widget.level != null)
+                                        CampaignMissionClearOverlay(
+                                          level: widget.level!,
+                                          score: game.score,
+                                          elapsedSeconds: _elapsedSeconds,
+                                          accent: const Color(0xFF55F2D7),
+                                          onNextLevel: _continueCampaign,
+                                          onExit: () =>
+                                              Navigator.of(context).pop(),
+                                        )
+                                      else
+                                        _NumberOverlay(
+                                          title: 'EQUATION SOLVED',
+                                          copy:
+                                              'You cleared every display, read its rewrites, and found a stable route through the equation.',
+                                          button: 'PLAY AGAIN',
+                                          onTap: _startRun,
+                                        ),
+                                    if (_paused)
+                                      GamePauseOverlay(
+                                        gameName: 'NUMBERFALL',
+                                        onResume: () => _setPaused(false),
+                                        onRestart: () {
+                                          _loop.setPaused(false);
+                                          _paused = false;
+                                          _startRun();
+                                        },
+                                        onExit: () =>
+                                            Navigator.of(context).pop(),
+                                      ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              );
-            },
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),

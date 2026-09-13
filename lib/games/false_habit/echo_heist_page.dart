@@ -17,10 +17,12 @@ class EchoHeistPage extends StatefulWidget {
 }
 
 class _EchoHeistPageState extends State<EchoHeistPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final GameLoopController _loop;
   late final _EchoHeist _heist;
-  Offset _input = Offset.zero;
+  late final FocusNode _gameFocus;
+  final DirectionalInput _movement = DirectionalInput();
+  final Set<LogicalKeyboardKey> _pressedActions = {};
   bool _paused = false;
   bool _completionReported = false;
   bool _continuingCampaign = false;
@@ -30,21 +32,20 @@ class _EchoHeistPageState extends State<EchoHeistPage>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     GamePresentation.enterLandscape();
     _heist = _EchoHeist(
       campaignLevel: widget.level?.number ?? 1,
       campaign: widget.level,
     );
+    _gameFocus = FocusNode(debugLabel: 'False Habit controls');
     _loop = GameLoopController(
       vsync: this,
       onStep: (dt) {
-        final previousPhase = _heist.phase;
-        if (previousPhase == _HeistPhase.playing) _elapsedSeconds += dt;
-        _heist.update(dt, _input);
-        if (previousPhase == _HeistPhase.playing &&
-            _heist.phase != _HeistPhase.playing) {
-          _clearInput();
-        }
+        final wasPlaying = _heist.phase == _HabitPhase.playing;
+        if (wasPlaying) _elapsedSeconds += dt;
+        _heist.update(dt, _movement.axis);
+        if (wasPlaying && _heist.phase != _HabitPhase.playing) _clearInput();
         _reportCompletion();
       },
       onFrame: () {
@@ -55,14 +56,41 @@ class _EchoHeistPageState extends State<EchoHeistPage>
   }
 
   void _clearInput() {
-    _input = Offset.zero;
+    _movement.reset();
+    _pressedActions.clear();
     _inputEpoch++;
   }
+
+  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
+    if (_movement.handleKey(event)) {
+      setState(() {});
+      return KeyEventResult.handled;
+    }
+    final key = event.logicalKey;
+    if (!_actionKeys.contains(key)) return KeyEventResult.ignored;
+    final freshPress = event is KeyDownEvent && _pressedActions.add(key);
+    if (event is KeyUpEvent) _pressedActions.remove(key);
+    if (freshPress &&
+        (key == LogicalKeyboardKey.keyE || key == LogicalKeyboardKey.space)) {
+      _heist.deployEcho();
+    } else if (freshPress && key == LogicalKeyboardKey.escape) {
+      _setPaused(!_paused);
+    }
+    setState(() {});
+    return KeyEventResult.handled;
+  }
+
+  static final Set<LogicalKeyboardKey> _actionKeys = {
+    LogicalKeyboardKey.keyE,
+    LogicalKeyboardKey.space,
+    LogicalKeyboardKey.escape,
+  };
 
   void _setPaused(bool value) {
     _paused = value;
     _clearInput();
     _loop.setPaused(value);
+    if (!value) _gameFocus.requestFocus();
   }
 
   void _startRun() {
@@ -76,15 +104,14 @@ class _EchoHeistPageState extends State<EchoHeistPage>
     final level = widget.level;
     if (_completionReported ||
         level == null ||
-        (_heist.phase != _HeistPhase.stageClear &&
-            _heist.phase != _HeistPhase.won)) {
+        _heist.phase != _HabitPhase.escaped) {
       return;
     }
     _completionReported = true;
     widget.onLevelComplete?.call(
       LevelRunResult(
         level: level,
-        score: _heist.runLoot.round(),
+        score: _heist.score,
         elapsedSeconds: _elapsedSeconds,
       ),
     );
@@ -102,13 +129,24 @@ class _EchoHeistPageState extends State<EchoHeistPage>
 
   void _exitGame() {
     _clearInput();
-    final navigator = Navigator.of(context);
     _loop.setPaused(true);
-    navigator.popUntil((route) => route.isFirst);
+    Navigator.of(context).pop();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) return;
+    _clearInput();
+    if (!_paused && _heist.phase == _HabitPhase.playing) {
+      _loop.setPaused(true);
+      if (mounted) setState(() => _paused = true);
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _gameFocus.dispose();
     _loop.dispose();
     if (!_continuingCampaign) GamePresentation.restore();
     super.dispose();
@@ -118,224 +156,133 @@ class _EchoHeistPageState extends State<EchoHeistPage>
   Widget build(BuildContext context) {
     final heist = _heist;
     return Scaffold(
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment(0, -1),
-            radius: 1.4,
-            colors: [Color(0xFF2B304E), Color(0xFF080B12), Color(0xFF030408)],
-          ),
-        ),
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxHeight < 520;
-              return Column(
-                children: [
-                  Offstage(
-                    offstage: true,
-                    child: _HeistHud(heist: heist, compact: compact),
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: Center(
-                        child: SizedBox.expand(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: const Color(0xFF4A5478),
-                                ),
-                              ),
-                              child: Stack(
-                                children: [
-                                  Positioned.fill(
-                                    child: CustomPaint(
-                                      key: const ValueKey(
-                                        'false-habit-playfield',
-                                      ),
-                                      painter: _HeistPainter(heist),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: compact ? 112 : 148,
-                                    left: 12,
-                                    child: IgnorePointer(
-                                      child: _HeistArenaHud(heist: heist),
-                                    ),
-                                  ),
-                                  if (heist.phase == _HeistPhase.playing)
-                                    Positioned(
-                                      top: 12,
-                                      right: 12,
-                                      child: GamePauseButton(
-                                        onTap: () =>
-                                            setState(() => _setPaused(true)),
-                                      ),
-                                    ),
-                                  Positioned(
-                                    left: 16,
-                                    bottom: 15,
-                                    child: TouchStick(
-                                      key: ValueKey(_inputEpoch),
-                                      onChanged: (value) =>
-                                          setState(() => _input = value),
-                                      size: compact ? 88 : 102,
-                                    ),
-                                  ),
-                                  Positioned(
-                                    right: 16,
-                                    bottom: 17,
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      children: [
-                                        TapGameButton(
-                                          label: 'ECHO',
-                                          icon: Icons.auto_awesome_rounded,
-                                          color: const Color(0xFFC3A2FF),
-                                          width: compact ? 62 : 72,
-                                          onTap: () =>
-                                              setState(heist.deployEcho),
-                                        ),
-                                        const SizedBox(width: 9),
-                                        TapGameButton(
-                                          label: 'ESCAPE',
-                                          icon: Icons.exit_to_app_rounded,
-                                          color: const Color(0xFF83F2C0),
-                                          width: compact ? 70 : 80,
-                                          onTap: () => setState(heist.cashOut),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (heist.phase == _HeistPhase.intro)
-                                    _HeistOverlay(
-                                      title: 'FALSE HABIT',
-                                      eyebrow: 'ECHO HEIST',
-                                      copy:
-                                          'Move predictably to teach the Warden a habit. Then change direction, steal on a broken prediction, and send an Echo to lure it away.',
-                                      button: 'START HEIST',
-                                      onTap: _startRun,
-                                    ),
-                                  if (heist.phase == _HeistPhase.caught)
-                                    _HeistOverlay(
-                                      title: 'CAUGHT',
-                                      eyebrow: 'THE WARDEN WAS RIGHT',
-                                      copy:
-                                          'You lost the unbanked haul. Build confidence in one direction, then cut across its prediction before collecting.',
-                                      button: 'TRY ANOTHER HEIST',
-                                      onTap: _startRun,
-                                      danger: true,
-                                    ),
-                                  if (heist.phase == _HeistPhase.stageClear)
-                                    if (widget.level != null)
-                                      CampaignMissionClearOverlay(
-                                        level: widget.level!,
-                                        score: heist.runLoot.round(),
-                                        elapsedSeconds: _elapsedSeconds,
-                                        accent: const Color(0xFFC29CFF),
-                                        onNextLevel: _continueCampaign,
-                                        onExit: () =>
-                                            Navigator.of(context).pop(),
-                                      )
-                                    else
-                                      _HeistOverlay(
-                                        title: 'DISTRICT CLEARED',
-                                        eyebrow:
-                                            '+${heist.runLoot.round()} BANKED THIS DISTRICT',
-                                        copy:
-                                            'The next Warden learns faster and runs harder. Keep breaking the prediction at the moment you steal.',
-                                        button: 'NEXT DISTRICT',
-                                        onTap: heist.nextStage,
-                                      ),
-                                  if (heist.phase == _HeistPhase.won)
-                                    if (widget.level != null)
-                                      CampaignMissionClearOverlay(
-                                        level: widget.level!,
-                                        score: heist.runLoot.round(),
-                                        elapsedSeconds: _elapsedSeconds,
-                                        accent: const Color(0xFFC29CFF),
-                                        onNextLevel: _continueCampaign,
-                                        onExit: () =>
-                                            Navigator.of(context).pop(),
-                                      )
-                                    else
-                                      _HeistOverlay(
-                                        title: 'THE HABIT BROKE',
-                                        eyebrow: 'ALL DISTRICTS CASHED OUT',
-                                        copy:
-                                            'No Warden can hold your pattern. You cleared the complete heist.',
-                                        button: 'NEW HEIST',
-                                        onTap: _startRun,
-                                      ),
-                                  if (_paused)
-                                    GamePauseOverlay(
-                                      gameName: 'FALSE HABIT',
-                                      onResume: () =>
-                                          setState(() => _setPaused(false)),
-                                      onRestart: () => setState(() {
-                                        _setPaused(false);
-                                        _startRun();
-                                      }),
-                                      onExit: _exitGame,
-                                    ),
-                                  // Keep the app-level exit above modal game
-                                  // states so it stays tappable on the launch
-                                  // and result screens.
-                                  Positioned(
-                                    top: 12,
-                                    left: 12,
-                                    child: GameExitButton(onExit: _exitGame),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+      body: Focus(
+        focusNode: _gameFocus,
+        autofocus: true,
+        onKeyEvent: _onKeyEvent,
+        onFocusChange: (focused) {
+          if (!focused) _clearInput();
+        },
+        child: ColoredBox(
+          color: const Color(0xFF030408),
+          child: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxHeight < 500;
+                final actionSize = compact ? 62.0 : 74.0;
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Positioned.fill(
+                      child: RepaintBoundary(
+                        child: CustomPaint(
+                          key: const ValueKey('false-habit-playfield'),
+                          painter: _HeistPainter(heist),
                         ),
                       ),
                     ),
-                  ),
-                  Offstage(
-                    offstage: true,
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(18, 0, 18, compact ? 6 : 10),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.psychology_alt_rounded,
-                            color: Color(0xFFC5B1FF),
-                            size: 15,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              heist.message,
-                              style: const TextStyle(
-                                color: Color(0xFFB8C5DF),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            'BANK ${heist.banked.round()}',
-                            style: const TextStyle(
-                              color: Color(0xFFFFD66B),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
+                    if (heist.phase == _HabitPhase.playing)
+                      Positioned(
+                        top: 10,
+                        right: 10,
+                        child: GamePauseButton(
+                          onTap: () => setState(() => _setPaused(true)),
+                        ),
+                      ),
+                    Positioned(
+                      top: compact ? 66 : 72,
+                      left: 12,
+                      child: IgnorePointer(
+                        child: _HabitHud(heist: heist, compact: compact),
                       ),
                     ),
-                  ),
-                ],
-              );
-            },
+                    if (heist.phase == _HabitPhase.playing) ...[
+                      Positioned(
+                        left: compact ? 12 : 18,
+                        bottom: compact ? 12 : 18,
+                        child: TouchStick(
+                          key: ValueKey(_inputEpoch),
+                          size: compact ? 90 : 108,
+                          onChanged: (value) =>
+                              setState(() => _movement.setAnalog(value)),
+                        ),
+                      ),
+                      Positioned(
+                        right: compact ? 12 : 18,
+                        bottom: compact ? 12 : 18,
+                        child: TapGameButton(
+                          label: heist.echoReady ? 'ECHO' : 'CHARGE',
+                          icon: Icons.auto_awesome_rounded,
+                          color: heist.echoReady
+                              ? const Color(0xFF9AB8FF)
+                              : const Color(0xFF69789A),
+                          width: actionSize,
+                          onTap: () => setState(heist.deployEcho),
+                        ),
+                      ),
+                    ],
+                    if (heist.phase == _HabitPhase.intro)
+                      _HabitOverlay(
+                        eyebrow: 'REWIRE HEIST',
+                        title: 'FALSE HABIT',
+                        copy:
+                            'The archive is larger than your camera. Steal Truth Fragments, then return to the Breach. Every doorway you repeat teaches the Warden a direction. When it reads you, the nearest rooms fold into a predicted door and an unexpected door: take the unexpected door to fracture its model. Cast an Echo after a long route to make the next fold happen somewhere else.',
+                        controls:
+                            'WASD / ARROWS  MOVE    ·    E / SPACE  CAST ECHO    ·    ESC  PAUSE',
+                        button: 'ENTER THE ARCHIVE',
+                        onTap: _startRun,
+                      ),
+                    if (heist.phase == _HabitPhase.caught)
+                      _HabitOverlay(
+                        eyebrow: 'MODEL COMPLETE',
+                        title: 'HABIT CAPTURED',
+                        copy:
+                            'The Warden used your familiar door choice to close the archive around you. Build a route, then take the wrong door when READ appears. Heat is pressure, not a timer: break the model to cool it.',
+                        controls: 'ECHOES REDIRECT A FOLD AFTER A LONG ROUTE.',
+                        button: 'REWRITE THE RUN',
+                        danger: true,
+                        onTap: _startRun,
+                      ),
+                    if (heist.phase == _HabitPhase.escaped)
+                      if (widget.level != null)
+                        CampaignMissionClearOverlay(
+                          level: widget.level!,
+                          score: heist.score,
+                          elapsedSeconds: _elapsedSeconds,
+                          accent: const Color(0xFFFF8AC6),
+                          onNextLevel: _continueCampaign,
+                          onExit: _exitGame,
+                        )
+                      else
+                        _HabitOverlay(
+                          eyebrow: 'THE ARCHIVE REMEMBERS',
+                          title: 'BREACH COMPLETE',
+                          copy:
+                              'You stole ${heist.stolen} Truth Fragments, fractured ${heist.breakChain} read${heist.breakChain == 1 ? '' : 's'}, and escaped before the Warden could make your route permanent.',
+                          controls: 'THE NEXT RUN REMIXES THE ARCHIVE PATHS.',
+                          button: 'RUN ANOTHER HEIST',
+                          onTap: _startRun,
+                        ),
+                    if (!_paused)
+                      Positioned(
+                        top: 10,
+                        left: 10,
+                        child: GameExitButton(onExit: _exitGame),
+                      ),
+                    if (_paused)
+                      GamePauseOverlay(
+                        gameName: 'FALSE HABIT',
+                        onResume: () => setState(() => _setPaused(false)),
+                        onRestart: () => setState(() {
+                          _setPaused(false);
+                          _startRun();
+                        }),
+                        onExit: _exitGame,
+                      ),
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -343,106 +290,130 @@ class _EchoHeistPageState extends State<EchoHeistPage>
   }
 }
 
-class _HeistHud extends StatelessWidget {
-  const _HeistHud({required this.heist, required this.compact});
+class _HabitHud extends StatelessWidget {
+  const _HabitHud({required this.heist, required this.compact});
 
   final _EchoHeist heist;
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    final confidence = heist.confidence;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(17, compact ? 6 : 10, 17, 0),
-      child: Row(
+    final heat = (heist.heat / 100).clamp(0.0, 1.0);
+    return Container(
+      width: compact ? 198 : 236,
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 8 : 10,
+        vertical: compact ? 6 : 8,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xD9080B16),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(
+          color: heist.wardenReading
+              ? const Color(0xFFFF6EAB)
+              : const Color(0xFF6576A6),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Text(
+            'FALSE HABIT · ARCHIVE ${heist.rooms.length}',
+            style: TextStyle(
+              color: const Color(0xFFC8D3FF),
+              fontSize: compact ? 7 : 8,
+              fontWeight: FontWeight.w900,
+              letterSpacing: .65,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            heist.objectiveReadout,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: heist.exitOpen
+                  ? const Color(0xFF7FF3BE)
+                  : const Color(0xFFFFE29A),
+              fontSize: compact ? 8 : 9,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Row(
             children: [
-              const Text(
-                'FALSE HABIT',
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2.1,
-                  fontSize: 16,
+              Expanded(
+                child: _HabitMetric(
+                  label: 'WARDEN',
+                  value: heist.wardenStateReadout,
+                  color: heist.wardenReading
+                      ? const Color(0xFFFF87BD)
+                      : const Color(0xFF9BB9FF),
                 ),
               ),
-              Text(
-                'DISTRICT ${heist.stageNumber}/${heist.stageCount}  LOOT ${heist.runLoot.round()}/${heist.stageTarget}',
-                style: const TextStyle(
-                  color: Color(0xFFFFD66B),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
+              const SizedBox(width: 8),
+              _HabitMetric(
+                label: 'FRACTURE',
+                value: '×${heist.breakChain}',
+                color: const Color(0xFFFFD96C),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              SizedBox(
+                width: compact ? 42 : 50,
+                child: Text(
+                  'HEAT ${heist.heat.round()}%',
+                  style: TextStyle(
+                    color: const Color(0xFFE4BDCF),
+                    fontSize: compact ? 7 : 8,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: heat,
+                    minHeight: compact ? 5 : 6,
+                    backgroundColor: const Color(0xFF20243B),
+                    valueColor: AlwaysStoppedAnimation(
+                      Color.lerp(
+                        const Color(0xFF70C9FF),
+                        const Color(0xFFFF547F),
+                        heat,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
-          const Spacer(),
-          _HeistMetric(
-            label: 'WARDEN READ',
-            value: '${(confidence * 100).round()}%',
-            color: confidence >= .85
-                ? const Color(0xFFFF7F95)
-                : const Color(0xFF8FE8FF),
-          ),
-          const SizedBox(width: 8),
-          _HeistMetric(
-            label: 'CHAIN',
-            value: '×${heist.combo.toStringAsFixed(1)}',
-            color: const Color(0xFFC3A2FF),
-          ),
-          const SizedBox(width: 8),
-          _HeistMetric(
-            label: 'ECHO',
-            value: heist.echoReady ? 'READY' : 'CHARGING',
-            color: heist.echoReady
-                ? const Color(0xFF83F2C0)
-                : const Color(0xFF9BAAC6),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeistMetric extends StatelessWidget {
-  const _HeistMetric({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xCC101625),
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: const Color(0xFF2D3A57)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+          const SizedBox(height: 5),
           Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF8899BA),
-              fontSize: 7,
-              fontWeight: FontWeight.w900,
-              letterSpacing: .7,
-            ),
-          ),
-          Text(
-            value,
+            heist.message,
+            maxLines: compact ? 1 : 2,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: color,
-              fontSize: 11,
+              color: const Color(0xFFB6C2DF),
+              fontSize: compact ? 7 : 8,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            heist.controlHint,
+            style: TextStyle(
+              color: heist.echoReady
+                  ? const Color(0xFFAAC2FF)
+                  : const Color(0xFF7481A5),
+              fontSize: compact ? 7 : 8,
               fontWeight: FontWeight.w900,
+              letterSpacing: .3,
             ),
           ),
         ],
@@ -451,75 +422,8 @@ class _HeistMetric extends StatelessWidget {
   }
 }
 
-class _HeistArenaHud extends StatelessWidget {
-  const _HeistArenaHud({required this.heist});
-
-  final _EchoHeist heist;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 138,
-    padding: const EdgeInsets.all(7),
-    decoration: BoxDecoration(
-      color: const Color(0xC90D1421),
-      borderRadius: BorderRadius.circular(11),
-      border: Border.all(color: const Color(0xFF47536F)),
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _HeistSideMetric(
-          label: 'WARDEN',
-          value: '${(heist.confidence * 100).round()}%',
-          color: heist.confidence >= .85
-              ? const Color(0xFFFF7F95)
-              : const Color(0xFF8FE8FF),
-        ),
-        const Divider(height: 9, color: Color(0xFF37425E)),
-        _HeistSideMetric(
-          label: 'CHAIN',
-          value: '×${heist.combo.toStringAsFixed(1)}',
-          color: const Color(0xFFC3A2FF),
-        ),
-        const Divider(height: 9, color: Color(0xFF37425E)),
-        _HeistSideMetric(
-          label: 'ECHO',
-          value: heist.echoReady ? 'READY' : 'CHARGE',
-          color: heist.echoReady
-              ? const Color(0xFF83F2C0)
-              : const Color(0xFF9BAAC6),
-        ),
-        const Divider(height: 9, color: Color(0xFF37425E)),
-        Text(
-          heist.message,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Color(0xFFB8C5DF),
-            fontSize: 8,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'BANK ${heist.banked.round()}',
-            style: const TextStyle(
-              color: Color(0xFFFFD66B),
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
-              letterSpacing: .4,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _HeistSideMetric extends StatelessWidget {
-  const _HeistSideMetric({
+class _HabitMetric extends StatelessWidget {
+  const _HabitMetric({
     required this.label,
     required this.value,
     required this.color,
@@ -530,23 +434,25 @@ class _HeistSideMetric extends StatelessWidget {
   final Color color;
 
   @override
-  Widget build(BuildContext context) => Row(
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
         label,
-        style: const TextStyle(
-          color: Color(0xFF9AAAC8),
-          fontSize: 8,
+        style: TextStyle(
+          color: Color(0xFF8190B5),
+          fontSize: 7,
           fontWeight: FontWeight.w900,
-          letterSpacing: .55,
+          letterSpacing: .45,
         ),
       ),
-      const Spacer(),
       Text(
         value,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: color,
-          fontSize: 11,
+          fontSize: 9,
           fontWeight: FontWeight.w900,
         ),
       ),
@@ -554,99 +460,142 @@ class _HeistSideMetric extends StatelessWidget {
   );
 }
 
-class _HeistOverlay extends StatelessWidget {
-  const _HeistOverlay({
-    required this.title,
+class _HabitOverlay extends StatelessWidget {
+  const _HabitOverlay({
     required this.eyebrow,
+    required this.title,
     required this.copy,
+    required this.controls,
     required this.button,
     required this.onTap,
     this.danger = false,
   });
 
-  final String title;
   final String eyebrow;
+  final String title;
   final String copy;
+  final String controls;
   final String button;
   final VoidCallback onTap;
   final bool danger;
 
   @override
-  Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: ColoredBox(
-        color: const Color(0xC9070B13),
-        child: Center(
-          child: Container(
-            width: 430,
-            margin: const EdgeInsets.all(20),
-            padding: const EdgeInsets.all(23),
-            decoration: BoxDecoration(
-              color: const Color(0xFF121A2B),
-              borderRadius: BorderRadius.circular(19),
-              border: Border.all(
-                color: danger
-                    ? const Color(0xFF984B61)
-                    : const Color(0xFF596D9C),
+  Widget build(BuildContext context) => Positioned.fill(
+    child: ColoredBox(
+      color: const Color(0xD904050A),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxHeight < 500;
+          return Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: 500,
+                maxHeight: constraints.maxHeight - (compact ? 16 : 32),
+              ),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(compact ? 8 : 16),
+                child: Container(
+                  padding: EdgeInsets.all(compact ? 12 : 22),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF101429),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: danger
+                          ? const Color(0xFFFF668B)
+                          : const Color(0xFF8DA7FF),
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x99000000),
+                        blurRadius: 28,
+                        offset: Offset(0, 14),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        eyebrow,
+                        style: TextStyle(
+                          color: danger
+                              ? const Color(0xFFFF8CA7)
+                              : const Color(0xFFAFBEFF),
+                          fontSize: compact ? 7 : 9,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.35,
+                        ),
+                      ),
+                      SizedBox(height: compact ? 3 : 5),
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: danger
+                              ? const Color(0xFFFFA5B9)
+                              : Colors.white,
+                          fontSize: compact ? 23 : 29,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      SizedBox(height: compact ? 7 : 12),
+                      Text(
+                        copy,
+                        style: TextStyle(
+                          color: Color(0xFFC0C9E4),
+                          fontSize: compact ? 11 : 13,
+                          height: compact ? 1.25 : 1.38,
+                        ),
+                      ),
+                      SizedBox(height: compact ? 8 : 14),
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(compact ? 7 : 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF191F39),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          controls,
+                          style: TextStyle(
+                            color: Color(0xFFB6C7FF),
+                            fontSize: compact ? 7 : 8,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: .45,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: compact ? 10 : 18),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: onTap,
+                          icon: Icon(
+                            danger
+                                ? Icons.restart_alt_rounded
+                                : Icons.account_tree_rounded,
+                          ),
+                          label: Text(button),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: danger
+                                ? const Color(0xFFC94368)
+                                : const Color(0xFF697FE8),
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(
+                              vertical: compact ? 9 : 13,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  eyebrow,
-                  style: const TextStyle(
-                    color: Color(0xFFC3A2FF),
-                    fontSize: 10,
-                    letterSpacing: 1.4,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: danger ? const Color(0xFFFF91A8) : Colors.white,
-                    fontSize: 34,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  copy,
-                  style: const TextStyle(
-                    color: Color(0xFFC5D0E6),
-                    height: 1.35,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: onTap,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: danger
-                          ? const Color(0xFFC54967)
-                          : const Color(0xFF856AF1),
-                      foregroundColor: Colors.white,
-                    ),
-                    child: Text(
-                      button,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+          );
+        },
       ),
-    );
-  }
+    ),
+  );
 }

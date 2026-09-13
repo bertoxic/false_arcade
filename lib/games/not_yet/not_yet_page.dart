@@ -17,7 +17,7 @@ class RealityGamePage extends StatefulWidget {
 }
 
 class _RealityGamePageState extends State<RealityGamePage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final GameLoopController _loop;
   late final FocusNode _gameFocus;
   late final RealityGame _game;
@@ -30,6 +30,7 @@ class _RealityGamePageState extends State<RealityGamePage>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     GamePresentation.enterLandscape();
     _game = RealityGame(
       campaignLevel: widget.level?.number ?? 1,
@@ -52,6 +53,7 @@ class _RealityGamePageState extends State<RealityGamePage>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _clearInput();
     _loop.dispose();
     _gameFocus.dispose();
@@ -63,6 +65,7 @@ class _RealityGamePageState extends State<RealityGamePage>
     _clearInput();
     _paused = value;
     _loop.setPaused(value);
+    if (!value) _gameFocus.requestFocus();
   }
 
   void _clearInput() {
@@ -92,9 +95,21 @@ class _RealityGamePageState extends State<RealityGamePage>
       LevelRunResult(
         level: level,
         score: _game.score,
-        elapsedSeconds: _game.time,
+        elapsedSeconds: _game.elapsedSeconds,
       ),
     );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) return;
+    _clearInput();
+    if (!_paused &&
+        (_game.phase == GamePhase.playing ||
+            _game.phase == GamePhase.settling)) {
+      _loop.setPaused(true);
+      if (mounted) setState(() => _paused = true);
+    }
   }
 
   void _continueCampaign() {

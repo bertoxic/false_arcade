@@ -21,6 +21,7 @@ class GamePainter extends CustomPainter {
     _paintProjectiles(canvas);
     _paintEnemies(canvas);
     _paintParticles(canvas);
+    _paintShockwaves(canvas);
     _paintPlayer(canvas);
     _paintLabels(canvas);
     if (game._introTimer > 0 && game.phase == GamePhase.playing) {
@@ -115,37 +116,65 @@ class GamePainter extends CustomPainter {
 
   void _paintDrums(Canvas canvas) {
     for (final drum in game._drums) {
-      final body = Paint()..color = const Color(0xFFB57432);
+      final pulse = (math.sin(game.time * 5 + drum.position.dx) * 0.5 + 0.5);
+      final warningColor = Color.lerp(
+        const Color(0xFFFF9C4E),
+        const Color(0xFFFF4868),
+        pulse,
+      )!;
+
+      // Outer warning radiation aura
+      canvas.drawCircle(
+        drum.position,
+        22 + pulse * 4,
+        Paint()..color = warningColor.withValues(alpha: 0.18 + pulse * 0.15),
+      );
+
+      // Drum octagonal / rounded metal barrel
+      final barrelRect = Rect.fromCenter(
+        center: drum.position,
+        width: 24,
+        height: 32,
+      );
       canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(center: drum.position, width: 22, height: 29),
-          const Radius.circular(3),
-        ),
-        body,
+        RRect.fromRectAndRadius(barrelRect, const Radius.circular(5)),
+        Paint()..color = const Color(0xFF281C14),
       );
-      final band = Paint()..color = const Color(0xFF553616);
-      canvas.drawRect(
-        Rect.fromCenter(
-          center: drum.position - const Offset(0, 7),
-          width: 24,
-          height: 4,
-        ),
-        band,
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(barrelRect.deflate(2), const Radius.circular(4)),
+        Paint()..color = const Color(0xFFB56A2B),
       );
-      canvas.drawRect(
-        Rect.fromCenter(
-          center: drum.position + const Offset(0, 7),
-          width: 24,
-          height: 4,
-        ),
-        band,
+
+      // Hazard diagonal stripes
+      canvas.save();
+      canvas.clipRRect(
+        RRect.fromRectAndRadius(barrelRect.deflate(2), const Radius.circular(4)),
       );
+      final stripePaint = Paint()
+        ..color = const Color(0xFF2B190B)
+        ..strokeWidth = 3;
+      for (double x = -30; x <= 30; x += 7) {
+        canvas.drawLine(
+          drum.position + Offset(x, -18),
+          drum.position + Offset(x + 12, 18),
+          stripePaint,
+        );
+      }
+      canvas.restore();
+
+      // Center hazard indicator plate
+      canvas.drawCircle(
+        drum.position,
+        7,
+        Paint()..color = const Color(0xFF1B0F07),
+      );
+      canvas.drawCircle(drum.position, 6, Paint()..color = warningColor);
       _text(
         canvas,
         '!',
-        drum.position + const Offset(0, 4),
-        12,
-        const Color(0xFFFFE1A6),
+        drum.position + const Offset(0, 3.5),
+        10,
+        const Color(0xFF1B0F07),
         align: TextAlign.center,
         bold: true,
       );
@@ -239,43 +268,95 @@ class GamePainter extends CustomPainter {
         ..color = const Color(0xFF150B12);
       switch (enemy.kind) {
         case EnemyKind.drone:
-          canvas.drawCircle(enemy.position, enemy.radius, body);
-          canvas.drawCircle(enemy.position, enemy.radius, outline);
+          // Rotating tri-blade shuriken rotor
+          final rotorAngle = game.time * 8 + enemy.position.dx;
+          final bladePaint = Paint()
+            ..color = color
+            ..strokeWidth = 2.5
+            ..strokeCap = StrokeCap.round;
+          for (var i = 0; i < 3; i++) {
+            final a = rotorAngle + (i * 2 * math.pi / 3);
+            final tip = enemy.position +
+                Offset(math.cos(a), math.sin(a)) * (enemy.radius + 3);
+            canvas.drawLine(enemy.position, tip, bladePaint);
+            canvas.drawCircle(
+              tip,
+              2.5,
+              Paint()..color = const Color(0xFFFF85A1),
+            );
+          }
+          canvas.drawCircle(enemy.position, enemy.radius * 0.75, body);
+          canvas.drawCircle(enemy.position, enemy.radius * 0.75, outline);
           canvas.drawCircle(
             enemy.position,
-            4,
-            Paint()..color = const Color(0xFFFFD5DF),
+            3.5,
+            Paint()..color = const Color(0xFFFFE6EE),
           );
         case EnemyKind.charger:
+          // Predatory arrowhead with forward ramming spikes and engine exhaust
+          final chargeDir = enemy.velocity.distance > 10
+              ? enemy.velocity
+              : const Offset(1, 0);
+          final angle = math.atan2(chargeDir.dy, chargeDir.dx);
+          canvas.save();
+          canvas.translate(enemy.position.dx, enemy.position.dy);
+          canvas.rotate(angle);
+
+          // Rear exhaust burn
+          final exhaustDist = 8 + math.sin(game.time * 24) * 4;
+          canvas.drawLine(
+            const Offset(-8, 0),
+            Offset(-8 - exhaustDist, 0),
+            Paint()
+              ..color = const Color(0xFFFF9254)
+              ..strokeWidth = 4
+              ..strokeCap = StrokeCap.round,
+          );
+
           final path = Path()
-            ..moveTo(enemy.position.dx, enemy.position.dy - enemy.radius)
-            ..lineTo(enemy.position.dx + enemy.radius, enemy.position.dy)
-            ..lineTo(enemy.position.dx, enemy.position.dy + enemy.radius)
-            ..lineTo(enemy.position.dx - enemy.radius, enemy.position.dy)
+            ..moveTo(enemy.radius + 4, 0)
+            ..lineTo(-enemy.radius * 0.6, -enemy.radius * 0.85)
+            ..lineTo(-enemy.radius * 0.2, 0)
+            ..lineTo(-enemy.radius * 0.6, enemy.radius * 0.85)
             ..close();
           canvas.drawPath(path, body);
           canvas.drawPath(path, outline);
-          _text(
-            canvas,
-            '›',
-            enemy.position + const Offset(0, 5),
-            20,
-            const Color(0xFFFFECF1),
-            align: TextAlign.center,
-            bold: true,
+          canvas.drawCircle(
+            const Offset(3, 0),
+            3,
+            Paint()..color = const Color(0xFFFFEDF2),
           );
+          canvas.restore();
         case EnemyKind.sentinel:
+          // Orbital energy shield segments around a glowing cyclops sensor
+          final orbAngle = game.time * 3;
+          final arcPaint = Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.5
+            ..color = color;
+          for (var i = 0; i < 3; i++) {
+            final start = orbAngle + i * (2 * math.pi / 3);
+            canvas.drawArc(
+              Rect.fromCircle(center: enemy.position, radius: enemy.radius + 2),
+              start,
+              1.2,
+              false,
+              arcPaint,
+            );
+          }
           canvas.drawCircle(enemy.position, enemy.radius, body);
           canvas.drawCircle(
             enemy.position,
-            enemy.radius - 6,
-            Paint()..color = const Color(0xFF532B6A),
+            enemy.radius - 5,
+            Paint()..color = const Color(0xFF381B4B),
           );
           canvas.drawCircle(enemy.position, enemy.radius, outline);
+          // Pulsing cyclops sensor eye
+          final eyePulse = (math.sin(game.time * 6) * 1.2).clamp(-1.0, 1.0);
           canvas.drawCircle(
             enemy.position,
-            4,
-            Paint()..color = const Color(0xFFEED8FF),
+            4 + eyePulse,
+            Paint()..color = const Color(0xFFF2DEFF),
           );
       }
       if (enemy.pending) {
@@ -331,6 +412,29 @@ class GamePainter extends CustomPainter {
     }
   }
 
+  void _paintShockwaves(Canvas canvas) {
+    for (final wave in game._shockwaves) {
+      final progress = (wave.time / wave.life).clamp(0.0, 1.0);
+      final radius = wave.maxRadius * progress;
+      final opacity = (1.0 - progress).clamp(0.0, 1.0);
+      final paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.5 * (1.0 - progress * 0.7)
+        ..color = wave.color.withValues(alpha: opacity * 0.75);
+      canvas.drawCircle(wave.position, radius, paint);
+      if (radius > 12) {
+        canvas.drawCircle(
+          wave.position,
+          radius * 0.85,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5
+            ..color = wave.color.withValues(alpha: opacity * 0.35),
+        );
+      }
+    }
+  }
+
   void _paintPlayer(Canvas canvas) {
     final player = game._player;
     final color = game.holding
@@ -339,51 +443,124 @@ class GamePainter extends CustomPainter {
         ? const Color(0xFFFFD166)
         : const Color(0xFF63E8F6);
     final glow = Paint()
-      ..color = color.withValues(alpha: player.invulnerable > 0 ? .14 : .28);
-    canvas.drawCircle(player.position, 25, glow);
+      ..color = color.withValues(alpha: player.invulnerable > 0 ? .14 : .32);
+    canvas.drawCircle(player.position, 28, glow);
     canvas.save();
     canvas.translate(player.position.dx, player.position.dy);
     canvas.rotate(math.atan2(player.aim.dy, player.aim.dx));
-    final ship = Path()
-      ..moveTo(18, 0)
-      ..lineTo(-9, -11)
-      ..lineTo(-4, 0)
-      ..lineTo(-9, 11)
+
+    // Dual thruster exhaust flames
+    if (player.velocity.distance > 15) {
+      final speedRatio = (player.velocity.distance / 240).clamp(0.6, 1.5);
+      final flicker = math.sin(game.time * 36);
+      final flameLen = (14 + flicker * 5) * speedRatio;
+
+      // Port & starboard engine flames
+      for (final ey in [-6.0, 6.0]) {
+        final outerFlame = Path()
+          ..moveTo(-7, ey - 2.5)
+          ..lineTo(-7 - flameLen, ey)
+          ..lineTo(-7, ey + 2.5)
+          ..close();
+        canvas.drawPath(
+          outerFlame,
+          Paint()
+            ..color = (game.holding
+                    ? const Color(0xFFFF4870)
+                    : const Color(0xFF4EE8FF))
+                .withValues(alpha: 0.65),
+        );
+        final innerFlame = Path()
+          ..moveTo(-7, ey - 1.2)
+          ..lineTo(-7 - flameLen * 0.65, ey)
+          ..lineTo(-7, ey + 1.2)
+          ..close();
+        canvas.drawPath(
+          innerFlame,
+          Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: 0.95),
+        );
+      }
+    }
+
+    // Main fighter fuselage and delta wings
+    final hullPath = Path()
+      ..moveTo(22, 0)
+      ..lineTo(3, -7)
+      ..lineTo(-8, -16)
+      ..lineTo(-5, -6)
+      ..lineTo(-9, -4)
+      ..lineTo(-7, 0)
+      ..lineTo(-9, 4)
+      ..lineTo(-5, 6)
+      ..lineTo(-8, 16)
+      ..lineTo(3, 7)
       ..close();
+
+    final shipColor = player.invulnerable > 0 && (game.time * 14).floor().isEven
+        ? const Color(0xFFEAFDFF)
+        : color;
+
+    canvas.drawPath(hullPath, Paint()..color = shipColor);
     canvas.drawPath(
-      ship,
-      Paint()
-        ..color = player.invulnerable > 0 && (game.time * 12).floor().isEven
-            ? const Color(0xFFEAFDFF)
-            : color,
-    );
-    canvas.drawPath(
-      ship,
+      hullPath,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5
-        ..color = const Color(0xFF112033),
+        ..strokeWidth = 1.6
+        ..color = const Color(0xFF091420),
     );
+
+    // Wingtip plasma cannon emitters
+    final emitterPaint = Paint()..color = const Color(0xFFFFFFFF);
+    canvas.drawCircle(const Offset(-7, -15), 1.8, emitterPaint);
+    canvas.drawCircle(const Offset(-7, 15), 1.8, emitterPaint);
+
+    // Center armor ridge
+    canvas.drawLine(
+      const Offset(-4, 0),
+      const Offset(14, 0),
+      Paint()
+        ..color = const Color(0xFF091420).withValues(alpha: 0.5)
+        ..strokeWidth = 1.2,
+    );
+
+    // Glowing cockpit canopy with glass reflection
+    final canopyRect =
+        Rect.fromCenter(center: const Offset(4, 0), width: 9, height: 5.5);
+    canvas.drawOval(
+      canopyRect,
+      Paint()..color = const Color(0xFF07121E),
+    );
+    canvas.drawOval(
+      canopyRect.deflate(0.8),
+      Paint()
+        ..color = (game.holding
+            ? const Color(0xFFFFD2DE)
+            : const Color(0xFFD4FAFF)),
+    );
+    // Specular canopy glint
     canvas.drawCircle(
-      const Offset(4, 0),
-      3.5,
-      Paint()..color = const Color(0xFFF6FEFF),
+      const Offset(5, -1),
+      1.2,
+      Paint()..color = const Color(0xFFFFFFFF),
     );
+
     canvas.restore();
   }
 
   void _paintLabels(Canvas canvas) {
     for (final label in game._labels) {
       final opacity = (1 - label.time / label.life).clamp(0.0, 1.0);
+      final scale = 1.0 + (1.0 - opacity) * 0.25;
       _text(
         canvas,
         label.text,
         label.position,
-        11,
+        11 * scale,
         label.color,
         align: TextAlign.center,
         opacity: opacity,
         bold: true,
+        glowColor: label.color,
       );
     }
   }
@@ -398,6 +575,7 @@ class GamePainter extends CustomPainter {
     double opacity = 1,
     bool bold = false,
     double letterSpacing = 0,
+    Color? glowColor,
   }) {
     paintGameText(
       canvas,
@@ -409,6 +587,7 @@ class GamePainter extends CustomPainter {
       opacity: opacity,
       bold: bold,
       letterSpacing: letterSpacing,
+      glowColor: glowColor,
     );
   }
 

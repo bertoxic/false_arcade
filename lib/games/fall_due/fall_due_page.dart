@@ -614,9 +614,7 @@ class _DueArenaHud extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      game.inPayback
-                          ? 'PAYBACK IN PROGRESS'
-                          : 'BORROW GRAVITY. PAY IT BACK.',
+                      game.objectiveReadout,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

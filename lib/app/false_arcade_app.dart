@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'arcade_catalog.dart';
 import 'arcade_game_art.dart';
 import 'game_level_select_page.dart';
+import '../core/game_feedback.dart';
+import '../ui/arcade_screen_filter.dart';
 import '../ui/game_controls.dart';
 
 class FalseArcadeApp extends StatelessWidget {
@@ -13,6 +15,8 @@ class FalseArcadeApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'False Arcade',
+      builder: (context, child) =>
+          ArcadeScreenFilter(child: child ?? const SizedBox.shrink()),
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
@@ -46,16 +50,19 @@ class _ArcadeHomePageState extends State<ArcadeHomePage> {
 
   void _select(int index) {
     if (index == _selectedIndex) return;
+    GameFeedback.selection();
     setState(() => _selectedIndex = index);
   }
 
   void _launch(ArcadeGameDefinition game) {
+    GameFeedback.selection();
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => GameLevelSelectPage(game: game)),
     );
   }
 
   void _cycle(int direction) {
+    GameFeedback.selection();
     final next = (_selectedIndex + direction) % arcadeCatalog.length;
     setState(() => _selectedIndex = next < 0 ? arcadeCatalog.length - 1 : next);
   }
@@ -250,10 +257,17 @@ class _ArcadeHeader extends StatelessWidget {
             'FALSE ARCADE',
             style: TextStyle(
               color: Color(0xFFF0FAFF),
-              fontSize: 22,
-              height: .9,
+              fontSize: 16,
+              height: 1.0,
               fontWeight: FontWeight.w900,
-              letterSpacing: 2.2,
+              fontFamily: 'PressStart2P',
+              letterSpacing: 1.8,
+              shadows: [
+                Shadow(
+                  color: Color(0xFF48F2C1),
+                  blurRadius: 16,
+                ),
+              ],
             ),
           ),
           SizedBox(height: 5),
@@ -287,14 +301,31 @@ class _ArcadeHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'PLAYER ONE READY',
-            style: TextStyle(
-              color: Color(0xFF677D90),
-              fontSize: 8,
-              fontWeight: FontWeight.w800,
-              letterSpacing: .85,
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFF48F2C1),
+                  boxShadow: [
+                    BoxShadow(color: Color(0xFF48F2C1), blurRadius: 6),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 5),
+              const Text(
+                'PLAYER ONE READY',
+                style: TextStyle(
+                  color: Color(0xFF7591A8),
+                  fontSize: 8,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: .85,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -327,19 +358,28 @@ class _FeaturedGamePanel extends StatelessWidget {
     child: DecoratedBox(
       decoration: BoxDecoration(
         color: const Color(0xFF06101A),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: game.colors.first.withValues(alpha: .77)),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: game.colors.first.withValues(alpha: .88),
+          width: 1.6,
+        ),
         boxShadow: [
           BoxShadow(
-            color: game.colors.first.withValues(alpha: .16),
-            blurRadius: 26,
-            spreadRadius: 1,
-            offset: const Offset(0, 10),
+            color: game.colors.first.withValues(alpha: .28),
+            blurRadius: 30,
+            spreadRadius: 2,
+            offset: const Offset(0, 8),
           ),
+          if (game.colors.length > 1)
+            BoxShadow(
+              color: game.colors[1].withValues(alpha: .15),
+              blurRadius: 40,
+              offset: const Offset(0, 14),
+            ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(13),
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -495,10 +535,17 @@ class _FeaturedCopy extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: const Color(0xFFF4FBFF),
-          fontSize: compact ? 28 : 35,
-          height: .92,
+          fontSize: compact ? 17 : 22,
+          height: 1.1,
           fontWeight: FontWeight.w900,
-          letterSpacing: 1.25,
+          fontFamily: 'PressStart2P',
+          letterSpacing: 1.2,
+          shadows: [
+            Shadow(
+              color: game.colors.first.withValues(alpha: .65),
+              blurRadius: 12,
+            ),
+          ],
         ),
       ),
       const SizedBox(height: 7),
@@ -589,24 +636,31 @@ class _GameCartridge extends StatelessWidget {
           child: Ink(
             decoration: BoxDecoration(
               color: const Color(0xFF07101A),
-              borderRadius: BorderRadius.circular(9),
+              borderRadius: BorderRadius.circular(11),
               border: Border.all(
                 color: game.colors.first.withValues(
-                  alpha: selected ? .92 : .38,
+                  alpha: selected ? 1.0 : .42,
                 ),
-                width: selected ? 1.7 : 1,
+                width: selected ? 2.0 : 1.2,
               ),
               boxShadow: selected
                   ? [
                       BoxShadow(
-                        color: game.colors.first.withValues(alpha: .13),
-                        blurRadius: 14,
+                        color: game.colors.first.withValues(alpha: .32),
+                        blurRadius: 18,
+                        spreadRadius: 1,
                       ),
                     ]
-                  : const [],
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: .4),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(10),
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -677,9 +731,10 @@ class _GameCartridge extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Color(0xFFF4FBFF),
-                            fontSize: 17,
+                            fontSize: 11,
                             fontWeight: FontWeight.w900,
-                            letterSpacing: 1.05,
+                            fontFamily: 'PressStart2P',
+                            letterSpacing: .8,
                           ),
                         ),
                         const SizedBox(height: 2),

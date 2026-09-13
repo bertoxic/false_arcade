@@ -17,10 +17,12 @@ class EdgeLoadPage extends StatefulWidget {
 }
 
 class _EdgeLoadPageState extends State<EdgeLoadPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final GameLoopController _loop;
   late final _MansionGame _game;
-  Offset _input = Offset.zero;
+  late final FocusNode _gameFocus;
+  final DirectionalInput _movement = DirectionalInput();
+  final Set<LogicalKeyboardKey> _pressedActions = {};
   bool _sprinting = false;
   bool _paused = false;
   bool _completionReported = false;
@@ -30,14 +32,16 @@ class _EdgeLoadPageState extends State<EdgeLoadPage>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     GamePresentation.enterLandscape();
     _game = _MansionGame(
       layoutSeed: widget.level?.seed,
       campaignLevel: widget.level?.number ?? 1,
     );
+    _gameFocus = FocusNode(debugLabel: 'EdgeLoad controls');
     _loop = GameLoopController(
       vsync: this,
-      onStep: (dt) => _game.update(dt, _input, _sprinting),
+      onStep: (dt) => _game.update(dt, _movement.axis, _sprinting),
       onFrame: () {
         _reportCompletion();
         if (mounted) setState(() {});
@@ -47,15 +51,49 @@ class _EdgeLoadPageState extends State<EdgeLoadPage>
   }
 
   void _clearInput() {
-    _input = Offset.zero;
+    _movement.reset();
+    _pressedActions.clear();
     _sprinting = false;
     _stickEpoch++;
   }
+
+  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
+    if (_movement.handleKey(event)) {
+      setState(() {});
+      return KeyEventResult.handled;
+    }
+    final key = event.logicalKey;
+    final recognized = _actionKeys.contains(key);
+    if (!recognized) return KeyEventResult.ignored;
+    final freshPress = event is KeyDownEvent && _pressedActions.add(key);
+    if (event is KeyUpEvent) _pressedActions.remove(key);
+    _sprinting =
+        _pressedActions.contains(LogicalKeyboardKey.shiftLeft) ||
+        _pressedActions.contains(LogicalKeyboardKey.shiftRight);
+    if (freshPress && key == LogicalKeyboardKey.keyC) {
+      _game.queueCoin();
+    } else if (freshPress && key == LogicalKeyboardKey.keyE) {
+      _game.queueDisguise();
+    } else if (freshPress && key == LogicalKeyboardKey.escape) {
+      _pause(!_paused);
+    }
+    setState(() {});
+    return KeyEventResult.handled;
+  }
+
+  static final Set<LogicalKeyboardKey> _actionKeys = {
+    LogicalKeyboardKey.shiftLeft,
+    LogicalKeyboardKey.shiftRight,
+    LogicalKeyboardKey.keyC,
+    LogicalKeyboardKey.keyE,
+    LogicalKeyboardKey.escape,
+  };
 
   void _pause(bool value) {
     _paused = value;
     _clearInput();
     _loop.setPaused(value);
+    if (!value) _gameFocus.requestFocus();
   }
 
   void _start() {
@@ -92,7 +130,19 @@ class _EdgeLoadPageState extends State<EdgeLoadPage>
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) return;
+    _clearInput();
+    if (!_paused && _game.phase == _MansionPhase.playing) {
+      _loop.setPaused(true);
+      if (mounted) setState(() => _paused = true);
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _gameFocus.dispose();
     _loop.dispose();
     if (!_continuingCampaign) GamePresentation.restore();
     super.dispose();
@@ -102,145 +152,153 @@ class _EdgeLoadPageState extends State<EdgeLoadPage>
   Widget build(BuildContext context) {
     final game = _game;
     return Scaffold(
-      body: ColoredBox(
-        color: const Color(0xFF05070B),
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxHeight < 470;
-              final control = compact ? 54.0 : 62.0;
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  RepaintBoundary(
-                    child: CustomPaint(painter: _EdgeLoadPainter(game)),
-                  ),
-                  Positioned(
-                    top: 10,
-                    left: 10,
-                    child: GameExitButton(
-                      onExit: () => Navigator.of(context).pop(),
+      body: Focus(
+        focusNode: _gameFocus,
+        autofocus: true,
+        onKeyEvent: _onKeyEvent,
+        onFocusChange: (focused) {
+          if (!focused) _clearInput();
+        },
+        child: ColoredBox(
+          color: const Color(0xFF05070B),
+          child: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxHeight < 470;
+                final control = compact ? 54.0 : 62.0;
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    RepaintBoundary(
+                      child: CustomPaint(painter: _EdgeLoadPainter(game)),
                     ),
-                  ),
-                  if (game.phase == _MansionPhase.playing)
                     Positioned(
                       top: 10,
-                      right: 10,
-                      child: GamePauseButton(
-                        onTap: () => setState(() => _pause(true)),
-                      ),
-                    ),
-                  if (game.phase == _MansionPhase.playing) ...[
-                    Positioned(
-                      top: 10,
-                      left: 56,
-                      child: _MansionRunHud(
-                        game: game,
-                        width: compact ? 170 : 202,
-                      ),
-                    ),
-                    Positioned(
-                      left: 16,
-                      bottom: 16,
-                      child: TouchStick(
-                        key: ValueKey(_stickEpoch),
-                        size: compact ? 94 : 116,
-                        onChanged: (value) => _input = value,
-                      ),
-                    ),
-                    Positioned(
-                      right: 16,
-                      bottom: 16,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              HoldGameButton(
-                                label: 'SPRINT',
-                                icon: Icons.bolt_rounded,
-                                color: const Color(0xFF72D6FF),
-                                size: control,
-                                onChanged: (value) => _sprinting = value,
-                              ),
-                              const SizedBox(width: 7),
-                              TapGameButton(
-                                label: 'COIN',
-                                icon: Icons.toll_rounded,
-                                color: const Color(0xFFF4D67B),
-                                width: control,
-                                onTap: () => setState(game.queueCoin),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 7),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              TapGameButton(
-                                label: 'MASK',
-                                icon: Icons.masks_rounded,
-                                color: const Color(0xFF86FFBE),
-                                width: control,
-                                onTap: () => setState(game.queueDisguise),
-                              ),
-                              const SizedBox(width: 7),
-                              SizedBox(width: control),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  if (game.phase == _MansionPhase.intro)
-                    _MansionOverlay(
-                      title: 'EDGELOAD: ${game.layoutName}',
-                      copy:
-                          'Steal the diamond, evade the guards, and extract. Every piece of loot closes in the screen. Loot is collected automatically; use the stick to move, sprint, throw coins, and wear a disguise.',
-                      button: 'INFILTRATE',
-                      onTap: () => setState(_start),
-                    ),
-                  if (game.phase == _MansionPhase.caught)
-                    _MansionOverlay(
-                      title: 'CAUGHT',
-                      copy: game.message,
-                      button: 'RUN IT AGAIN',
-                      danger: true,
-                      onTap: () => setState(_start),
-                    ),
-                  if (game.phase == _MansionPhase.extracted)
-                    if (widget.level != null)
-                      CampaignMissionClearOverlay(
-                        level: widget.level!,
-                        score: game.player.loot,
-                        elapsedSeconds: game.time,
-                        accent: const Color(0xFFF7C948),
-                        onNextLevel: _continueCampaign,
+                      left: 10,
+                      child: GameExitButton(
                         onExit: () => Navigator.of(context).pop(),
-                      )
-                    else
+                      ),
+                    ),
+                    if (game.phase == _MansionPhase.playing)
+                      Positioned(
+                        top: 10,
+                        right: 10,
+                        child: GamePauseButton(
+                          onTap: () => setState(() => _pause(true)),
+                        ),
+                      ),
+                    if (game.phase == _MansionPhase.playing) ...[
+                      Positioned(
+                        top: 10,
+                        left: 56,
+                        child: _MansionRunHud(
+                          game: game,
+                          width: compact ? 170 : 202,
+                        ),
+                      ),
+                      Positioned(
+                        left: 16,
+                        bottom: 16,
+                        child: TouchStick(
+                          key: ValueKey(_stickEpoch),
+                          size: compact ? 94 : 116,
+                          onChanged: _movement.setAnalog,
+                        ),
+                      ),
+                      Positioned(
+                        right: 16,
+                        bottom: 16,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                HoldGameButton(
+                                  label: 'SPRINT',
+                                  icon: Icons.bolt_rounded,
+                                  color: const Color(0xFF72D6FF),
+                                  size: control,
+                                  onChanged: (value) => _sprinting = value,
+                                ),
+                                const SizedBox(width: 7),
+                                TapGameButton(
+                                  label: 'COIN',
+                                  icon: Icons.toll_rounded,
+                                  color: const Color(0xFFF4D67B),
+                                  width: control,
+                                  onTap: () => setState(game.queueCoin),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 7),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                TapGameButton(
+                                  label: 'MASK',
+                                  icon: Icons.masks_rounded,
+                                  color: const Color(0xFF86FFBE),
+                                  width: control,
+                                  onTap: () => setState(game.queueDisguise),
+                                ),
+                                const SizedBox(width: 7),
+                                SizedBox(width: control),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (game.phase == _MansionPhase.intro)
                       _MansionOverlay(
-                        title: 'EXTRACTION COMPLETE',
+                        title: 'EDGELOAD: ${game.layoutName}',
                         copy:
-                            'You extracted \$${game.player.loot}. The more you stole, the less you could see.',
-                        button: 'NEW RUN',
+                            'Steal the diamond, evade the guards, and extract. Every piece of loot closes in the screen. Move with the stick or WASD, hold Shift to sprint, press C for a coin, and E for a disguise.',
+                        button: 'INFILTRATE',
                         onTap: () => setState(_start),
                       ),
-                  if (_paused)
-                    GamePauseOverlay(
-                      gameName: 'EDGELOAD: MANSION RUN',
-                      onResume: () => setState(() => _pause(false)),
-                      onRestart: () => setState(() {
-                        _pause(false);
-                        _start();
-                      }),
-                      onExit: () => Navigator.of(context).pop(),
-                    ),
-                ],
-              );
-            },
+                    if (game.phase == _MansionPhase.caught)
+                      _MansionOverlay(
+                        title: 'CAUGHT',
+                        copy: game.message,
+                        button: 'RUN IT AGAIN',
+                        danger: true,
+                        onTap: () => setState(_start),
+                      ),
+                    if (game.phase == _MansionPhase.extracted)
+                      if (widget.level != null)
+                        CampaignMissionClearOverlay(
+                          level: widget.level!,
+                          score: game.player.loot,
+                          elapsedSeconds: game.time,
+                          accent: const Color(0xFFF7C948),
+                          onNextLevel: _continueCampaign,
+                          onExit: () => Navigator.of(context).pop(),
+                        )
+                      else
+                        _MansionOverlay(
+                          title: 'EXTRACTION COMPLETE',
+                          copy:
+                              'You extracted \$${game.player.loot}. The more you stole, the less you could see.',
+                          button: 'NEW RUN',
+                          onTap: () => setState(_start),
+                        ),
+                    if (_paused)
+                      GamePauseOverlay(
+                        gameName: 'EDGELOAD: MANSION RUN',
+                        onResume: () => setState(() => _pause(false)),
+                        onRestart: () => setState(() {
+                          _pause(false);
+                          _start();
+                        }),
+                        onExit: () => Navigator.of(context).pop(),
+                      ),
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -257,7 +315,7 @@ class _MansionRunHud extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     width: width,
-    height: 46,
+    height: 60,
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
     decoration: BoxDecoration(
       color: const Color(0xDD101829),
@@ -267,53 +325,72 @@ class _MansionRunHud extends StatelessWidget {
         width: 1.5,
       ),
     ),
-    child: Row(
+    child: Column(
       children: [
         Expanded(
-          flex: 3,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          child: Row(
             children: [
-              _MansionStat(
-                label: 'MONEY',
-                value: '\$${game.player.loot}',
-                color: const Color(0xFFF4D67B),
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _MansionStat(
+                      label: 'MONEY',
+                      value: '\$${game.player.loot}',
+                      color: const Color(0xFFF4D67B),
+                    ),
+                    _MansionStat(
+                      label: 'COINS',
+                      value: '${game.player.coins}',
+                      color: const Color(0xFFF4D67B),
+                    ),
+                  ],
+                ),
               ),
-              _MansionStat(
-                label: 'COINS',
-                value: '${game.player.coins}',
-                color: const Color(0xFFF4D67B),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6),
+                child: SizedBox(
+                  height: 30,
+                  child: VerticalDivider(color: Color(0xFF4D6381), width: 1),
+                ),
+              ),
+              Expanded(
+                flex: 5,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _MansionMeter(
+                      label: 'SPRINT',
+                      value: game.player.stamina / 100,
+                      color: game.sprinting
+                          ? const Color(0xFFB7F3FF)
+                          : const Color(0xFF72D6FF),
+                    ),
+                    _MansionMeter(
+                      label: 'STEALTH',
+                      value:
+                          game.player.disguise / _MansionGame.disguiseDuration,
+                      color: const Color(0xFF86FFBE),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 6),
-          child: SizedBox(
-            height: 30,
-            child: VerticalDivider(color: Color(0xFF4D6381), width: 1),
-          ),
-        ),
-        Expanded(
-          flex: 5,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _MansionMeter(
-                label: 'SPRINT',
-                value: game.player.stamina / 100,
-                color: game.sprinting
-                    ? const Color(0xFFB7F3FF)
-                    : const Color(0xFF72D6FF),
-              ),
-              _MansionMeter(
-                label: 'STEALTH',
-                value: game.player.disguise / _MansionGame.disguiseDuration,
-                color: const Color(0xFF86FFBE),
-              ),
-            ],
+        Text(
+          game.objectiveReadout,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Color(0xFFBFD4EA),
+            fontSize: 7,
+            height: 1,
+            fontWeight: FontWeight.w900,
+            letterSpacing: .25,
           ),
         ),
       ],

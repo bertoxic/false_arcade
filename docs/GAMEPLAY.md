@@ -28,10 +28,13 @@ health or speed.
 
 ### FALSE HABIT
 
-The Warden observes a route, telegraphs a prediction, commits to it, and then
-recovers. The player earns openings by changing direction after commitment—not
-by exploiting a stale sample. Echoes replay credible recorded movement, making
-them a planned deception rather than a generic homing distraction.
+False Habit is a return heist through a 24-room living archive, not an arena
+score chase. The Warden learns a repeated doorway direction, then folds the
+nearby map into a predicted route and an unexpected route. Taking the unexpected
+door fractures the read, cools Heat, and keeps the extraction run alive. Echoes
+replay a recent route and pull the next fold into another district, creating a
+planned deception rather than a generic distraction. A run ends only after the
+player steals enough Truth Fragments and returns to the original Breach.
 
 ### NUMBERFALL
 

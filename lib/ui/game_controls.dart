@@ -58,27 +58,72 @@ class _TouchStickState extends State<TouchStick> {
           child: DecoratedBox(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0x66121A2A),
-              border: Border.all(color: const Color(0x997B92B7), width: 1.4),
+              color: const Color(0x7707111D),
+              border: Border.all(
+                color: _knob != Offset.zero
+                    ? const Color(0xFF48F2C1).withValues(alpha: .75)
+                    : const Color(0xFF4A6B8F).withValues(alpha: .55),
+                width: _knob != Offset.zero ? 2.0 : 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _knob != Offset.zero
+                      ? const Color(0xFF48F2C1).withValues(alpha: .28)
+                      : const Color(0xFF1E3A5F).withValues(alpha: .15),
+                  blurRadius: _knob != Offset.zero ? 18 : 8,
+                ),
+              ],
             ),
-            child: Center(
-              child: Transform.translate(
-                offset: _knob,
-                child: Container(
-                  height: widget.size * .42,
-                  width: widget.size * .42,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Inner reticle circle
+                Container(
+                  height: widget.size * .65,
+                  width: widget.size * .65,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFF30445F),
-                    border: Border.all(color: const Color(0xFFC1D4F0)),
-                  ),
-                  child: const Icon(
-                    Icons.control_camera_rounded,
-                    color: Colors.white,
-                    size: 20,
+                    border: Border.all(
+                      color: const Color(0xFF38587A).withValues(alpha: .4),
+                      width: 1,
+                    ),
                   ),
                 ),
-              ),
+                Transform.translate(
+                  offset: _knob,
+                  child: Container(
+                    height: widget.size * .44,
+                    width: widget.size * .44,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: _knob != Offset.zero
+                            ? [const Color(0xFF48F2C1), const Color(0xFF165C58)]
+                            : [const Color(0xFF3A587B), const Color(0xFF162537)],
+                      ),
+                      border: Border.all(
+                        color: _knob != Offset.zero
+                            ? const Color(0xFFE6FFF9)
+                            : const Color(0xFF90BBE8),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _knob != Offset.zero
+                              ? const Color(0xFF48F2C1).withValues(alpha: .6)
+                              : const Color(0xFF000000).withValues(alpha: .4),
+                          blurRadius: _knob != Offset.zero ? 14 : 4,
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      Icons.control_camera_rounded,
+                      color: _knob != Offset.zero ? Colors.black87 : Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -141,20 +186,19 @@ class _HoldGameButtonState extends State<HoldGameButton> {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: _held
-                ? widget.color.withValues(alpha: .72)
-                : const Color(0xDD101829),
+                ? widget.color.withValues(alpha: .85)
+                : const Color(0xEE0B1220),
             border: Border.all(
-              color: widget.color.withValues(alpha: _held ? 1 : .65),
-              width: 2,
+              color: widget.color.withValues(alpha: _held ? 1 : .72),
+              width: _held ? 2.5 : 1.8,
             ),
-            boxShadow: _held
-                ? [
-                    BoxShadow(
-                      color: widget.color.withValues(alpha: .42),
-                      blurRadius: 18,
-                    ),
-                  ]
-                : const [],
+            boxShadow: [
+              BoxShadow(
+                color: widget.color.withValues(alpha: _held ? .55 : .18),
+                blurRadius: _held ? 22 : 8,
+                spreadRadius: _held ? 1.5 : 0,
+              ),
+            ],
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -257,19 +301,18 @@ class _AimGameButtonState extends State<AimGameButton> {
           width: widget.size,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: _firing ? firingColor : const Color(0xDD101829),
+            color: _firing ? firingColor : const Color(0xEE0B1220),
             border: Border.all(
-              color: widget.color.withValues(alpha: _firing ? 1 : .65),
-              width: 2,
+              color: widget.color.withValues(alpha: _firing ? 1 : .72),
+              width: _firing ? 2.5 : 1.8,
             ),
-            boxShadow: _firing
-                ? [
-                    BoxShadow(
-                      color: widget.color.withValues(alpha: .42),
-                      blurRadius: 18,
-                    ),
-                  ]
-                : const [],
+            boxShadow: [
+              BoxShadow(
+                color: widget.color.withValues(alpha: _firing ? .55 : .18),
+                blurRadius: _firing ? 22 : 8,
+                spreadRadius: _firing ? 1.5 : 0,
+              ),
+            ],
           ),
           child: Stack(
             alignment: Alignment.center,
@@ -344,12 +387,18 @@ class TapGameButton extends StatelessWidget {
             width: width,
             height: 54,
             decoration: BoxDecoration(
-              color: const Color(0xDD101829),
+              color: const Color(0xEE0B1220),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: color.withValues(alpha: .72),
-                width: 1.5,
+                color: color.withValues(alpha: .82),
+                width: 1.8,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: .22),
+                  blurRadius: 10,
+                ),
+              ],
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -382,7 +431,7 @@ class GameExitButton extends StatelessWidget {
     return Tooltip(
       message: 'Exit game',
       child: Material(
-        color: const Color(0xD9111828),
+        color: const Color(0xEE0B1220),
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: () {
@@ -390,9 +439,16 @@ class GameExitButton extends StatelessWidget {
             onExit();
           },
           borderRadius: BorderRadius.circular(12),
-          child: const Padding(
-            padding: EdgeInsets.all(8),
-            child: Icon(
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFF3B5B84).withValues(alpha: .6),
+                width: 1.2,
+              ),
+            ),
+            padding: const EdgeInsets.all(8),
+            child: const Icon(
               Icons.arrow_back_rounded,
               size: 20,
               color: Color(0xFFE3ECFF),
@@ -413,7 +469,7 @@ class GamePauseButton extends StatelessWidget {
   Widget build(BuildContext context) => Tooltip(
     message: 'Pause game',
     child: Material(
-      color: const Color(0xD9111828),
+      color: const Color(0xEE0B1220),
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: () {
@@ -421,9 +477,16 @@ class GamePauseButton extends StatelessWidget {
           onTap();
         },
         borderRadius: BorderRadius.circular(12),
-        child: const Padding(
-          padding: EdgeInsets.all(8),
-          child: Icon(Icons.pause_rounded, size: 20, color: Color(0xFFE3ECFF)),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: const Color(0xFF3B5B84).withValues(alpha: .6),
+              width: 1.2,
+            ),
+          ),
+          padding: const EdgeInsets.all(8),
+          child: const Icon(Icons.pause_rounded, size: 20, color: Color(0xFFE3ECFF)),
         ),
       ),
     ),
@@ -623,6 +686,13 @@ class _FeedbackSettingsSheet extends StatelessWidget {
                   value: settings.hapticsEnabled,
                   onChanged: GameFeedback.setHapticsEnabled,
                 ),
+                _FeedbackToggle(
+                  icon: Icons.tv_rounded,
+                  title: 'CRT Arcade Screen FX',
+                  subtitle: 'Retro scanlines & phosphor vignette',
+                  value: settings.crtEnabled,
+                  onChanged: GameFeedback.setCrtEnabled,
+                ),
               ],
             ),
           ),
@@ -661,7 +731,7 @@ class _FeedbackToggle extends StatelessWidget {
 /// Shared end-of-mission flow for every campaign title. Internal game stages
 /// may still use their own transitions, but a selected campaign level always
 /// ends here so players can deliberately continue to the newly unlocked level.
-class CampaignMissionClearOverlay extends StatelessWidget {
+class CampaignMissionClearOverlay extends StatefulWidget {
   const CampaignMissionClearOverlay({
     super.key,
     required this.level,
@@ -680,13 +750,28 @@ class CampaignMissionClearOverlay extends StatelessWidget {
   final VoidCallback? onNextLevel;
 
   @override
+  State<CampaignMissionClearOverlay> createState() =>
+      _CampaignMissionClearOverlayState();
+}
+
+class _CampaignMissionClearOverlayState
+    extends State<CampaignMissionClearOverlay> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      GameFeedback.victory();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final result = LevelRunResult(
-      level: level,
-      score: score,
-      elapsedSeconds: elapsedSeconds,
+      level: widget.level,
+      score: widget.score,
+      elapsedSeconds: widget.elapsedSeconds,
     );
-    final isFinalMission = level.number >= gameCampaignLevelCount;
+    final isFinalMission = widget.level.number >= gameCampaignLevelCount;
     return Positioned.fill(
       child: ColoredBox(
         color: const Color(0xE8080C16),
@@ -699,29 +784,51 @@ class CampaignMissionClearOverlay extends StatelessWidget {
               color: const Color(0xFF111A2A),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: accent.withValues(alpha: .9),
-                width: 1.4,
+                color: widget.accent.withValues(alpha: .75),
+                width: 1.5,
               ),
               boxShadow: [
-                BoxShadow(color: accent.withValues(alpha: .16), blurRadius: 32),
+                BoxShadow(
+                  color: widget.accent.withValues(alpha: .24),
+                  blurRadius: 36,
+                ),
               ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  isFinalMission ? 'CAMPAIGN COMPLETE' : 'MISSION COMPLETE',
-                  style: TextStyle(
-                    color: accent,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.4,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      isFinalMission ? 'CAMPAIGN COMPLETE' : 'MISSION COMPLETE',
+                      style: TextStyle(
+                        color: widget.accent,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: 'PressStart2P',
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        for (var i = 1; i <= 3; i++)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 3),
+                            child: Icon(
+                              i <= result.stars ? Icons.star_rounded : Icons.star_outline_rounded,
+                              size: 18,
+                              color: i <= result.stars ? const Color(0xFFFFD36A) : const Color(0xFF485A72),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'LEVEL ${level.number.toString().padLeft(2, '0')} · ${level.chapterTitle}',
+                  'LEVEL ${widget.level.number.toString().padLeft(2, '0')} · ${widget.level.chapterTitle}',
                   style: const TextStyle(
                     fontSize: 24,
                     height: 1.05,
@@ -731,7 +838,7 @@ class CampaignMissionClearOverlay extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  level.storyBeat,
+                  widget.level.storyBeat,
                   style: const TextStyle(
                     color: Color(0xFFC6D2E6),
                     fontSize: 13,
@@ -750,12 +857,12 @@ class CampaignMissionClearOverlay extends StatelessWidget {
                     ),
                     _CampaignResultChip(
                       icon: Icons.stars_rounded,
-                      label: '$score SCORE',
-                      color: accent,
+                      label: '${widget.score} SCORE',
+                      color: widget.accent,
                     ),
                     _CampaignResultChip(
                       icon: Icons.timer_outlined,
-                      label: '${elapsedSeconds.round()}s',
+                      label: '${widget.elapsedSeconds.round()}s',
                       color: const Color(0xFF9EB4D1),
                     ),
                   ],
@@ -765,15 +872,15 @@ class CampaignMissionClearOverlay extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: onNextLevel ?? onExit,
+                      onPressed: widget.onNextLevel ?? widget.onExit,
                       style: FilledButton.styleFrom(
-                        backgroundColor: accent,
+                        backgroundColor: widget.accent,
                         foregroundColor: const Color(0xFF04101A),
                         padding: const EdgeInsets.symmetric(vertical: 13),
                       ),
                       icon: const Icon(Icons.arrow_forward_rounded),
                       label: Text(
-                        'NEXT LEVEL · ${level.number + 1}',
+                        'NEXT LEVEL · ${widget.level.number + 1}',
                         style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
                     ),
@@ -781,7 +888,7 @@ class CampaignMissionClearOverlay extends StatelessWidget {
                 if (!isFinalMission) const SizedBox(height: 6),
                 Center(
                   child: TextButton(
-                    onPressed: onExit,
+                    onPressed: widget.onExit,
                     child: Text(
                       isFinalMission ? 'RETURN TO LEVELS' : 'CHOOSE A LEVEL',
                     ),
