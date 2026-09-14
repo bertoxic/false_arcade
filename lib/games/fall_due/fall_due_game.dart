@@ -17,6 +17,7 @@ import '../../ui/screen_shake.dart';
 part 'fall_due_page.dart';
 part 'fall_due_simulation.dart';
 part 'fall_due_painter.dart';
+part 'fall_due_level_generator.dart';
 
 /// Central tuning for Fall Due's deliberately arcade-like physics.
 ///
@@ -47,6 +48,13 @@ abstract final class FallDueTuning {
   static const crateVelocityRetainedPerSecond = .025;
   static const deathLedgerFee = 28.0;
   static const deathScoreFee = 150;
+
+  static const slamSpeed = 820.0;
+  static const shockwaveRadius = 80.0;
+  static const dashImpulse = 350.0;
+  static const dashDebtCost = 22.0;
+  static const parryRange = 170.0;
+  static const parryBonusScore = 450;
 
   /// Borrow starts as strong lift, then smoothly exhausts over the final 35%.
   static double borrowLiftAcceleration(double debt) {
@@ -87,4 +95,40 @@ abstract final class FallDueRules {
     final outstanding = (carriedDebt + payback).clamp(0, FallDueTuning.maxDebt);
     return ((FallDueTuning.maxDebt - outstanding) * 10).round();
   }
+
+  static int generatedStageLength(int stageIndex) {
+    final stage = _FallDueLevelGenerator.generateStage(stageIndex);
+    return stage.finalExit.right.round();
+  }
+
+  static String generatedStageTitle(int stageIndex) =>
+      _FallDueLevelGenerator.generateStage(stageIndex).title;
+
+  static int generatedStageSectionCount(int stageIndex) =>
+      _FallDueLevelGenerator.generateStage(stageIndex).route?.sections.length ?? 0;
+
+  static Set<String> generatedStageTargetKinds(int stageIndex) =>
+      _FallDueLevelGenerator.generateStage(stageIndex)
+          .allTargets
+          .map((t) => t.kind.name)
+          .toSet();
+
+  static double slamDescentSpeed(double borrowPower) {
+    final clamped = borrowPower.clamp(0.0, FallDueTuning.maxDebt);
+    return 640.0 + (clamped / FallDueTuning.maxDebt) * 440.0;
+  }
+
+  static bool slamCausesShockwave(double borrowPower) => borrowPower >= 70.0;
+
+  static bool canInitiateSlam(double borrowPower) => borrowPower >= 8.0;
+
+  static double droneGiveDownwardSpeed() => 750.0;
+
+  static double droneTakeBlastSpeed() => 920.0;
+
+  static double slamConcussionRadius(double borrowPower) =>
+      70.0 + (borrowPower.clamp(0.0, FallDueTuning.maxDebt) * 0.2);
+
+  static double slamConcussionPush(double borrowPower) =>
+      70.0 + (borrowPower.clamp(0.0, FallDueTuning.maxDebt) * 0.3);
 }

@@ -846,6 +846,7 @@ class _FallDueGame {
   final List<_DueWeakPanel> weakPanels = [];
   final List<_DueSafeDebtPad> safeDebtPads = [];
   final List<_DueParticle> particles = [];
+  final List<_FallDueShockwave> shockwaves = [];
   final Set<int> disabledSpikes = {};
   final Set<int> rewardedSpikes = {};
   Rect? _activeExit;
@@ -857,12 +858,17 @@ class _FallDueGame {
   bool right = false;
   bool _jumpHeld = false;
   bool _borrowHeld = false;
+  bool _slamming = false;
+  double _slamBorrowPower = 0.0;
+  bool _slamHeld = false;
+  bool _hasAirDashed = false;
   bool _antiGravityActive = false;
   double _jumpBuffer = 0;
   double debt = 0;
   double _payback = 0;
   double _settleGrace = 0;
   final Cooldown _transferCooldown = Cooldown();
+  final Cooldown _slamCooldown = Cooldown();
   double _spawnGrace = 0;
   double camera = 0;
   double time = 0;
@@ -1008,6 +1014,7 @@ class _FallDueGame {
       ..addAll(stage.allSafeDebtPads.map(_DueSafeDebtPad.new));
     bullets.clear();
     particles.clear();
+    shockwaves.clear();
     disabledSpikes.clear();
     rewardedSpikes.clear();
     _appendCampaignAnnex();
@@ -1024,58 +1031,32 @@ class _FallDueGame {
 
   void _appendCampaignAnnex() {
     if (_campaignLevel <= 1) return;
-    final random = math.Random(_campaignSeed ^ (levelIndex * 0x9E3779B9));
-    // A campaign mission adds an authored-feeling annex after the selected
-    // stage. It has two to four distinct beats (spike crossing, elevated seal,
-    // and a guarded exit) so higher levels feel like a route, not a single
-    // extra platform bolted onto an old level.
-    final extension =
-        ((520 + _campaignLevel * 58 + random.nextInt(280)) * _campaignLength)
-            .roundToDouble();
-    final start = exit.left - 18;
-    final shelfX = start + extension * .28;
-    final shelfY = 260 + random.nextDouble() * 50;
-    platforms.add(Rect.fromLTWH(start, 430, extension + 90, 110));
-    platforms.add(Rect.fromLTWH(shelfX, shelfY, 140, 18));
-    platforms.add(Rect.fromLTWH(start + extension * .56, 300, 150, 18));
-    platforms.add(Rect.fromLTWH(start + extension * .78, 246, 130, 18));
-    spikes.add(
-      Rect.fromLTWH(
-        start + extension * .12,
-        465,
-        110 + random.nextDouble() * 76,
-        55,
-      ),
+    final annex = _FallDueLevelGenerator.generateAnnex(
+      campaignLevel: _campaignLevel,
+      campaignSeed: _campaignSeed,
+      lengthMultiplier: _campaignLength,
+      startX: exit.left - 18,
     );
-    spikes.add(
-      Rect.fromLTWH(
-        start + extension * .68,
-        465,
-        94 + random.nextDouble() * 70,
-        55,
-      ),
-    );
-    targets.add(
-      _DueTarget(start + extension * .46, 388, 32, 42, _TargetKind.enemy),
-    );
-    targets.add(
-      _DueTarget(start + extension * .87, 388, 32, 42, _TargetKind.enemy),
-    );
-    seals.add(_DueSeal(Offset(shelfX + 70, shelfY - 18)));
-    seals.add(_DueSeal(Offset(start + extension * .61, 260)));
-    seals.add(_DueSeal(Offset(start + extension * .82, 208)));
-    emitters.add(_DueEmitter(Offset(start + extension * .54, 388), -250, 1.35));
-    emitters.add(_DueEmitter(Offset(start + extension * .9, 388), 245, 1.2));
-    _activeExit = Rect.fromLTWH(start + extension, 350, 56, 80);
+    platforms.addAll(annex.platforms);
+    spikes.addAll(annex.spikes);
+    targets.addAll(annex.targets.map(_targetFromSpec));
+    emitters.addAll(annex.emitters.map(_DueEmitter.fromSpec));
+    seals.addAll(annex.seals.map(_DueSeal.new));
+    weakPanels.addAll(annex.weakPanels.map(_DueWeakPanel.new));
+    safeDebtPads.addAll(annex.safeDebtPads.map(_DueSafeDebtPad.new));
+    _activeExit = annex.exit;
   }
 
-  _DueTarget _targetFromSpec(_DueTargetSpec target) => _DueTarget(
-    target.x,
-    target.y,
-    target.kind == _TargetKind.enemy ? 32 : 35,
-    target.kind == _TargetKind.enemy ? 42 : 40,
-    target.kind,
-  );
+  _DueTarget _targetFromSpec(_DueTargetSpec target) {
+    final (w, h) = switch (target.kind) {
+      _TargetKind.heavy => (40.0, 46.0),
+      _TargetKind.drone => (34.0, 30.0),
+      _TargetKind.leecher => (28.0, 32.0),
+      _TargetKind.enemy => (32.0, 42.0),
+      _TargetKind.crate => (35.0, 40.0),
+    };
+    return _DueTarget(target.x, target.y, w, h, target.kind);
+  }
 
   _DueTarget _puzzleTarget(_GravityPuzzleSpec puzzle) => _DueTarget(
     puzzle.boxPosition.dx,
@@ -1110,6 +1091,22 @@ class _FallDueGame {
 
   void setBorrow(bool value) {
     if (value && !_borrowHeld && phase == _DuePhase.playing) {
+      final hasHorizontal = left || right;
+      if (!player.grounded && hasHorizontal && !_hasAirDashed) {
+        // GRAVITY DASH: Directional horizontal aerial impulse (once per jump)
+        _hasAirDashed = true;
+        final dir = (right ? 1.0 : 0.0) - (left ? 1.0 : 0.0);
+        player.vx = dir * FallDueTuning.dashImpulse;
+        player.vy = math.min(player.vy, -130.0);
+        debt = math.min(
+          FallDueTuning.maxDebt,
+          debt + FallDueTuning.dashDebtCost,
+        );
+        _burst(player.center, const Color(0xFF8DE1FF), 14);
+        ArcadeShake.shake(0.18);
+        GameFeedback.jump();
+        message = 'GRAVITY DASH: directional air burst borrowed!';
+      }
       _antiGravityActive = true;
       _settleGrace = 0;
       debt = math.min(
@@ -1127,6 +1124,145 @@ class _FallDueGame {
       _openSettlementWindow();
     }
     _borrowHeld = value;
+  }
+
+  void setSlam(bool value) {
+    _slamHeld = value;
+    if (value && phase == _DuePhase.playing) {
+      if (!player.grounded && math.max(debt, _payback) >= 8) {
+        performSlam();
+      } else if (!player.grounded && math.max(debt, _payback) < 8) {
+        message =
+            'HOLDING SLAM: Charge Borrow (W/Shift/Borrow) to execute slam!';
+      }
+    }
+  }
+
+  void performSlam() {
+    if (phase != _DuePhase.playing) return;
+    if (_slamCooldown.isActive) {
+      message = 'SLAM RECHARGING: allow kinetic inertia to stabilize.';
+      return;
+    }
+    if (player.grounded) {
+      message = 'SLAM REQUIRES AIR: leap and slam downward!';
+      return;
+    }
+    final currentPower = math.max(debt, _payback);
+    if (currentPower < 8) {
+      message =
+          'INSUFFICIENT BORROW: Hold Borrow in the air to power your slam!';
+      return;
+    }
+    _slamCooldown.tryTrigger(1.2);
+    _slamming = true;
+    _slamBorrowPower = currentPower;
+    final scaledSpeed = FallDueRules.slamDescentSpeed(currentPower);
+    player.vy = scaledSpeed;
+    _antiGravityActive = false;
+    _borrowHeld = false;
+    _burst(player.center, const Color(0xFFFF7186), 14);
+    GameFeedback.jump();
+    if (currentPower >= 70) {
+      message =
+          'MAXIMUM KINETIC SLAM: High borrow ready to detonate shockwave!';
+    } else if (currentPower >= 35) {
+      message = 'MEDIUM KINETIC SLAM: Heavy downward plunge initiated.';
+    } else {
+      message = 'LIGHT KINETIC SLAM: Descending downward.';
+    }
+  }
+
+  Set<_DueTarget> _triggerGravitationalShockwave(Offset center, {bool isSlam = false}) {
+    final discharged = _payback > 0 ? _payback : debt;
+    // Discharges 65% of debt/payback into kinetic blast, leaving 35% due
+    _payback = discharged * 0.35;
+    debt = math.max(0, debt - discharged);
+    final dynamicRadius = FallDueTuning.shockwaveRadius +
+        (discharged * 0.3).clamp(0.0, 30.0);
+
+    shockwaves.add(
+      _FallDueShockwave(
+        position: center,
+        color: isSlam ? const Color(0xFFFF7186) : const Color(0xFFFFD86E),
+        maxRadius: dynamicRadius,
+      ),
+    );
+    ArcadeShake.shake(0.38);
+    GameFeedback.heavyImpact();
+    _burst(center, const Color(0xFFFF7186), 26);
+    player.vx *= 0.35; // Landing recovery lag prevents instant sprint
+
+    final affectedTargets = <_DueTarget>{};
+    for (final enemy in targets) {
+      if (!enemy.alive || !enemy.kind!.isEnemy) continue;
+      final dist = (enemy.center - center).distance;
+      if (dist < dynamicRadius) {
+        affectedTargets.add(enemy);
+        final damage = discharged >= 45 ? 2 : 1;
+        enemy.health -= damage;
+        final pushDir = enemy.center.dx >= center.dx ? 1.0 : -1.0;
+        enemy.vx += pushDir * 95.0;
+        enemy.vy = math.min(enemy.vy, -35.0);
+        if (enemy.kind == _TargetKind.drone) {
+          enemy.droneRecoveryTimer = 0.4;
+          enemy.abilityCooldown = math.max(enemy.abilityCooldown, 1.2);
+        }
+        if (enemy.health <= 0) {
+          enemy.alive = false;
+          final killScore = switch (enemy.kind) {
+            _TargetKind.heavy => 950,
+            _TargetKind.drone => 750,
+            _TargetKind.leecher => 600,
+            _TargetKind.enemy => 650,
+            _TargetKind.crate || null => 0,
+          };
+          score += killScore;
+          _burst(enemy.center, const Color(0xFFFF7186), 18);
+        }
+      }
+    }
+
+    for (final crate in targets) {
+      if (!crate.alive || crate.kind != _TargetKind.crate || crate.anchored) {
+        continue;
+      }
+      final dist = (crate.center - center).distance;
+      if (dist < dynamicRadius + 20) {
+        affectedTargets.add(crate);
+        final pushDir = crate.center.dx >= center.dx ? 1.0 : -1.0;
+        crate.vx += pushDir * 75.0;
+        crate.vy = math.min(crate.vy, -25.0);
+        _burst(crate.center, const Color(0xFFFFD86E), 12);
+      }
+    }
+
+    for (final bullet in bullets) {
+      if (!bullet.alive) continue;
+      final dist = (bullet.rect.center - center).distance;
+      if (dist < dynamicRadius + 15) {
+        bullet.alive = false;
+        score += 150;
+        _burst(bullet.rect.center, const Color(0xFF8DE1FF), 10);
+      }
+    }
+
+    for (final panel in weakPanels) {
+      if (panel.broken) continue;
+      if ((panel.rect.center - center).distance < dynamicRadius + 15) {
+        panel.broken = true;
+        score += 400;
+        _burst(panel.rect.center, const Color(0xFFFFD86E), 20);
+      }
+    }
+
+    if (discharged > 5) {
+      message =
+          'KINETIC DISCHARGE! Converted ${(discharged * 0.6).round()}% payback into shockwave (${_payback.round()}% debt still due).';
+    } else {
+      message = 'GRAVITATIONAL SHOCKWAVE deployed!';
+    }
+    return affectedTargets;
   }
 
   void _openSettlementWindow() {
@@ -1173,6 +1309,7 @@ class _FallDueGame {
     if (phase != _DuePhase.playing) return;
     _spawnGrace = math.max(0, _spawnGrace - dt);
     _transferCooldown.tick(dt);
+    _slamCooldown.tick(dt);
     _jumpBuffer = math.max(0, _jumpBuffer - dt);
     for (final pad in safeDebtPads) {
       pad.cooldown = math.max(0, pad.cooldown - dt);
@@ -1227,7 +1364,22 @@ class _FallDueGame {
         .toDouble();
     player.coyote = player.grounded ? .12 : math.max(0, player.coyote - dt);
     if (_jumpBuffer > 0 && player.coyote > 0) {
-      player.vy = -FallDueTuning.jumpImpulse;
+      final onCrate = targets.any(
+        (t) =>
+            t.alive &&
+            t.kind == _TargetKind.crate &&
+            (player.rect.bottom - t.y).abs() < 10 &&
+            player.rect.right > t.x &&
+            player.rect.left < t.x + t.w,
+      );
+      if (onCrate) {
+        player.vy = -FallDueTuning.jumpImpulse * 1.15;
+        _hasAirDashed = false;
+        _burst(player.rect.bottomCenter, const Color(0xFF8CFFB1), 14);
+        message = 'SPRINGBOARD BOOST! +15% vertical leap.';
+      } else {
+        player.vy = -FallDueTuning.jumpImpulse;
+      }
       player.coyote = 0;
       player.grounded = false;
       _jumpBuffer = 0;
@@ -1259,16 +1411,55 @@ class _FallDueGame {
         _payback = math.max(0, _payback - (player.grounded ? 15 : 5) * dt);
       }
     }
+    if (_slamHeld && !_slamming && !player.grounded) {
+      final power = math.max(debt, _payback);
+      if (power >= 8 && !_slamCooldown.isActive) {
+        performSlam();
+      }
+    }
     final impactSpeed = player.vy;
+    final wasSlamming = _slamming;
+    final slamPower = _slamBorrowPower;
+    Set<_DueTarget> shockwaveHitTargets = const {};
     final landed = _resolve(player, dt, gravity);
     if (landed) {
+      _hasAirDashed = false;
+      if (wasSlamming) {
+        _slamming = false;
+        if (FallDueRules.slamCausesShockwave(slamPower)) {
+          // Highest borrow causes shockwaves!
+          shockwaveHitTargets =
+              _triggerGravitationalShockwave(player.center, isSlam: true);
+        } else if (slamPower >= 35.0) {
+          // Medium slam: heavy landing, breaks panels directly underfoot, no radial shockwave
+          final discharged = _payback > 0 ? _payback : debt;
+          _payback = discharged * 0.5;
+          debt = math.max(0, debt - discharged);
+          _breakWeakPanels(player.rect, impactSpeed, source: 'MEDIUM SLAM');
+          _burst(player.center, const Color(0xFFFF7186), 16);
+          ArcadeShake.shake(0.22);
+          GameFeedback.mediumImpact();
+          player.vx *= 0.5;
+          message =
+              'MEDIUM SLAM: Heavy landing! Highest borrow required for shockwaves.';
+        } else {
+          // Light slam: direct stomp, no radial shockwave
+          final discharged = _payback > 0 ? _payback : debt;
+          _payback = discharged * 0.6;
+          debt = math.max(0, debt - discharged);
+          _burst(player.center, const Color(0xFFFF7186), 10);
+          GameFeedback.lightImpact();
+          message = 'LIGHT SLAM: Borrow more gravity to unleash heavier impact.';
+        }
+      }
       _settleDebtOnSafePad();
-      if (gravity > 1.3) {
+      if (!wasSlamming && gravity > 1.6 && impactSpeed > 450) {
         _breakWeakPanels(player.rect, impactSpeed, source: 'DEBT DIVE');
       }
     }
+    _DueTarget? directlyStompedEnemy;
     for (final target in targets) {
-      if (target.kind != _TargetKind.enemy ||
+      if (!target.kind!.isEnemy ||
           !target.alive ||
           !player.rect.overlaps(target.rect)) {
         continue;
@@ -1278,19 +1469,112 @@ class _FallDueGame {
           playerRectBeforeMove.bottom <= target.y + 12 &&
           player.rect.bottom >= target.y;
       if (stomped) {
-        target.health -= 1;
-        player.y = target.y - player.h;
-        player.vy = -280;
-        message = 'STOMP HIT — ${target.health} HITS LEFT';
-        if (target.health <= 0) {
-          target.alive = false;
-          score += 550;
-          message = 'LIABILITY CRUSHED +550';
-          _burst(target.center, const Color(0xFFFFD86E), 18);
+        if (target.kind == _TargetKind.heavy && !wasSlamming) {
+          // Heavy Armor Deflection on normal stomp
+          player.y = target.y - player.h;
+          player.vy = -310;
+          _burst(target.rect.topCenter, const Color(0xFFFFD86E), 10);
+          GameFeedback.selection();
+          message =
+              'ARMOR DEFLECTION: Slam or drop crates to break heavy plating!';
+        } else {
+          // Enemies slammed on die instantly!
+          final damage = wasSlamming ? target.health : 1;
+          target.health -= damage;
+          player.y = target.y - player.h;
+          player.vy = -280;
+          _slamming = false;
+          if (wasSlamming) {
+            directlyStompedEnemy = target;
+          }
+          if (target.health <= 0) {
+            target.alive = false;
+            final killScore = switch (target.kind) {
+              _TargetKind.heavy => 950,
+              _TargetKind.drone => 750,
+              _TargetKind.leecher => 600,
+              _TargetKind.enemy => 550,
+              _TargetKind.crate || null => 0,
+            };
+            score += killScore;
+            final name = switch (target.kind) {
+              _TargetKind.heavy => 'ENFORCER',
+              _TargetKind.drone => 'DRONE',
+              _TargetKind.leecher => 'LEECHER',
+              _TargetKind.enemy => 'LIABILITY',
+              _TargetKind.crate || null => 'CRATE',
+            };
+            message = wasSlamming
+                ? 'KINETIC OBLITERATION! $name CRUSHED INSTANTLY +$killScore'
+                : '$name CRUSHED +$killScore';
+            _burst(target.center, const Color(0xFFFF7186), 22);
+            ArcadeShake.shake(0.35);
+            GameFeedback.heavyImpact();
+          } else {
+            message = 'STOMP HIT — ${target.health} HITS LEFT';
+          }
         }
       } else if (_spawnGrace <= 0) {
-        _die('Crushed by liability.');
-        return;
+        if (wasSlamming) {
+          // Slam descent impact directly crushes enemy
+          target.health = 0;
+          target.alive = false;
+          directlyStompedEnemy = target;
+          score += 550;
+          message = 'KINETIC OBLITERATION! Enemy crushed by slam +550';
+          _burst(target.center, const Color(0xFFFF7186), 22);
+          ArcadeShake.shake(0.35);
+          GameFeedback.heavyImpact();
+        } else if (target.kind == _TargetKind.leecher) {
+          // Siphon Leecher latches on and drains balance into Payback!
+          target.alive = false;
+          _payback = math.min(FallDueTuning.maxDebt, _payback + 28.0);
+          _burst(player.center, const Color(0xFFC77DFF), 18);
+          GameFeedback.heavyImpact();
+          ArcadeShake.shake(0.24);
+          message =
+              'LEDGER LEECHED! Siphon leech attached +28% Payback to your balance!';
+        } else {
+          _die('Crushed by liability.');
+          return;
+        }
+      }
+    }
+    if (wasSlamming) {
+      // Concussion push: if slam fails to land a direct hit, at least push nearby enemies away!
+      final radius = FallDueRules.slamConcussionRadius(slamPower);
+      final pushForce = FallDueRules.slamConcussionPush(slamPower);
+      var enemiesPushed = 0;
+      for (final target in targets) {
+        if (!target.alive ||
+            target == directlyStompedEnemy ||
+            shockwaveHitTargets.contains(target)) {
+          continue;
+        }
+        final dist = (target.center - player.center).distance;
+        if (dist > radius) continue;
+
+        final pushDir = target.center.dx >= player.center.dx ? 1.0 : -1.0;
+        if (target.kind!.isEnemy) {
+          enemiesPushed++;
+          target.vx += pushDir * pushForce;
+          target.vy = math.min(target.vy, -35.0);
+          if (target.kind == _TargetKind.drone) {
+            target.droneRecoveryTimer = 0.4;
+            target.abilityCooldown = math.max(target.abilityCooldown, 1.2);
+          }
+          _burst(target.center, const Color(0xFFFF7186), 8);
+        } else if (target.kind == _TargetKind.crate && !target.anchored) {
+          target.vx += pushDir * (pushForce * 0.5);
+          target.vy = math.min(target.vy, -25.0);
+          _burst(target.center, const Color(0xFFFFD86E), 6);
+        }
+      }
+      if (directlyStompedEnemy == null && enemiesPushed > 0) {
+        message =
+            'KINETIC CONCUSSION: Direct hit missed, but shock nudged $enemiesPushed ${enemiesPushed == 1 ? "enemy" : "enemies"} back!';
+        ArcadeShake.shake(0.18);
+        GameFeedback.mediumImpact();
       }
     }
     for (var index = 0; index < spikes.length; index++) {
@@ -1443,6 +1727,7 @@ class _FallDueGame {
       score = math.max(0, snapshot.score - FallDueTuning.deathScoreFee);
       bullets.clear();
       particles.clear();
+      shockwaves.clear();
       _selectedTarget = null;
     }
     for (final puzzle in level.allGravityPuzzles) {
@@ -1497,6 +1782,10 @@ class _FallDueGame {
       particle.life -= dt;
     }
     particles.removeWhere((particle) => particle.life <= 0);
+    for (final wave in shockwaves) {
+      wave.time += dt;
+    }
+    shockwaves.removeWhere((wave) => wave.time >= _FallDueShockwave.life);
   }
 
   void _burst(Offset position, Color color, int count) {
@@ -1519,28 +1808,138 @@ class _FallDueGame {
       if (!target.alive) continue;
       if (target.anchored) continue;
       target.lastY = target.y;
+      target.abilityCooldown = math.max(0, target.abilityCooldown - dt);
       final playerRiding =
-          target.kind != _TargetKind.enemy &&
+          target.kind.isCrate &&
           target.debt < -1 &&
           player.rect.right > target.rect.left + 4 &&
           player.rect.left < target.rect.right - 4 &&
           player.rect.bottom >= target.y - 4 &&
           player.rect.bottom <= target.y + 6;
+
       if (target.kind == _TargetKind.enemy) {
         final weight = (target.debt / 35).clamp(0.0, .78).toDouble();
         final patrolSpeed = 58 * (1 - weight);
         target.vx = target.vx == 0 ? patrolSpeed : target.vx;
-        if (target.debt > 0) {
-          final desiredSpeed = target.vx.sign * patrolSpeed;
-          target.vx += (desiredSpeed - target.vx) * math.min(1, dt * 7);
+        final desiredSpeed = target.vx.sign * patrolSpeed;
+        if (target.debt > 0 || target.vx.abs() > patrolSpeed) {
+          target.vx += (desiredSpeed - target.vx) * math.min(1, dt * 8);
         }
         if (target.grounded &&
             target.vx.abs() <= 70 &&
             !_hasPatrolLedgeAhead(target, dt)) {
           target.vx = -target.vx;
         }
+      } else if (target.kind == _TargetKind.drone) {
+        // Aerial drone floats, stabilizes, and bobs
+        if (target.droneRecoveryTimer > 0) {
+          target.droneRecoveryTimer =
+              math.max(0, target.droneRecoveryTimer - dt);
+          target.vx = damp(target.vx, 0.28, dt);
+          final altitudeErr = target.droneHomeY - target.y;
+          if (target.grounded && target.droneRecoveryTimer < 1.4) {
+            // Hit ground from GIVE: unstick and thrust upward toward hover altitude
+            target.grounded = false;
+            target.vy = -280.0;
+          } else if (!target.grounded) {
+            target.vy = damp(target.vy, 0.16, dt);
+            target.vy += altitudeErr.clamp(-120.0, 120.0) * dt * 3.2;
+          }
+        } else {
+          if (target.debt.abs() < 1) {
+            target.vy = math.sin(time * 3.2 + target.x * 0.05) * 25.0;
+            target.vx = math.cos(time * 1.5 + target.x * 0.02) * 35.0;
+            final altitudeErr = target.droneHomeY - target.y;
+            if (altitudeErr.abs() > 15) {
+              target.vy += altitudeErr.clamp(-60.0, 60.0) * dt * 2.0;
+            }
+          } else if (target.debt < -1) {
+            target.vy = -160.0;
+          }
+        }
+        // Drone Repulsor Pulse
+        if (target.droneRecoveryTimer <= 0 && target.abilityCooldown <= 0) {
+          final dist = (target.center - player.center).distance;
+          if (dist < 220) {
+            target.abilityCooldown = 2.4;
+            final pushDir = player.center - target.center;
+            if (pushDir.distance > 0) {
+              player.vx += (pushDir.dx / pushDir.distance) * 260.0;
+              player.vy = math.min(player.vy, -160.0);
+            }
+            shockwaves.add(_FallDueShockwave(
+              position: target.center,
+              color: const Color(0xFF6DE8FF),
+              maxRadius: 70,
+            ));
+            debt = math.min(FallDueTuning.maxDebt, debt + 10.0);
+            message = 'REPULSOR PULSE! Drone blast pushed you with +10% debt.';
+            GameFeedback.lightImpact();
+            ArcadeShake.shake(0.18);
+          }
+        }
+      } else if (target.kind == _TargetKind.heavy) {
+        final weight = (target.debt / 45).clamp(0.0, .85).toDouble();
+        final patrolSpeed = 38 * (1 - weight);
+        target.vx = target.vx == 0 ? patrolSpeed : target.vx;
+        final desiredSpeed = target.vx.sign * patrolSpeed;
+        if (target.debt > 0 || target.vx.abs() > patrolSpeed) {
+          target.vx += (desiredSpeed - target.vx) * math.min(1, dt * 8);
+        }
+        if (target.grounded &&
+            target.vx.abs() <= 50 &&
+            !_hasPatrolLedgeAhead(target, dt)) {
+          target.vx = -target.vx;
+        }
+        // Heavy Quake Stomp
+        if (target.grounded && target.abilityCooldown <= 0) {
+          final dist = (target.center - player.center).distance;
+          if (dist < 240 && player.grounded) {
+            target.abilityCooldown = 3.2;
+            shockwaves.add(_FallDueShockwave(
+              position: target.rect.bottomCenter,
+              color: const Color(0xFFFF5277),
+              maxRadius: 90,
+            ));
+            ArcadeShake.shake(0.28);
+            GameFeedback.heavyImpact();
+            if (dist < 180 && player.grounded) {
+              player.vy = -260.0;
+              player.grounded = false;
+              message = 'QUAKE STOMP! Enforcer ground tremor popped you into the air!';
+            }
+          }
+        }
+      } else if (target.kind == _TargetKind.leecher) {
+        final dist = (target.center - player.center).distance;
+        if (dist < 260) {
+          final dir = player.center.dx >= target.center.dx ? 1.0 : -1.0;
+          final runSpeed = dir * 110.0;
+          if (target.vx.abs() > 110.0) {
+            target.vx = damp(target.vx, 0.1, dt);
+          } else {
+            target.vx = runSpeed;
+          }
+        } else {
+          final weight = (target.debt / 25).clamp(0.0, .6).toDouble();
+          final patrolSpeed = 75 * (1 - weight);
+          target.vx = target.vx == 0 ? patrolSpeed : target.vx;
+          final desiredSpeed = target.vx.sign * patrolSpeed;
+          if (target.debt > 0 || target.vx.abs() > patrolSpeed) {
+            target.vx += (desiredSpeed - target.vx) * math.min(1, dt * 8);
+          }
+          if (target.grounded &&
+              target.vx.abs() <= 90 &&
+              !_hasPatrolLedgeAhead(target, dt)) {
+            target.vx = -target.vx;
+          }
+        }
       }
-      final gravity = (1 + target.debt * .035).clamp(.22, 2.4).toDouble();
+
+      double gravity = (1 + target.debt * .035).clamp(.22, 2.4).toDouble();
+      if (target.kind == _TargetKind.drone) {
+        gravity = 0;
+      }
       final fallImpact = target.vy + FallDueTuning.gravity * gravity * dt;
       _resolve(target, dt, gravity);
       if (playerRiding) {
@@ -1559,7 +1958,8 @@ class _FallDueGame {
         );
         if (target.vx.abs() < 2) target.vx = 0;
       }
-      if (target.kind == _TargetKind.enemy &&
+      if (target.kind!.isEnemy &&
+          target.kind != _TargetKind.drone &&
           (target.debt < -1 || target.vx.abs() > 180)) {
         _launchEnemyIntoTargets(target);
       }
@@ -1597,7 +1997,7 @@ class _FallDueGame {
           target.alive = false;
         }
       }
-      if (target.kind == _TargetKind.enemy &&
+      if (target.kind!.isEnemy &&
           spikes.asMap().entries.any(
             (entry) =>
                 !disabledSpikes.contains(entry.key) &&
@@ -1605,7 +2005,7 @@ class _FallDueGame {
           )) {
         target.alive = false;
         score += 350;
-        message = 'COLLECTOR LOST TO THE SPIKE BED +350.';
+        message = 'ENEMY LOST TO THE SPIKE BED +350.';
         _burst(target.center, const Color(0xFFFF7186), 14);
       }
     }
@@ -1625,13 +2025,20 @@ class _FallDueGame {
 
   void _crushEnemiesWithCrate(_DueTarget crate) {
     for (final enemy in targets) {
-      if (!enemy.alive || enemy == crate || enemy.kind != _TargetKind.enemy) {
+      if (!enemy.alive || enemy == crate || !enemy.kind!.isEnemy) {
         continue;
       }
       if (!crate.rect.overlaps(enemy.rect)) continue;
       enemy.alive = false;
-      score += 700;
-      message = 'CRATE DROP: collector crushed +700.';
+      final killScore = switch (enemy.kind) {
+        _TargetKind.heavy => 950,
+        _TargetKind.drone => 750,
+        _TargetKind.leecher => 600,
+        _TargetKind.enemy => 700,
+        _TargetKind.crate || null => 0,
+      };
+      score += killScore;
+      message = 'CRATE DROP: enemy crushed +$killScore.';
       _burst(enemy.center, const Color(0xFFFFD86E), 20);
       GameFeedback.mediumImpact();
     }
@@ -1641,14 +2048,14 @@ class _FallDueGame {
     for (final other in targets) {
       if (!other.alive ||
           other == launched ||
-          other.kind != _TargetKind.enemy) {
+          !other.kind!.isEnemy) {
         continue;
       }
       if (!launched.rect.overlaps(other.rect)) continue;
       other.alive = false;
       launched.vx *= .4;
       score += 450;
-      message = 'GRAVITY LAUNCH: collector struck another collector +450.';
+      message = 'GRAVITY LAUNCH: collision neutralized enemy +450.';
       _burst(other.center, const Color(0xFF8DE1FF), 18);
       GameFeedback.mediumImpact();
     }
@@ -1740,249 +2147,10 @@ class _FallDueGame {
   }
 
   _DueStage _generateStage(int index) {
-    final run = index - stages.length + 1;
-    final family = (run - 1) % 5;
-    final turretInterval = _contractDifficulty.interval(
-      run - 1,
-      start: 1.7,
-      minimum: .72,
+    return _FallDueLevelGenerator.generateStage(
+      index,
+      difficultyCurve: _contractDifficulty,
     );
-
-    switch (family) {
-      case 0:
-        return _DueStage(
-          title: 'BRIDGE RELAY $run',
-          briefing:
-              'One yellow crate, several jobs: seal each long spike bed or recall a bridge when the route changes.',
-          platforms: const [
-            Rect.fromLTWH(-40, 430, 270, 110),
-            Rect.fromLTWH(410, 430, 200, 110),
-            Rect.fromLTWH(790, 430, 220, 110),
-            Rect.fromLTWH(1190, 430, 210, 110),
-            Rect.fromLTWH(1580, 430, 380, 110),
-            Rect.fromLTWH(430, 340, 130, 18),
-            Rect.fromLTWH(820, 300, 125, 18),
-            Rect.fromLTWH(1215, 335, 130, 18),
-          ],
-          spikes: const [
-            Rect.fromLTWH(230, 465, 180, 55),
-            Rect.fromLTWH(610, 465, 180, 55),
-            Rect.fromLTWH(1010, 465, 180, 55),
-            Rect.fromLTWH(1400, 465, 180, 55),
-          ],
-          targets: const [
-            _DueTargetSpec(170, 390, _TargetKind.crate),
-            _DueTargetSpec(550, 390, _TargetKind.crate),
-            _DueTargetSpec(940, 390, _TargetKind.crate),
-            _DueTargetSpec(846, 258, _TargetKind.enemy),
-          ],
-          gravityPuzzles: const [
-            _GravityPuzzleSpec(
-              id: 501,
-              boxPosition: Offset(455, 390),
-              leverPosition: Offset(470, 265),
-              gate: Rect.fromLTWH(750, 180, 28, 250),
-            ),
-          ],
-          seals: const [
-            Offset(495, 315),
-            Offset(882, 275),
-            Offset(1280, 310),
-            Offset(1690, 390),
-          ],
-          exit: const Rect.fromLTWH(1840, 350, 56, 80),
-        );
-      case 1:
-        return _DueStage(
-          title: 'ELEVATOR SHAFT $run',
-          briefing:
-              'Take gravity from ordinary crates to make moving lifts. Ride them through the shaft and hold the route levers.',
-          platforms: const [
-            Rect.fromLTWH(-40, 430, 300, 110),
-            Rect.fromLTWH(420, 430, 210, 110),
-            Rect.fromLTWH(790, 430, 210, 110),
-            Rect.fromLTWH(1160, 430, 800, 110),
-            Rect.fromLTWH(300, 365, 130, 18),
-            Rect.fromLTWH(450, 300, 150, 18),
-            Rect.fromLTWH(660, 350, 105, 18),
-            Rect.fromLTWH(815, 270, 150, 18),
-            Rect.fromLTWH(1005, 340, 110, 18),
-            Rect.fromLTWH(1080, 260, 140, 18),
-          ],
-          spikes: const [
-            Rect.fromLTWH(260, 465, 160, 55),
-            Rect.fromLTWH(630, 465, 160, 55),
-            Rect.fromLTWH(1000, 465, 160, 55),
-          ],
-          targets: const [
-            _DueTargetSpec(200, 390, _TargetKind.crate),
-            _DueTargetSpec(540, 390, _TargetKind.crate),
-            _DueTargetSpec(835, 228, _TargetKind.enemy),
-            _DueTargetSpec(950, 390, _TargetKind.crate),
-          ],
-          gravityPuzzles: const [
-            _GravityPuzzleSpec(
-              id: 502,
-              boxPosition: Offset(460, 390),
-              leverPosition: Offset(525, 250),
-              gate: Rect.fromLTWH(630, 180, 28, 250),
-            ),
-            _GravityPuzzleSpec(
-              id: 503,
-              boxPosition: Offset(905, 390),
-              leverPosition: Offset(1065, 230),
-              gate: Rect.fromLTWH(1140, 180, 28, 250),
-            ),
-          ],
-          seals: const [
-            Offset(365, 340),
-            Offset(525, 275),
-            Offset(890, 245),
-            Offset(1150, 235),
-          ],
-          safeDebtPads: const [Rect.fromLTWH(1210, 423, 86, 7)],
-          exit: const Rect.fromLTWH(1840, 350, 56, 80),
-        );
-      case 2:
-        return _DueStage(
-          title: 'GUARD CORRIDOR $run',
-          briefing:
-              'Collectors patrol an exposed corridor. Give them weight to slow and shove them; Take sends them over the edges.',
-          platforms: const [
-            Rect.fromLTWH(-40, 430, 500, 110),
-            Rect.fromLTWH(610, 430, 490, 110),
-            Rect.fromLTWH(1250, 430, 710, 110),
-            Rect.fromLTWH(130, 345, 170, 18),
-            Rect.fromLTWH(720, 335, 140, 18),
-            Rect.fromLTWH(900, 285, 135, 18),
-            Rect.fromLTWH(1360, 335, 160, 18),
-          ],
-          spikes: const [
-            Rect.fromLTWH(460, 465, 150, 55),
-            Rect.fromLTWH(1100, 465, 150, 55),
-          ],
-          targets: const [
-            _DueTargetSpec(245, 388, _TargetKind.enemy),
-            _DueTargetSpec(355, 388, _TargetKind.enemy),
-            _DueTargetSpec(775, 293, _TargetKind.enemy),
-            _DueTargetSpec(965, 243, _TargetKind.enemy),
-            _DueTargetSpec(1410, 293, _TargetKind.enemy),
-          ],
-          gravityPuzzles: const [
-            _GravityPuzzleSpec(
-              id: 504,
-              boxPosition: Offset(700, 390),
-              leverPosition: Offset(720, 250),
-              gate: Rect.fromLTWH(1080, 180, 28, 250),
-            ),
-          ],
-          seals: const [
-            Offset(215, 320),
-            Offset(790, 310),
-            Offset(965, 260),
-            Offset(1440, 310),
-          ],
-          emitters: [
-            _DueEmitterSpec(1000, 396, -250, turretInterval),
-            _DueEmitterSpec(1335, 396, 245, turretInterval + .18),
-          ],
-          exit: const Rect.fromLTWH(1840, 350, 56, 80),
-        );
-      case 3:
-        return _DueStage(
-          title: 'DEBT DIVE $run',
-          briefing:
-              'The thin rust floors are deliberate shortcuts over spike beds. Land with payback to break one only when a lower route is safe.',
-          platforms: const [
-            Rect.fromLTWH(-40, 430, 275, 110),
-            Rect.fromLTWH(415, 430, 230, 110),
-            Rect.fromLTWH(825, 430, 220, 110),
-            Rect.fromLTWH(1225, 430, 735, 110),
-            Rect.fromLTWH(260, 320, 135, 18),
-            Rect.fromLTWH(455, 300, 135, 18),
-            Rect.fromLTWH(855, 320, 135, 18),
-            Rect.fromLTWH(1270, 300, 140, 18),
-          ],
-          spikes: const [
-            Rect.fromLTWH(235, 465, 180, 55),
-            Rect.fromLTWH(645, 465, 180, 55),
-            Rect.fromLTWH(1045, 465, 180, 55),
-          ],
-          targets: const [
-            _DueTargetSpec(175, 390, _TargetKind.crate),
-            _DueTargetSpec(500, 388, _TargetKind.enemy),
-            _DueTargetSpec(745, 390, _TargetKind.crate),
-            _DueTargetSpec(890, 278, _TargetKind.enemy),
-            _DueTargetSpec(1300, 258, _TargetKind.enemy),
-          ],
-          weakPanels: const [
-            Rect.fromLTWH(235, 390, 180, 16),
-            Rect.fromLTWH(645, 390, 180, 16),
-          ],
-          safeDebtPads: const [
-            Rect.fromLTWH(440, 423, 86, 7),
-            Rect.fromLTWH(1250, 423, 86, 7),
-          ],
-          seals: const [
-            Offset(325, 295),
-            Offset(520, 275),
-            Offset(920, 295),
-            Offset(1340, 275),
-          ],
-          emitters: [_DueEmitterSpec(1095, 396, -250, turretInterval)],
-          exit: const Rect.fromLTWH(1840, 350, 56, 80),
-        );
-      default:
-        return _DueStage(
-          title: 'CROSSFIRE GALLERY $run',
-          briefing:
-              'Cross the firing lanes, turn turret shots heavy, and use crates as shields, lifts, or thrown weight.',
-          platforms: const [
-            Rect.fromLTWH(-40, 430, 330, 110),
-            Rect.fromLTWH(455, 430, 245, 110),
-            Rect.fromLTWH(870, 430, 250, 110),
-            Rect.fromLTWH(1290, 430, 670, 110),
-            Rect.fromLTWH(330, 345, 125, 18),
-            Rect.fromLTWH(730, 300, 125, 18),
-            Rect.fromLTWH(935, 340, 135, 18),
-            Rect.fromLTWH(1370, 290, 155, 18),
-          ],
-          spikes: const [
-            Rect.fromLTWH(290, 465, 165, 55),
-            Rect.fromLTWH(700, 465, 170, 55),
-            Rect.fromLTWH(1120, 465, 170, 55),
-          ],
-          targets: const [
-            _DueTargetSpec(235, 390, _TargetKind.crate),
-            _DueTargetSpec(585, 388, _TargetKind.enemy),
-            _DueTargetSpec(650, 390, _TargetKind.crate),
-            _DueTargetSpec(760, 258, _TargetKind.enemy),
-            _DueTargetSpec(960, 298, _TargetKind.enemy),
-            _DueTargetSpec(1350, 390, _TargetKind.crate),
-          ],
-          gravityPuzzles: const [
-            _GravityPuzzleSpec(
-              id: 505,
-              boxPosition: Offset(535, 390),
-              leverPosition: Offset(750, 245),
-              gate: Rect.fromLTWH(1120, 180, 28, 250),
-            ),
-          ],
-          safeDebtPads: const [Rect.fromLTWH(1320, 423, 86, 7)],
-          seals: const [
-            Offset(390, 320),
-            Offset(790, 275),
-            Offset(1000, 315),
-            Offset(1450, 265),
-          ],
-          emitters: [
-            _DueEmitterSpec(480, 396, -270, turretInterval),
-            _DueEmitterSpec(1015, 396, 265, turretInterval + .12),
-            _DueEmitterSpec(1475, 396, -250, turretInterval + .24),
-          ],
-          exit: const Rect.fromLTWH(1840, 350, 56, 80),
-        );
-    }
   }
 
   void _updateBullets(double dt) {
@@ -2021,15 +2189,29 @@ class _FallDueGame {
       if (bullet.debt > 3 && bullet.alive) {
         for (final target in targets) {
           if (!target.alive ||
-              target.kind != _TargetKind.enemy ||
+              !target.kind!.isEnemy ||
               !bullet.rect.overlaps(target.rect)) {
             continue;
           }
-          target.alive = false;
+          final damage = target.kind == _TargetKind.heavy ? 3 : target.health;
+          target.health -= damage;
+          if (target.health <= 0) {
+            target.alive = false;
+            final killScore = switch (target.kind) {
+              _TargetKind.heavy => 950,
+              _TargetKind.drone => 750,
+              _TargetKind.leecher => 600,
+              _TargetKind.enemy => 500,
+              _TargetKind.crate || null => 0,
+            };
+            score += killScore;
+            message = 'PARRIED PLASMA SHREDDED ENEMY +$killScore';
+            _burst(target.center, const Color(0xFFFFD86E), 18);
+          } else {
+            message = 'PARRIED PLASMA STRUCK ENFORCER! ${target.health} HP LEFT';
+            _burst(target.center, const Color(0xFFFFD86E), 12);
+          }
           bullet.alive = false;
-          score += 500;
-          message = 'SABOTAGED TURRET SHOT DESTROYED A COLLECTOR +500.';
-          _burst(target.center, const Color(0xFFFFD86E), 18);
           break;
         }
         _breakWeakPanels(bullet.rect, 330, source: 'HEAVY TURRET SHOT');
@@ -2047,8 +2229,8 @@ class _FallDueGame {
           targets.any(
             (target) =>
                 target.alive &&
-                (target.kind == _TargetKind.crate ||
-                    (target.kind == _TargetKind.enemy && target.debt >= 10)) &&
+                (target.kind.isCrate ||
+                    (target.kind!.isEnemy && target.debt >= 10)) &&
                 bullet.rect.overlaps(target.rect),
           )) {
         bullet.alive = false;
@@ -2075,7 +2257,7 @@ class _FallDueGame {
       FallDueTuning.terminalVelocity,
       body.vy + FallDueTuning.gravity * gravity * dt,
     );
-    final bodyIsEnemy = body is _DueTarget && body.kind == _TargetKind.enemy;
+    final bodyIsEnemy = body is _DueTarget && body.kind!.isEnemy;
     final solidCrates = targets
         .where(
           (target) =>
@@ -2089,7 +2271,7 @@ class _FallDueGame {
           (target) =>
               target != body &&
               target.alive &&
-              target.kind == _TargetKind.enemy &&
+              target.kind!.isEnemy &&
               target.debt >= 10,
         )
         .map((target) => target.rect);
@@ -2105,7 +2287,7 @@ class _FallDueGame {
     ];
     final canRiseThroughPlatforms =
         (body is _DueTarget &&
-            body.kind != _TargetKind.enemy &&
+            body.kind!.isCrate &&
             body.debt < -1) ||
         (body == player && _ridingLightBox);
     final distance = math.max(body.vx.abs(), body.vy.abs()) * dt;
@@ -2129,7 +2311,7 @@ class _FallDueGame {
         } else {
           continue;
         }
-        body.vx = body.kind == _TargetKind.enemy ? -body.vx : 0;
+        body.vx = (body.kind?.isEnemy ?? false) ? -body.vx : 0;
       }
 
       final beforeY = body.rect;
@@ -2190,6 +2372,9 @@ class _FallDueGame {
         : candidates.indexOf(_selectedTarget!);
     _selectedTarget = candidates[(current + 1) % candidates.length];
     final label = switch (_selectedTarget!.kind) {
+      _TargetKind.heavy => 'ENFORCER',
+      _TargetKind.drone => 'DRONE',
+      _TargetKind.leecher => 'LEECHER',
       _TargetKind.enemy => 'COLLECTOR',
       _TargetKind.crate => 'CRATE',
       null => 'TARGET',
@@ -2197,6 +2382,20 @@ class _FallDueGame {
     message =
         'TARGET ${candidates.indexOf(_selectedTarget!) + 1}/${candidates.length}: $label.';
     GameFeedback.selection();
+  }
+
+  _DueBullet? _nearestBullet() {
+    _DueBullet? closest;
+    var distance = interactionRange;
+    for (final bullet in bullets) {
+      if (!bullet.alive) continue;
+      final dist = (bullet.rect.center - player.center).distance;
+      if (dist < distance) {
+        closest = bullet;
+        distance = dist;
+      }
+    }
+    return closest;
   }
 
   _DueEmitter? _nearestEmitter() {
@@ -2226,12 +2425,31 @@ class _FallDueGame {
       message = 'GRAVITY CHANNEL RECHARGING.';
       return;
     }
-    if (debt < 3) {
-      message = 'BORROW FIRST, THEN GIVE THE LOAN TO A NEARBY TARGET.';
-      return;
+    // Instant micro-loan if debt is low, so player is never locked out of using Give
+    if (debt < 10) {
+      debt = math.min(FallDueTuning.maxDebt, debt + 15.0);
+      _burst(player.center, const Color(0xFFFFD86E), 6);
     }
     final target = _nearestTarget();
     final emitter = _nearestEmitter();
+    final bullet = _nearestBullet();
+
+    // Bullet gravity slam if bullet is nearby and no other closer target
+    if (bullet != null &&
+        (bullet.rect.center - player.center).distance < 160 &&
+        target == null &&
+        emitter == null) {
+      bullet.vy = 850.0;
+      bullet.debt = 35.0;
+      debt = math.max(0, debt - 10.0);
+      score += 200;
+      _transferCooldown.tryTrigger(.35);
+      _burst(bullet.rect.center, const Color(0xFFFFD86E), 14);
+      GameFeedback.mediumImpact();
+      message = 'GRAVITY OVERLOAD: bullet grounded into the floor +200.';
+      return;
+    }
+
     if (target == null && emitter == null) {
       message = 'Move closer to an enemy, crate, or turret to give gravity.';
       return;
@@ -2248,7 +2466,7 @@ class _FallDueGame {
       debt -= amount;
       emitter.debt += amount;
       emitter.cooldown += .3 + amount * .02;
-      _transferCooldown.tryTrigger(.45);
+      _transferCooldown.tryTrigger(.35);
       message =
           'GAVE ${amount.round()}% TO TURRET: its shots slow and fall sooner.';
       _burst(emitter.position, const Color(0xFFFFD86E), 10);
@@ -2256,6 +2474,33 @@ class _FallDueGame {
       return;
     }
     final recipient = target!;
+    if (recipient.kind == _TargetKind.leecher && requested >= 15.0) {
+      // Overload Siphon Leecher with excess debt!
+      debt -= requested;
+      recipient.alive = false;
+      score += 600;
+      _transferCooldown.tryTrigger(.35);
+      _burst(recipient.center, const Color(0xFFC77DFF), 22);
+      GameFeedback.heavyImpact();
+      message = 'SIPHON OVERLOAD! Leecher detonated by excess debt +600.';
+      return;
+    }
+    if (recipient.kind == _TargetKind.drone) {
+      // Drone GIVE: shove down into the ground ("like giving gravity")
+      final amount = math.min(requested, 25.0);
+      debt -= amount;
+      recipient.vx *= 0.1;
+      recipient.vy = FallDueRules.droneGiveDownwardSpeed();
+      recipient.droneRecoveryTimer = 2.0;
+      recipient.abilityCooldown = math.max(recipient.abilityCooldown, 2.5);
+      _transferCooldown.tryTrigger(.35);
+      _burst(recipient.center, const Color(0xFFFFD86E), 18);
+      GameFeedback.heavyImpact();
+      ArcadeShake.shake(0.25);
+      message =
+          'GAVE ${amount.round()}% GRAVITY: drone shoved down into the ground!';
+      return;
+    }
     final amount = math.min(requested, 40 - recipient.debt).toDouble();
     if (amount < 1) {
       message = 'TARGET LEDGER FULL: Take weight back before giving more.';
@@ -2265,9 +2510,13 @@ class _FallDueGame {
     recipient.debt += amount;
     final pushDirection = recipient.center.dx >= player.center.dx ? 1.0 : -1.0;
     recipient.vx += pushDirection * (125 + amount * 7);
-    _transferCooldown.tryTrigger(.45);
+    _transferCooldown.tryTrigger(.35);
     message = recipient.kind == _TargetKind.crate
         ? 'GAVE ${amount.round()}% TO CRATE: push it into a spike bed to build a bridge.'
+        : recipient.kind == _TargetKind.drone
+        ? 'GAVE ${amount.round()}% TO DRONE: gravity overload pulling drone down.'
+        : recipient.kind == _TargetKind.heavy
+        ? 'GAVE ${amount.round()}% TO ENFORCER: weighed down and shoved backward.'
         : 'GAVE ${amount.round()}% TO COLLECTOR: heavy, slow, and shoved toward the edge.';
     _burst(recipient.center, const Color(0xFFFFD86E), 10);
     GameFeedback.selection();
@@ -2279,6 +2528,27 @@ class _FallDueGame {
       message = 'GRAVITY CHANNEL RECHARGING.';
       return;
     }
+
+    final bullet = _nearestBullet();
+    if (bullet != null &&
+        (bullet.rect.center - player.center).distance <
+            FallDueTuning.parryRange) {
+      // PLASMA PARRY: Invert and accelerate bullet back with heavy debt
+      bullet.vx = -bullet.vx * 1.5;
+      bullet.vy = -140.0;
+      bullet.debt = 25.0;
+      debt = math.min(FallDueTuning.maxDebt, debt + 12.0);
+      score += FallDueTuning.parryBonusScore;
+      _settleGrace = math.max(_settleGrace, FallDueTuning.settlementWindow);
+      _transferCooldown.tryTrigger(.35);
+      ArcadeShake.shake(0.22);
+      GameFeedback.selection();
+      _burst(bullet.rect.center, const Color(0xFF8DE1FF), 18);
+      message =
+          'PLASMA PARRY! Shot reversed with +25 debt +${FallDueTuning.parryBonusScore}.';
+      return;
+    }
+
     final target = _nearestTarget();
     final emitter = _nearestEmitter();
     if (target == null && emitter == null) {
@@ -2366,12 +2636,20 @@ class _FallDueGame {
         ArcadeShake.shake(0.35);
         GameFeedback.jump();
       }
+    } else if (recipient.kind == _TargetKind.drone) {
+      // TAKE on Drone: push it off by 500 to 1000 pixels!
+      recipient.vx = pushDirection * FallDueRules.droneTakeBlastSpeed();
+      recipient.vy = -60.0;
+      recipient.droneRecoveryTimer = 2.4;
+      recipient.abilityCooldown = math.max(recipient.abilityCooldown, 3.0);
     } else {
       recipient.vx += pushDirection * (245 + amount * 11);
     }
     _settleGrace = math.max(_settleGrace, FallDueTuning.settlementWindow);
     _transferCooldown.tryTrigger(.45);
-    message = recipient.kind == _TargetKind.crate && recipient.debt < -1
+    message = recipient.kind == _TargetKind.drone
+        ? 'GRAVITY SIPHON: drone blasted across the room (500-1000px)!'
+        : recipient.kind == _TargetKind.crate && recipient.debt < -1
         ? 'YELLOW CRATE UNWEIGHTED: it is rising through the overhead route.'
         : recipient.kind == _TargetKind.crate
         ? 'CRATE LIGHTENED: Take once more to reverse its gravity.'
@@ -2431,11 +2709,35 @@ class _FallDueGame {
     _jumpBuffer = 0;
     _settleGrace = 0;
     _transferCooldown.clear();
+    _slamCooldown.clear();
+    _slamming = false;
+    _slamBorrowPower = 0.0;
+    _slamHeld = false;
+    _hasAirDashed = false;
     player = _DueBody(position.dx, position.dy, 27, 37)..grounded = true;
   }
 }
 
-enum _TargetKind { crate, enemy }
+class _FallDueShockwave {
+  _FallDueShockwave({
+    required this.position,
+    required this.color,
+    this.maxRadius = FallDueTuning.shockwaveRadius,
+  });
+
+  final Offset position;
+  final Color color;
+  final double maxRadius;
+  static const double life = 0.45;
+  double time = 0;
+}
+
+enum _TargetKind { crate, enemy, drone, heavy, leecher }
+
+extension _TargetKindX on _TargetKind? {
+  bool get isEnemy => this != null && this != _TargetKind.crate;
+  bool get isCrate => this == _TargetKind.crate;
+}
 
 class _DueStage {
   const _DueStage({
@@ -2571,12 +2873,24 @@ class _DueTarget extends _DueBody {
     _TargetKind kind, {
     this.puzzleId,
   }) : super(kind: kind) {
-    health = kind == _TargetKind.enemy ? 3 : 2;
+    health = switch (kind) {
+      _TargetKind.heavy => 5,
+      _TargetKind.enemy => 3,
+      _TargetKind.drone => 2,
+      _TargetKind.leecher => 2,
+      _TargetKind.crate => 2,
+    };
+    maxHealth = health;
     lastY = y;
+    droneHomeY = y;
   }
   int health = 2;
+  int maxHealth = 2;
   double debt = 0;
   double lastY = 0;
+  double droneHomeY = 0;
+  double droneRecoveryTimer = 0;
+  double abilityCooldown = 0;
   bool alive = true;
   bool anchored = false;
   final int? puzzleId;
@@ -2589,8 +2903,12 @@ class _DueTarget extends _DueBody {
     ..coyote = coyote
     ..grounded = grounded
     ..health = health
+    ..maxHealth = maxHealth
     ..debt = debt
     ..lastY = lastY
+    ..droneHomeY = droneHomeY
+    ..droneRecoveryTimer = droneRecoveryTimer
+    ..abilityCooldown = abilityCooldown
     ..alive = alive
     ..anchored = anchored
     ..bridgeSpikeIndex = bridgeSpikeIndex

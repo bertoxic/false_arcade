@@ -77,6 +77,12 @@ class _FallDuePageState extends State<FallDuePage>
     _game.setJump(
       _isAnyPressed({LogicalKeyboardKey.space, LogicalKeyboardKey.arrowUp}),
     );
+    _game.setSlam(
+      _isAnyPressed({
+        LogicalKeyboardKey.keyS,
+        LogicalKeyboardKey.arrowDown,
+      }),
+    );
 
     if (freshPress && key == LogicalKeyboardKey.keyQ) {
       _game.transferDebt();
@@ -102,6 +108,8 @@ class _FallDuePageState extends State<FallDuePage>
     LogicalKeyboardKey.keyQ,
     LogicalKeyboardKey.keyE,
     LogicalKeyboardKey.keyF,
+    LogicalKeyboardKey.keyS,
+    LogicalKeyboardKey.arrowDown,
   };
 
   bool _isAnyPressed(Set<LogicalKeyboardKey> keys) =>
@@ -227,22 +235,15 @@ class _FallDuePageState extends State<FallDuePage>
                             ),
                             const Spacer(),
                             _DueStat(
-                              label: game.inPayback ? 'PAYBACK' : 'LOAN',
-                              value: game.gravityReadout,
-                              color: game.inPayback
-                                  ? const Color(0xFFFFD86E)
-                                  : const Color(0xFF8DE1FF),
-                            ),
-                            const SizedBox(width: 8),
-                            _DueStat(
                               label: 'HEARTS',
                               value: '♥ ${game.lives}',
                               color: const Color(0xFFFF7186),
                             ),
                             const SizedBox(width: 8),
                             _DueStat(
-                              label: 'STAGE',
-                              value: game.stageProgress,
+                              label: 'SEALS',
+                              value:
+                                  '${game.collectedSeals}/${game.seals.length}',
                               color: const Color(0xFFFFD86E),
                             ),
                             const SizedBox(width: 8),
@@ -274,29 +275,6 @@ class _FallDuePageState extends State<FallDuePage>
                                     Positioned.fill(
                                       child: CustomPaint(
                                         painter: _FallPainter(game),
-                                      ),
-                                    ),
-                                    Positioned(
-                                      top: 10,
-                                      left: 62,
-                                      right: 62,
-                                      child: IgnorePointer(
-                                        child: Center(
-                                          child: GameStageProgressMenu(
-                                            title: 'FALL DUE',
-                                            stageLabel: 'STAGE',
-                                            currentStage: game.stageNumber,
-                                            stageCount:
-                                                _FallDueGame.stages.length,
-                                            accentColor: const Color(
-                                              0xFFFFD86E,
-                                            ),
-                                            compact: compact,
-                                            endless:
-                                                game.levelIndex >=
-                                                _FallDueGame.stages.length,
-                                          ),
-                                        ),
                                       ),
                                     ),
                                     Positioned(
@@ -361,13 +339,13 @@ class _FallDuePageState extends State<FallDuePage>
                                           Row(
                                             children: [
                                               HoldGameButton(
-                                                label: 'JUMP',
+                                                label: 'SLAM',
                                                 icon: Icons
-                                                    .keyboard_double_arrow_up_rounded,
-                                                color: const Color(0xFF8DE1FF),
-                                                size: compact ? 56 : 67,
+                                                    .keyboard_double_arrow_down_rounded,
+                                                color: const Color(0xFFFF7186),
+                                                size: compact ? 62 : 72,
                                                 onChanged: (value) => setState(
-                                                  () => game.setJump(value),
+                                                  () => game.setSlam(value),
                                                 ),
                                               ),
                                               const SizedBox(width: 7),
@@ -422,7 +400,7 @@ class _FallDuePageState extends State<FallDuePage>
                                       _DueOverlay(
                                         title: 'FALL DUE',
                                         copy:
-                                            'Jump the route, then HOLD BORROW to lift yourself through the air. GIVE makes yellow crates heavy enough to seal spike beds. TAKE makes any yellow crate rise through platforms, carry you upward, or hold a lever. Touch blue SAVE beacons to keep your progress.',
+                                            'Jump and feather BORROW to glide. SLAM down to discharge debt into a destructive shockwave. TAKE unweights crates into lifts and PARRIES plasma back at turrets. GIVE anchors bridges and crushes enemies. Touch blue SAVE beacons to keep your progress.',
                                         button: 'ENTER THE LEDGER',
                                         onTap: () => setState(game.start),
                                         showLoop: true,
@@ -520,7 +498,7 @@ class _FallDuePageState extends State<FallDuePage>
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                '${game.message}   •   Keyboard: A/D move · Space jump · W borrow · Q give · E take · F cycle',
+                                '${game.message}   •   Keyboard: A/D move · Space jump · W borrow · S slam · Q give · E take · F cycle',
                                 style: const TextStyle(
                                   color: Color(0xFFBAC8DF),
                                   fontSize: 11,
@@ -554,11 +532,28 @@ class _DueStat extends StatelessWidget {
   final Color color;
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
     decoration: BoxDecoration(
-      color: const Color(0xCC111826),
-      border: Border.all(color: const Color(0xFF2E3C57)),
-      borderRadius: BorderRadius.circular(9),
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          const Color(0xEE111A2B),
+          const Color(0xDD090F1B),
+        ],
+      ),
+      border: Border.all(
+        color: color.withValues(alpha: 0.38),
+        width: 1.2,
+      ),
+      borderRadius: BorderRadius.circular(8),
+      boxShadow: [
+        BoxShadow(
+          color: color.withValues(alpha: 0.12),
+          blurRadius: 6,
+          spreadRadius: -1,
+        ),
+      ],
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -567,9 +562,9 @@ class _DueStat extends StatelessWidget {
           label,
           style: const TextStyle(
             fontSize: 7,
-            color: Color(0xFF8E9DBB),
+            color: Color(0xFF90A4C8),
             fontWeight: FontWeight.w900,
-            letterSpacing: .65,
+            letterSpacing: .8,
           ),
         ),
         Text(
@@ -578,6 +573,7 @@ class _DueStat extends StatelessWidget {
             fontSize: 11,
             color: color,
             fontWeight: FontWeight.w900,
+            letterSpacing: .3,
           ),
         ),
       ],
@@ -628,22 +624,14 @@ class _DueArenaHud extends StatelessWidget {
                 ),
               ),
               _DueStat(
-                label: game.inPayback ? 'PAYBACK' : 'LOAN',
-                value: game.gravityReadout,
-                color: game.inPayback
-                    ? const Color(0xFFFFD86E)
-                    : const Color(0xFF8DE1FF),
-              ),
-              const SizedBox(width: 4),
-              _DueStat(
                 label: 'HEARTS',
                 value: '♥ ${game.lives}',
                 color: const Color(0xFFFF7186),
               ),
               const SizedBox(width: 4),
               _DueStat(
-                label: 'STAGE',
-                value: game.stageProgress,
+                label: 'SEALS',
+                value: '${game.collectedSeals}/${game.seals.length}',
                 color: const Color(0xFFFFD86E),
               ),
               const SizedBox(width: 4),
@@ -796,10 +784,12 @@ class _GravityLoopGuide extends StatelessWidget {
     child: const Row(
       children: [
         _LoopStep(number: '1', label: 'BORROW', color: Color(0xFF8DE1FF)),
-        Icon(Icons.arrow_forward_rounded, size: 15, color: Color(0xFF8E9DBB)),
+        Icon(Icons.arrow_forward_rounded, size: 13, color: Color(0xFF8E9DBB)),
         _LoopStep(number: '2', label: 'GIVE', color: Color(0xFFFFD86E)),
-        Icon(Icons.arrow_forward_rounded, size: 15, color: Color(0xFF8E9DBB)),
+        Icon(Icons.arrow_forward_rounded, size: 13, color: Color(0xFF8E9DBB)),
         _LoopStep(number: '3', label: 'TAKE', color: Color(0xFF8CFFB1)),
+        Icon(Icons.arrow_forward_rounded, size: 13, color: Color(0xFF8E9DBB)),
+        _LoopStep(number: '4', label: 'SLAM', color: Color(0xFFFF7186)),
       ],
     ),
   );

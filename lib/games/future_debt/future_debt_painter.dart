@@ -229,6 +229,24 @@ class _FuturePainter extends CustomPainter {
         );
         canvas.drawRect(tile.deflate(5), panelOutline);
 
+        // Glowing cybernetic data bus conduits along selected panel seams
+        if ((column + row) % 3 == 0) {
+          final conduitPaint = Paint()
+            ..color = const Color(0xFF48F2C1).withValues(alpha: 0.16)
+            ..strokeWidth = 1.2;
+          canvas.drawLine(Offset(tile.left, tile.center.dy), Offset(tile.right, tile.center.dy), conduitPaint);
+
+          // Traveling data packet pulse
+          final packetProgress = ((game.time * 70 + column * 33 + row * 21) % tileSize);
+          canvas.drawCircle(
+            Offset(tile.left + packetProgress, tile.center.dy),
+            1.8,
+            Paint()
+              ..color = const Color(0xFF58E8FF).withValues(alpha: 0.7)
+              ..blendMode = BlendMode.screen,
+          );
+        }
+
         if ((noise & 7) == 0) {
           final start = Offset(tile.left + 19, tile.top + 25 + (noise % 36));
           canvas.drawLine(start, start + const Offset(38, -5), scuff);
@@ -331,6 +349,25 @@ class _FuturePainter extends CustomPainter {
       fill: const Color(0xFF3DC9F6).withValues(alpha: .14),
       rim: const Color(0xFFB4F6FF).withValues(alpha: .3),
     );
+
+    // Floating atmospheric dust motes catching the tactical flashlight beam
+    for (var i = 0; i < 12; i++) {
+      final dist = 40.0 + (i * 31 + game.time * 26) % 390;
+      final spread = math.sin(game.time * 1.6 + i * 1.3) * 0.44;
+      final moteAngle = aimAngle + spread;
+      final maxRay = game._flashlightRayDistance(source, moteAngle, dist);
+      if (maxRay >= dist - 2) {
+        final motePos = source + Offset(math.cos(moteAngle), math.sin(moteAngle)) * dist;
+        final moteAlpha = ((1.0 - dist / 390) * 0.55).clamp(0.0, 1.0);
+        canvas.drawCircle(
+          motePos,
+          1.3,
+          Paint()
+            ..color = const Color(0xFFB4F6FF).withValues(alpha: moteAlpha)
+            ..blendMode = BlendMode.screen,
+        );
+      }
+    }
     final glow = Rect.fromCircle(center: player, radius: 145 * pulse);
     canvas.drawCircle(
       player,
@@ -899,14 +936,20 @@ class _FuturePainter extends CustomPainter {
         game.player.dx + math.cos(rotation) * radius,
         game.player.dy + math.sin(rotation) * radius,
       );
-      canvas.rotate(rotation + .7);
-      canvas.drawRect(
-        Rect.fromCenter(center: Offset.zero, width: 10, height: 6),
-        Paint()
-          ..color =
-              (index.isEven ? const Color(0xFFFF5F82) : const Color(0xFF8E79FF))
-                  .withValues(alpha: .55),
+      final slipColor = index.isEven ? const Color(0xFFFF4F78) : const Color(0xFFC995FF);
+      final slipRect = Rect.fromCenter(center: Offset.zero, width: 11, height: 7);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(slipRect, const Radius.circular(2)),
+        Paint()..color = const Color(0xFF140B1E),
       );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(slipRect, const Radius.circular(2)),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2
+          ..color = slipColor,
+      );
+      _text(canvas, r'$', const Offset(0, 0.5), 6, slipColor, center: true, bold: true);
       canvas.restore();
     }
   }
@@ -1879,15 +1922,27 @@ class _FuturePainter extends CustomPainter {
     final map = Rect.fromLTWH(origin.dx, origin.dy, mapWidth, mapHeight);
     canvas.drawRect(
       map,
-      Paint()..color = const Color(0xFF07101A).withValues(alpha: .9),
+      Paint()..color = const Color(0xEE060D17),
     );
     canvas.drawRect(
       map.deflate(.5),
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1
-        ..color = const Color(0xFF435270),
+        ..color = const Color(0xFF2E4566),
     );
+
+    // Rotating radar scanner line
+    final radarSweep = (game.time * 2.8) % (math.pi * 2);
+    final sweepEnd = map.center + Offset(math.cos(radarSweep) * 55, math.sin(radarSweep) * 35);
+    canvas.drawLine(
+      map.center,
+      sweepEnd,
+      Paint()
+        ..color = const Color(0xFF58E8FF).withValues(alpha: 0.28)
+        ..strokeWidth = 1.2,
+    );
+
     const sx = mapWidth / _FutureDebtGame.worldWidth;
     const sy = mapHeight / _FutureDebtGame.worldHeight;
     for (final zone in game.zones) {
@@ -1922,7 +1977,7 @@ class _FuturePainter extends CustomPainter {
           origin.dx + portal.position.dx * sx,
           origin.dy + portal.position.dy * sy,
         ),
-        1.7,
+        2.2,
         Paint()..color = const Color(0xFFC995FF),
       );
     }
@@ -1932,13 +1987,13 @@ class _FuturePainter extends CustomPainter {
           origin.dx + game.levelExit!.position.dx * sx,
           origin.dy + game.levelExit!.position.dy * sy,
         ),
-        2.5,
+        3.0,
         Paint()..color = const Color(0xFFFFD36A),
       );
     }
     canvas.drawCircle(
       Offset(origin.dx + game.player.dx * sx, origin.dy + game.player.dy * sy),
-      3,
+      3.5,
       Paint()..color = const Color(0xFF58E8FF),
     );
     for (final enemy in game.enemies.take(30)) {
@@ -1948,12 +2003,30 @@ class _FuturePainter extends CustomPainter {
             origin.dx + enemy.position.dx * sx,
             origin.dy + enemy.position.dy * sy,
           ),
-          width: 2,
-          height: 2,
+          width: 2.5,
+          height: 2.5,
         ),
         Paint()..color = const Color(0xFFFF587D),
       );
     }
+
+    // High-tech corner bracket accents
+    final bracketPaint = Paint()
+      ..color = const Color(0xFF6DE8FF).withValues(alpha: 0.75)
+      ..strokeWidth = 1.4;
+    const bLen = 6.0;
+    // Top-left
+    canvas.drawLine(map.topLeft, map.topLeft + const Offset(bLen, 0), bracketPaint);
+    canvas.drawLine(map.topLeft, map.topLeft + const Offset(0, bLen), bracketPaint);
+    // Top-right
+    canvas.drawLine(map.topRight, map.topRight + const Offset(-bLen, 0), bracketPaint);
+    canvas.drawLine(map.topRight, map.topRight + const Offset(0, bLen), bracketPaint);
+    // Bottom-left
+    canvas.drawLine(map.bottomLeft, map.bottomLeft + const Offset(bLen, 0), bracketPaint);
+    canvas.drawLine(map.bottomLeft, map.bottomLeft + const Offset(0, -bLen), bracketPaint);
+    // Bottom-right
+    canvas.drawLine(map.bottomRight, map.bottomRight + const Offset(-bLen, 0), bracketPaint);
+    canvas.drawLine(map.bottomRight, map.bottomRight + const Offset(0, -bLen), bracketPaint);
   }
 
   void _worldHud(Canvas canvas) {
