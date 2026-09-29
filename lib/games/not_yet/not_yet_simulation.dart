@@ -369,14 +369,19 @@ class RealityGame {
       if (forced) {
         GameFeedback.alarm();
         ArcadeShake.shake(0.75);
+        ArcadeFlash.flash(const Color(0xFFFF2255), 0.25);
+        ArcadeHitStop.freeze(0.06);
       } else {
         GameFeedback.settlement();
+        ArcadeShake.shake(0.35);
+        ArcadeFlash.flash(const Color(0xFF48F2C1), 0.15);
       }
     } else {
       debt = 0;
       _holdTime = 0;
       statusText = 'Nothing is owed. Keep moving.';
     }
+
   }
 
   void step(double dt, Offset input, bool firing) {
@@ -701,6 +706,10 @@ class RealityGame {
                 payoutMultiplier)
             .round();
     score += reward;
+    ArcadeFever.charge(0.08, currentMusicTheme: 'battle_theme');
+    if (chain >= 3.0) {
+      ArcadeAchievements.unlock('combo_king');
+    }
     _burst(enemy.position, 15, _enemyColor(enemy.kind), .55);
     _label(enemy.position, '+$reward', const Color(0xFFFFD166));
     if (_random.nextDouble() < .34) {
@@ -740,15 +749,23 @@ class RealityGame {
     _shockwave(center, const Color(0xFFFF9C4E), 115);
     GameFeedback.explosion();
     ArcadeShake.shake(0.65);
+    ArcadeFlash.flash(const Color(0xFFFF8833), 0.18);
+    ArcadeHitStop.freeze(0.05);
+    var drumDefeats = 0;
     for (final enemy in _enemies) {
       if (enemy.alive &&
           !enemy.pending &&
           (enemy.position - center).distance < 105) {
         _defeatEnemy(enemy, resolved: true);
+        drumDefeats++;
       }
+    }
+    if (drumDefeats >= 2) {
+      ArcadeAchievements.unlock('chain_reaction');
     }
     if ((_player.position - center).distance < 88) _takeHit(2);
   }
+
 
   void _takeHit(int damage) {
     if (_player.invulnerable > 0 || phase != GamePhase.playing) return;
@@ -950,7 +967,11 @@ class RealityGame {
       _player.invulnerable = math.max(_player.invulnerable, 2.0);
       _shockwave(_player.position, const Color(0xFF48F2C1), 220);
       _label(_player.position, 'SETTLEMENT SURGE!', const Color(0xFF48F2C1));
-      GameFeedback.heavyImpact();
+      GameFeedback.shockwave();
+      ArcadeFlash.flash(const Color(0xFF48F2C1), 0.22);
+      ArcadeHitStop.freeze(0.06);
+      ArcadeAchievements.unlock('debt_baron');
+      ArcadeFever.charge(0.35, currentMusicTheme: 'battle_theme');
     }
 
     statusText = clean && !_forcedSettlement && risk >= .35
@@ -978,9 +999,12 @@ class RealityGame {
     hitPoints = 0;
     holding = false;
     phase = GamePhase.gameOver;
-    statusText = 'Reality won this round.';
-    GameFeedback.explosion();
+    statusText = 'Breach critical. Account terminated.';
+    GameFeedback.defeat();
+    ArcadeShake.shake(0.85);
+    ArcadeFlash.flash(const Color(0xFFFF2255), 0.3);
   }
+
 
   void _cleanupWorld() {
     _enemies.removeWhere((enemy) => !enemy.alive);

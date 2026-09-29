@@ -11,6 +11,9 @@ import '../../core/game_math.dart';
 import '../../core/game_presentation.dart';
 import '../../core/gameplay.dart';
 import '../../core/logical_viewport.dart';
+import '../../core/arcade_achievements.dart';
+import '../../core/arcade_fever.dart';
+import '../../ui/arcade_screen_filter.dart';
 import '../../ui/game_controls.dart';
 import '../../ui/screen_shake.dart';
 
@@ -125,6 +128,8 @@ abstract final class FallDueRules {
   static double droneGiveDownwardSpeed() => 750.0;
 
   static double droneTakeBlastSpeed() => 920.0;
+
+  static double enemyTakeBlastSpeed() => 920.0;
 
   static double slamConcussionRadius(double borrowPower) =>
       70.0 + (borrowPower.clamp(0.0, FallDueTuning.maxDebt) * 0.2);

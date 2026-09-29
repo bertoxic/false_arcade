@@ -32,6 +32,7 @@ class _FallDuePageState extends State<FallDuePage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     GamePresentation.enterLandscape();
+    GameFeedback.playMusic('platform_theme');
     _game = _FallDueGame(
       campaignLevel: widget.level?.number ?? 1,
       campaign: widget.level,
@@ -41,6 +42,8 @@ class _FallDuePageState extends State<FallDuePage>
     _loop = GameLoopController(
       vsync: this,
       onStep: (dt) {
+        if (ArcadeHitStop.tick(dt)) return;
+        ArcadeFever.tick(dt);
         if (_game.phase == _DuePhase.playing) _elapsedSeconds += dt;
         _game.update(dt);
         _reportCompletion();
@@ -127,6 +130,11 @@ class _FallDuePageState extends State<FallDuePage>
   void _setPaused(bool value) {
     if (value) _clearInput();
     _loop.setPaused(value);
+    if (value) {
+      GameFeedback.pauseMusic();
+    } else {
+      GameFeedback.resumeMusic();
+    }
     setState(() => _paused = value);
     if (!value) _gameFocus.requestFocus();
   }
@@ -174,6 +182,9 @@ class _FallDuePageState extends State<FallDuePage>
     _gameFocus.removeListener(_onFocusChanged);
     _loop.dispose();
     _gameFocus.dispose();
+    ArcadeFlash.reset();
+    ArcadeFever.reset();
+    GameFeedback.playMusic('arcade_theme');
     if (!_continuingCampaign) GamePresentation.restore();
     super.dispose();
   }
@@ -270,8 +281,9 @@ class _FallDuePageState extends State<FallDuePage>
                                     color: const Color(0xFF3A4A67),
                                   ),
                                 ),
-                                child: Stack(
-                                  children: [
+                                child: ArcadeScreenFilter(
+                                  child: Stack(
+                                    children: [
                                     Positioned.fill(
                                       child: CustomPaint(
                                         painter: _FallPainter(game),
@@ -310,7 +322,7 @@ class _FallDuePageState extends State<FallDuePage>
                                             label: 'LEFT',
                                             icon: Icons.chevron_left_rounded,
                                             color: const Color(0xFF8DE1FF),
-                                            size: compact ? 64 : 76,
+                                            size: compact ? 76 : 88,
                                             onChanged: (value) => setState(
                                               () => game.left = value,
                                             ),
@@ -320,7 +332,7 @@ class _FallDuePageState extends State<FallDuePage>
                                             label: 'RIGHT',
                                             icon: Icons.chevron_right_rounded,
                                             color: const Color(0xFF8DE1FF),
-                                            size: compact ? 64 : 76,
+                                            size: compact ? 76 : 88,
                                             onChanged: (value) => setState(
                                               () => game.right = value,
                                             ),
@@ -473,6 +485,7 @@ class _FallDuePageState extends State<FallDuePage>
                                       ),
                                   ],
                                 ),
+                              ),
                               ),
                             ),
                           ),

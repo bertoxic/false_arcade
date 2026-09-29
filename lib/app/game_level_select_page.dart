@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/level_campaign.dart';
 import '../games/future_debt/future_debt_game.dart';
+import '../ui/screen_shake.dart';
 import 'arcade_catalog.dart';
 import 'game_tutorial_page.dart';
 
@@ -66,6 +67,7 @@ class _GameLevelSelectPageState extends State<GameLevelSelectPage> {
             }),
       ),
     );
+    ArcadeFlash.reset();
     if (!mounted ||
         navigation != CampaignNavigation.nextLevel ||
         _selectedLevel >= gameCampaignLevelCount) {

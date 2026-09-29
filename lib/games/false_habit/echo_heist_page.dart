@@ -34,6 +34,8 @@ class _EchoHeistPageState extends State<EchoHeistPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     GamePresentation.enterLandscape();
+    GameFeedback.playMusic('stealth_theme');
+    ArcadeFever.reset();
     _heist = _EchoHeist(
       campaignLevel: widget.level?.number ?? 1,
       campaign: widget.level,
@@ -42,6 +44,8 @@ class _EchoHeistPageState extends State<EchoHeistPage>
     _loop = GameLoopController(
       vsync: this,
       onStep: (dt) {
+        if (ArcadeHitStop.tick(dt)) return;
+        ArcadeFever.tick(dt);
         final wasPlaying = _heist.phase == _HabitPhase.playing;
         if (wasPlaying) _elapsedSeconds += dt;
         _heist.update(dt, _movement.axis);
@@ -54,6 +58,7 @@ class _EchoHeistPageState extends State<EchoHeistPage>
       onLifecyclePause: _clearInput,
     )..start();
   }
+
 
   void _clearInput() {
     _movement.reset();
@@ -90,7 +95,12 @@ class _EchoHeistPageState extends State<EchoHeistPage>
     _paused = value;
     _clearInput();
     _loop.setPaused(value);
-    if (!value) _gameFocus.requestFocus();
+    if (value) {
+      GameFeedback.pauseMusic();
+    } else {
+      GameFeedback.resumeMusic();
+      _gameFocus.requestFocus();
+    }
   }
 
   void _startRun() {
@@ -146,11 +156,14 @@ class _EchoHeistPageState extends State<EchoHeistPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    ArcadeFlash.reset();
+    ArcadeFever.reset();
     _gameFocus.dispose();
     _loop.dispose();
     if (!_continuingCampaign) GamePresentation.restore();
     super.dispose();
   }
+
 
   @override
   Widget build(BuildContext context) {

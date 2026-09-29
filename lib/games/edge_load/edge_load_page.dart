@@ -34,6 +34,8 @@ class _EdgeLoadPageState extends State<EdgeLoadPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     GamePresentation.enterLandscape();
+    GameFeedback.playMusic('stealth_theme');
+    ArcadeFever.reset();
     _game = _MansionGame(
       layoutSeed: widget.level?.seed,
       campaignLevel: widget.level?.number ?? 1,
@@ -41,7 +43,11 @@ class _EdgeLoadPageState extends State<EdgeLoadPage>
     _gameFocus = FocusNode(debugLabel: 'EdgeLoad controls');
     _loop = GameLoopController(
       vsync: this,
-      onStep: (dt) => _game.update(dt, _movement.axis, _sprinting),
+      onStep: (dt) {
+        if (ArcadeHitStop.tick(dt)) return;
+        ArcadeFever.tick(dt);
+        _game.update(dt, _movement.axis, _sprinting);
+      },
       onFrame: () {
         _reportCompletion();
         if (mounted) setState(() {});
@@ -93,8 +99,27 @@ class _EdgeLoadPageState extends State<EdgeLoadPage>
     _paused = value;
     _clearInput();
     _loop.setPaused(value);
-    if (!value) _gameFocus.requestFocus();
+    if (value) {
+      GameFeedback.pauseMusic();
+    } else {
+      GameFeedback.resumeMusic();
+      _gameFocus.requestFocus();
+    }
   }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _clearInput();
+    ArcadeFever.reset();
+    ArcadeFlash.reset();
+    GameFeedback.playMusic('arcade_theme');
+    _loop.dispose();
+    _gameFocus.dispose();
+    if (!_continuingCampaign) GamePresentation.restore();
+    super.dispose();
+  }
+
 
   void _start() {
     _clearInput();
@@ -139,14 +164,7 @@ class _EdgeLoadPageState extends State<EdgeLoadPage>
     }
   }
 
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _gameFocus.dispose();
-    _loop.dispose();
-    if (!_continuingCampaign) GamePresentation.restore();
-    super.dispose();
-  }
+
 
   @override
   Widget build(BuildContext context) {

@@ -2,13 +2,46 @@ import 'package:flutter/material.dart';
 
 import 'arcade_catalog.dart';
 import 'arcade_game_art.dart';
+import 'arcade_hall_of_fame_page.dart';
 import 'game_level_select_page.dart';
+import '../core/arcade_achievements.dart';
 import '../core/game_feedback.dart';
 import '../ui/arcade_screen_filter.dart';
 import '../ui/game_controls.dart';
+import '../ui/screen_shake.dart';
 
-class FalseArcadeApp extends StatelessWidget {
+
+class FalseArcadeApp extends StatefulWidget {
   const FalseArcadeApp({super.key});
+
+  @override
+  State<FalseArcadeApp> createState() => _FalseArcadeAppState();
+}
+
+class _FalseArcadeAppState extends State<FalseArcadeApp>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      GameFeedback.pauseMusic();
+    } else if (state == AppLifecycleState.resumed) {
+      GameFeedback.resumeMusic();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,18 +81,37 @@ class _ArcadeHomePageState extends State<ArcadeHomePage> {
 
   ArcadeGameDefinition get _selected => arcadeCatalog[_selectedIndex];
 
+  @override
+  void initState() {
+    super.initState();
+    ArcadeFlash.reset();
+    GameFeedback.playMusic('arcade_theme');
+  }
+
   void _select(int index) {
     if (index == _selectedIndex) return;
     GameFeedback.selection();
     setState(() => _selectedIndex = index);
   }
 
-  void _launch(ArcadeGameDefinition game) {
+  Future<void> _launch(ArcadeGameDefinition game) async {
     GameFeedback.selection();
-    Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => GameLevelSelectPage(game: game)),
     );
+    ArcadeFlash.reset();
+    GameFeedback.playMusic('arcade_theme');
   }
+
+  void _openHallOfFame([int tab = 0]) {
+    GameFeedback.selection();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ArcadeHallOfFamePage(initialTab: tab),
+      ),
+    );
+  }
+
 
   void _cycle(int direction) {
     GameFeedback.selection();
@@ -105,9 +157,12 @@ class _ArcadeHomePageState extends State<ArcadeHomePage> {
                         child: _ArcadeHeader(
                           active: _selectedIndex + 1,
                           total: arcadeCatalog.length,
+                          onHallOfFame: () => _openHallOfFame(0),
+                          onTrophies: () => _openHallOfFame(1),
                           onFeedbackSettings: () =>
                               showGameFeedbackSettings(context),
                         ),
+
                       ),
                     ),
                     SliverPadding(
@@ -218,11 +273,15 @@ class _ArcadeHeader extends StatelessWidget {
   const _ArcadeHeader({
     required this.active,
     required this.total,
+    required this.onHallOfFame,
+    required this.onTrophies,
     required this.onFeedbackSettings,
   });
 
   final int active;
   final int total;
+  final VoidCallback onHallOfFame;
+  final VoidCallback onTrophies;
   final VoidCallback onFeedbackSettings;
 
   @override
@@ -284,10 +343,30 @@ class _ArcadeHeader extends StatelessWidget {
       ),
       const Spacer(),
       IconButton(
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.all(4),
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        onPressed: onHallOfFame,
+        tooltip: 'Hall of Fame (High Scores)',
+        icon: const Icon(Icons.leaderboard_rounded, color: Color(0xFFFFD36A), size: 20),
+      ),
+      IconButton(
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.all(4),
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        onPressed: onTrophies,
+        tooltip: 'Trophies & Achievements',
+        icon: const Icon(Icons.military_tech_rounded, color: Color(0xFF48F2C1), size: 20),
+      ),
+      IconButton(
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.all(4),
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
         onPressed: onFeedbackSettings,
         tooltip: 'Feedback settings',
-        icon: const Icon(Icons.tune_rounded, color: Color(0xFF8FEAFF)),
+        icon: const Icon(Icons.tune_rounded, color: Color(0xFF8FEAFF), size: 20),
       ),
+      const SizedBox(width: 4),
       Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -304,6 +383,39 @@ class _ArcadeHeader extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              ValueListenableBuilder<Set<String>>(
+                valueListenable: ArcadeAchievements.unlockedNotifier,
+                builder: (context, unlocked, _) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F1E2C),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: const Color(0xFFFFD36A).withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.military_tech_rounded,
+                        color: Color(0xFFFFD36A),
+                        size: 11,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${unlocked.length}/${ArcadeAchievements.totalCount}',
+                        style: const TextStyle(
+                          color: Color(0xFFFFD36A),
+                          fontSize: 8,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
               Container(
                 width: 6,
                 height: 6,
@@ -329,6 +441,7 @@ class _ArcadeHeader extends StatelessWidget {
           ),
         ],
       ),
+
     ],
   );
 }
@@ -489,14 +602,14 @@ class _CycleButton extends StatelessWidget {
     label: label,
     child: Material(
       color: const Color(0xCC06111C),
-      borderRadius: BorderRadius.circular(5),
+      borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(8),
         child: SizedBox(
-          height: 29,
-          width: 29,
-          child: Icon(icon, color: const Color(0xFFCFEAFF), size: 20),
+          height: 38,
+          width: 38,
+          child: Icon(icon, color: const Color(0xFFCFEAFF), size: 26),
         ),
       ),
     ),

@@ -41,12 +41,17 @@ class _FutureDebtPageState extends State<FutureDebtPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     GamePresentation.enterLandscape();
+    GameFeedback.playMusic('battle_theme');
     _game = _FutureDebtGame(campaign: widget.level);
     _gameFocus = FocusNode(debugLabel: 'Future Debt controls')
       ..addListener(_onFocusChanged);
     _loop = GameLoopController(
       vsync: this,
-      onStep: (dt) => _game.update(dt, _input, _aimInput, _firing),
+      onStep: (dt) {
+        if (ArcadeHitStop.tick(dt)) return;
+        ArcadeFever.tick(dt);
+        _game.update(dt, _input, _aimInput, _firing);
+      },
       onFrame: () {
         _reportCompletion();
         if (mounted) setState(() {});
@@ -116,6 +121,11 @@ class _FutureDebtPageState extends State<FutureDebtPage>
   void _pause(bool value) {
     _clearInput();
     _loop.setPaused(value);
+    if (value) {
+      GameFeedback.pauseMusic();
+    } else {
+      GameFeedback.resumeMusic();
+    }
     setState(() => _paused = value);
     if (!value) _gameFocus.requestFocus();
   }
@@ -255,6 +265,9 @@ class _FutureDebtPageState extends State<FutureDebtPage>
     _gameFocus
       ..removeListener(_onFocusChanged)
       ..dispose();
+    ArcadeFlash.reset();
+    ArcadeFever.reset();
+    GameFeedback.playMusic('arcade_theme');
     if (!_continuingCampaign) GamePresentation.restore();
     super.dispose();
   }
@@ -288,8 +301,9 @@ class _FutureDebtPageState extends State<FutureDebtPage>
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final compact = constraints.maxHeight < 520;
-                      return Stack(
-                        children: [
+                      return ArcadeScreenFilter(
+                        child: Stack(
+                          children: [
                           Positioned.fill(
                             child: RepaintBoundary(
                               child: CustomPaint(
@@ -415,6 +429,7 @@ class _FutureDebtPageState extends State<FutureDebtPage>
                             ),
                           ),
                         ],
+                      ),
                       );
                     },
                   ),

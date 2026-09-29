@@ -32,6 +32,8 @@ class _RealityGamePageState extends State<RealityGamePage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     GamePresentation.enterLandscape();
+    GameFeedback.playMusic('battle_theme');
+    ArcadeFever.reset();
     _game = RealityGame(
       campaignLevel: widget.level?.number ?? 1,
       random: math.Random(widget.level?.seed),
@@ -41,6 +43,8 @@ class _RealityGamePageState extends State<RealityGamePage>
     _loop = GameLoopController(
       vsync: this,
       onStep: (dt) {
+        if (ArcadeHitStop.tick(dt)) return;
+        ArcadeFever.tick(dt);
         _game.step(dt, _movement.axis, _firing);
         _reportCompletion();
       },
@@ -55,6 +59,9 @@ class _RealityGamePageState extends State<RealityGamePage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _clearInput();
+    ArcadeFever.reset();
+    ArcadeFlash.reset();
+    GameFeedback.playMusic('arcade_theme');
     _loop.dispose();
     _gameFocus.dispose();
     if (!_continuingCampaign) GamePresentation.restore();
@@ -65,8 +72,14 @@ class _RealityGamePageState extends State<RealityGamePage>
     _clearInput();
     _paused = value;
     _loop.setPaused(value);
-    if (!value) _gameFocus.requestFocus();
+    if (value) {
+      GameFeedback.pauseMusic();
+    } else {
+      GameFeedback.resumeMusic();
+      _gameFocus.requestFocus();
+    }
   }
+
 
   void _clearInput() {
     _movement.reset();
@@ -447,10 +460,58 @@ class _RealityArenaHud extends StatelessWidget {
               ),
             ),
           ),
+          ValueListenableBuilder<double>(
+            valueListenable: ArcadeFever.energyNotifier,
+            builder: (context, energy, _) {
+              if (energy <= 0) return const SizedBox.shrink();
+              final isFever = ArcadeFever.isActive;
+              return Container(
+                margin: const EdgeInsets.only(left: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: isFever
+                      ? const Color(0xFFFFD36A).withValues(alpha: 0.25)
+                      : const Color(0xFF111829),
+                  borderRadius: BorderRadius.circular(11),
+                  border: Border.all(
+                    color: isFever
+                        ? const Color(0xFFFFD36A)
+                        : const Color(0xFF48F2C1),
+                    width: isFever ? 1.8 : 1.0,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isFever ? Icons.auto_awesome_rounded : Icons.bolt_rounded,
+                      size: 13,
+                      color: isFever
+                          ? const Color(0xFFFFD36A)
+                          : const Color(0xFF48F2C1),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isFever ? 'FEVER 2X!' : 'FEVER ${(energy * 100).toInt()}%',
+                      style: TextStyle(
+                        color: isFever
+                            ? const Color(0xFFFFD36A)
+                            : const Color(0xFF48F2C1),
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: 'PressStart2P',
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ],
       ),
     );
   }
+
 }
 
 class _StatChip extends StatelessWidget {

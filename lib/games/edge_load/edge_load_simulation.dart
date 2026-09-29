@@ -547,8 +547,11 @@ class _MansionGame {
       if (distance < 22) {
         phase = _MansionPhase.caught;
         message = 'A GUARD REACHED YOU DURING PURSUIT.';
-        GameFeedback.heavyImpact();
+        GameFeedback.defeat();
+        ArcadeShake.shake(0.7);
+        ArcadeFlash.flash(const Color(0xFFFF2244), 0.28);
       }
+
     } else if (g.state == _GuardState.suspicious ||
         g.state == _GuardState.search) {
       _guardMove(g, g.target, 95 * dt);
@@ -641,6 +644,11 @@ class _MansionGame {
       player.lootCount++;
       _message('VAULT DIAMOND SECURED · REACH EXTRACTION');
       GameFeedback.pickup();
+      GameFeedback.combo();
+      ArcadeShake.shake(0.35);
+      ArcadeHitStop.freeze(0.06);
+      ArcadeFlash.flash(const Color(0xFF72D6FF), 0.22);
+      ArcadeFever.charge(0.35, currentMusicTheme: 'stealth_theme');
       return;
     }
     for (final l in loot.where((e) => !e.taken)) {
@@ -650,6 +658,7 @@ class _MansionGame {
         player.lootCount++;
         _message('LOOT SECURED · YOUR VIEWPORT SHRINKS');
         GameFeedback.pickup();
+        ArcadeFever.charge(0.12, currentMusicTheme: 'stealth_theme');
         return;
       }
     }
@@ -658,6 +667,10 @@ class _MansionGame {
         phase = _MansionPhase.extracted;
         _message('EXTRACTION COMPLETE');
         GameFeedback.victory();
+        ArcadeAchievements.unlock('phantom_heist');
+        if (player.lootCount >= loot.length) {
+          ArcadeAchievements.unlock('max_capacity');
+        }
       } else if (vaultTaken) {
         _message(
           'EXTRACTION NEEDS ${requiredLootCount - player.lootCount} MORE LOOT ITEM${requiredLootCount - player.lootCount == 1 ? '' : 'S'}',
@@ -666,6 +679,7 @@ class _MansionGame {
         _message('EXTRACTION LOCKED · STEAL THE DIAMOND');
       }
     }
+
   }
 
   void _autoCollectNearby() {

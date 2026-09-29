@@ -1188,8 +1188,14 @@ class _FallDueGame {
         maxRadius: dynamicRadius,
       ),
     );
-    ArcadeShake.shake(0.38);
-    GameFeedback.heavyImpact();
+    ArcadeShake.shake(0.48);
+    ArcadeFlash.flash(isSlam ? const Color(0x66FF7186) : const Color(0x55FFD86E));
+    ArcadeHitStop.freeze(0.08);
+    ArcadeFever.charge(0.25, currentMusicTheme: 'platform_theme');
+    GameFeedback.shockwave();
+    if (isSlam) {
+      ArcadeAchievements.unlock('gravity_hammer');
+    }
     _burst(center, const Color(0xFFFF7186), 26);
     player.vx *= 0.35; // Landing recovery lag prevents instant sprint
 
@@ -1761,8 +1767,11 @@ class _FallDueGame {
       message = 'GATE LOCKED: latch $lockedGates remaining gravity lock(s).';
       return;
     }
-    score +=
-        800 + FallDueRules.cleanExitBonus(carriedDebt: debt, payback: _payback);
+    final cleanBonus = FallDueRules.cleanExitBonus(carriedDebt: debt, payback: _payback);
+    score += 800 + cleanBonus;
+    if (debt <= 1.0 && _payback <= 1.0) {
+      ArcadeAchievements.unlock('zero_sum');
+    }
     if (levelIndex == stages.length - 1) {
       phase = _DuePhase.won;
       message = 'CORE LEDGER CLEARED. Optional contract runs are now open.';
@@ -1818,17 +1827,22 @@ class _FallDueGame {
           player.rect.bottom <= target.y + 6;
 
       if (target.kind == _TargetKind.enemy) {
-        final weight = (target.debt / 35).clamp(0.0, .78).toDouble();
-        final patrolSpeed = 58 * (1 - weight);
-        target.vx = target.vx == 0 ? patrolSpeed : target.vx;
-        final desiredSpeed = target.vx.sign * patrolSpeed;
-        if (target.debt > 0 || target.vx.abs() > patrolSpeed) {
-          target.vx += (desiredSpeed - target.vx) * math.min(1, dt * 8);
-        }
-        if (target.grounded &&
-            target.vx.abs() <= 70 &&
-            !_hasPatrolLedgeAhead(target, dt)) {
-          target.vx = -target.vx;
+        if (target.stunTimer > 0) {
+          target.stunTimer = math.max(0, target.stunTimer - dt);
+          target.vx = damp(target.vx, 0.28, dt);
+        } else {
+          final weight = (target.debt / 35).clamp(0.0, .78).toDouble();
+          final patrolSpeed = 58 * (1 - weight);
+          target.vx = target.vx == 0 ? patrolSpeed : target.vx;
+          final desiredSpeed = target.vx.sign * patrolSpeed;
+          if (target.debt > 0 || target.vx.abs() > patrolSpeed) {
+            target.vx += (desiredSpeed - target.vx) * math.min(1, dt * 8);
+          }
+          if (target.grounded &&
+              target.vx.abs() <= 70 &&
+              !_hasPatrolLedgeAhead(target, dt)) {
+            target.vx = -target.vx;
+          }
         }
       } else if (target.kind == _TargetKind.drone) {
         // Aerial drone floats, stabilizes, and bobs
@@ -1879,20 +1893,27 @@ class _FallDueGame {
           }
         }
       } else if (target.kind == _TargetKind.heavy) {
-        final weight = (target.debt / 45).clamp(0.0, .85).toDouble();
-        final patrolSpeed = 38 * (1 - weight);
-        target.vx = target.vx == 0 ? patrolSpeed : target.vx;
-        final desiredSpeed = target.vx.sign * patrolSpeed;
-        if (target.debt > 0 || target.vx.abs() > patrolSpeed) {
-          target.vx += (desiredSpeed - target.vx) * math.min(1, dt * 8);
-        }
-        if (target.grounded &&
-            target.vx.abs() <= 50 &&
-            !_hasPatrolLedgeAhead(target, dt)) {
-          target.vx = -target.vx;
+        if (target.stunTimer > 0) {
+          target.stunTimer = math.max(0, target.stunTimer - dt);
+          target.vx = damp(target.vx, 0.28, dt);
+        } else {
+          final weight = (target.debt / 45).clamp(0.0, .85).toDouble();
+          final patrolSpeed = 38 * (1 - weight);
+          target.vx = target.vx == 0 ? patrolSpeed : target.vx;
+          final desiredSpeed = target.vx.sign * patrolSpeed;
+          if (target.debt > 0 || target.vx.abs() > patrolSpeed) {
+            target.vx += (desiredSpeed - target.vx) * math.min(1, dt * 8);
+          }
+          if (target.grounded &&
+              target.vx.abs() <= 50 &&
+              !_hasPatrolLedgeAhead(target, dt)) {
+            target.vx = -target.vx;
+          }
         }
         // Heavy Quake Stomp
-        if (target.grounded && target.abilityCooldown <= 0) {
+        if (target.stunTimer <= 0 &&
+            target.grounded &&
+            target.abilityCooldown <= 0) {
           final dist = (target.center - player.center).distance;
           if (dist < 240 && player.grounded) {
             target.abilityCooldown = 3.2;
@@ -1911,27 +1932,32 @@ class _FallDueGame {
           }
         }
       } else if (target.kind == _TargetKind.leecher) {
-        final dist = (target.center - player.center).distance;
-        if (dist < 260) {
-          final dir = player.center.dx >= target.center.dx ? 1.0 : -1.0;
-          final runSpeed = dir * 110.0;
-          if (target.vx.abs() > 110.0) {
-            target.vx = damp(target.vx, 0.1, dt);
-          } else {
-            target.vx = runSpeed;
-          }
+        if (target.stunTimer > 0) {
+          target.stunTimer = math.max(0, target.stunTimer - dt);
+          target.vx = damp(target.vx, 0.28, dt);
         } else {
-          final weight = (target.debt / 25).clamp(0.0, .6).toDouble();
-          final patrolSpeed = 75 * (1 - weight);
-          target.vx = target.vx == 0 ? patrolSpeed : target.vx;
-          final desiredSpeed = target.vx.sign * patrolSpeed;
-          if (target.debt > 0 || target.vx.abs() > patrolSpeed) {
-            target.vx += (desiredSpeed - target.vx) * math.min(1, dt * 8);
-          }
-          if (target.grounded &&
-              target.vx.abs() <= 90 &&
-              !_hasPatrolLedgeAhead(target, dt)) {
-            target.vx = -target.vx;
+          final dist = (target.center - player.center).distance;
+          if (dist < 260) {
+            final dir = player.center.dx >= target.center.dx ? 1.0 : -1.0;
+            final runSpeed = dir * 110.0;
+            if (target.vx.abs() > 110.0) {
+              target.vx = damp(target.vx, 0.1, dt);
+            } else {
+              target.vx = runSpeed;
+            }
+          } else {
+            final weight = (target.debt / 25).clamp(0.0, .6).toDouble();
+            final patrolSpeed = 75 * (1 - weight);
+            target.vx = target.vx == 0 ? patrolSpeed : target.vx;
+            final desiredSpeed = target.vx.sign * patrolSpeed;
+            if (target.debt > 0 || target.vx.abs() > patrolSpeed) {
+              target.vx += (desiredSpeed - target.vx) * math.min(1, dt * 8);
+            }
+            if (target.grounded &&
+                target.vx.abs() <= 90 &&
+                !_hasPatrolLedgeAhead(target, dt)) {
+              target.vx = -target.vx;
+            }
           }
         }
       }
@@ -2555,42 +2581,46 @@ class _FallDueGame {
       message = 'Move closer to an enemy, crate, or turret to take gravity.';
       return;
     }
-    if (_emitterIsCloser(target, emitter)) {
-      if (emitter!.debt < 2) {
+    if (emitter != null && (target == null || _emitterIsCloser(target, emitter))) {
+      if (emitter.debt >= 2) {
+        final amount = math.min(
+          math.min(emitter.debt, 18),
+          FallDueTuning.maxDebt - debt,
+        );
+        if (amount < 1) {
+          message = 'YOUR LEDGER IS FULL: release or give gravity first.';
+          return;
+        }
+        emitter.debt -= amount;
+        debt += amount;
+        _settleGrace = math.max(_settleGrace, FallDueTuning.settlementWindow);
+        _transferCooldown.tryTrigger(.45);
+        message =
+            'TOOK ${amount.round()}% BACK: credit is ready for your next lift.';
+        _burst(emitter.position, const Color(0xFF8DE1FF), 10);
+        GameFeedback.selection();
+        return;
+      } else if (target == null) {
         message = 'That turret has no borrowed gravity to take.';
         return;
       }
-      final amount = math.min(
-        math.min(emitter.debt, 18),
-        FallDueTuning.maxDebt - debt,
-      );
-      if (amount < 1) {
-        message = 'YOUR LEDGER IS FULL: release or give gravity first.';
-        return;
-      }
-      emitter.debt -= amount;
-      debt += amount;
-      _settleGrace = math.max(_settleGrace, FallDueTuning.settlementWindow);
-      _transferCooldown.tryTrigger(.45);
-      message =
-          'TOOK ${amount.round()}% BACK: credit is ready for your next lift.';
-      _burst(emitter.position, const Color(0xFF8DE1FF), 10);
-      GameFeedback.selection();
-      return;
+      // If emitter has no debt to siphon, fallback to adjacent target!
     }
     final recipient = target!;
     final isLiftableBox = recipient.kind == _TargetKind.crate;
+    final isEnemy = recipient.kind.isEnemy;
     final reclaimingLoan = !isLiftableBox && recipient.debt > 1;
     final naturalGravity = isLiftableBox
         ? (32 + recipient.debt).clamp(0.0, 72.0)
         : (32 + recipient.debt).clamp(0.0, 32.0);
+    final maxTransfer = math.max(0.0, FallDueTuning.maxDebt - debt);
     final amount = reclaimingLoan
-        ? math.min(math.min(recipient.debt, 22), FallDueTuning.maxDebt - debt)
+        ? math.min(math.min(recipient.debt, 22), maxTransfer)
         : math.min(
             math.min(isLiftableBox ? 30.0 : 14.0, naturalGravity),
-            FallDueTuning.maxDebt - debt,
+            maxTransfer,
           );
-    if (amount < 1) {
+    if (!isEnemy && amount < 1) {
       message = reclaimingLoan
           ? 'YOUR LEDGER IS FULL: release or give some gravity first.'
           : 'THAT TARGET IS ALREADY WEIGHTLESS.';
@@ -2615,10 +2645,12 @@ class _FallDueGame {
       recipient.debt = math.max(-32, recipient.debt - amount - 8);
     } else if (reclaimingLoan) {
       recipient.debt -= amount;
-    } else {
+    } else if (amount > 0) {
       recipient.debt = math.max(-32, recipient.debt - amount);
     }
-    debt += amount;
+    if (amount > 0) {
+      debt = math.min(FallDueTuning.maxDebt, debt + amount);
+    }
     final pushDirection = recipient.center.dx >= player.center.dx ? 1.0 : -1.0;
     if (isLiftableBox) {
       recipient
@@ -2636,10 +2668,12 @@ class _FallDueGame {
         ArcadeShake.shake(0.35);
         GameFeedback.jump();
       }
-    } else if (recipient.kind == _TargetKind.drone) {
-      // TAKE on Drone: push it off by 500 to 1000 pixels!
-      recipient.vx = pushDirection * FallDueRules.droneTakeBlastSpeed();
-      recipient.vy = -60.0;
+    } else if (isEnemy) {
+      // TAKE on Enemies: repulsor siphon blasts enemy away by 500 to 1000 pixels!
+      recipient.vx = pushDirection * FallDueRules.enemyTakeBlastSpeed();
+      recipient.vy = math.min(recipient.vy, -120.0);
+      recipient.grounded = false;
+      recipient.stunTimer = 1.6;
       recipient.droneRecoveryTimer = 2.4;
       recipient.abilityCooldown = math.max(recipient.abilityCooldown, 3.0);
     } else {
@@ -2647,8 +2681,8 @@ class _FallDueGame {
     }
     _settleGrace = math.max(_settleGrace, FallDueTuning.settlementWindow);
     _transferCooldown.tryTrigger(.45);
-    message = recipient.kind == _TargetKind.drone
-        ? 'GRAVITY SIPHON: drone blasted across the room (500-1000px)!'
+    message = isEnemy
+        ? 'GRAVITY SIPHON: enemy blasted away (500-1000px)!'
         : recipient.kind == _TargetKind.crate && recipient.debt < -1
         ? 'YELLOW CRATE UNWEIGHTED: it is rising through the overhead route.'
         : recipient.kind == _TargetKind.crate
@@ -2656,7 +2690,8 @@ class _FallDueGame {
         : reclaimingLoan
         ? 'TOOK ${amount.round()}% BACK: credit is ready for another lift.'
         : 'TOOK ${amount.round()}% OF NATURAL GRAVITY: target is light and knocked outward.';
-    _burst(recipient.center, const Color(0xFF8DE1FF), 10);
+    _burst(recipient.center, const Color(0xFF8DE1FF), isEnemy ? 18 : 10);
+    if (isEnemy) ArcadeShake.shake(0.24);
     GameFeedback.selection();
   }
 
@@ -2682,11 +2717,17 @@ class _FallDueGame {
       message =
           '$reason  ${_payback.round()}% is still due. $lives heart${lives == 1 ? '' : 's'} left.$checkpointNote';
       _burst(impact, const Color(0xFFFF7186), 14);
+      GameFeedback.heavyImpact();
+      ArcadeShake.shake(0.35);
+      ArcadeFlash.flash(const Color(0x44FF7186));
     } else {
       phase = _DuePhase.dead;
       message = '$reason  No hearts left; ${_payback.round()}% remains due.';
+      GameFeedback.defeat();
+      ArcadeShake.shake(0.65);
+      ArcadeFlash.flash(const Color(0x77FF2A55));
+      ArcadeFever.reset();
     }
-    GameFeedback.heavyImpact();
   }
 
   void _resetPlayerAtFieldStart() {
@@ -2890,6 +2931,7 @@ class _DueTarget extends _DueBody {
   double lastY = 0;
   double droneHomeY = 0;
   double droneRecoveryTimer = 0;
+  double stunTimer = 0;
   double abilityCooldown = 0;
   bool alive = true;
   bool anchored = false;
@@ -2908,6 +2950,7 @@ class _DueTarget extends _DueBody {
     ..lastY = lastY
     ..droneHomeY = droneHomeY
     ..droneRecoveryTimer = droneRecoveryTimer
+    ..stunTimer = stunTimer
     ..abilityCooldown = abilityCooldown
     ..alive = alive
     ..anchored = anchored

@@ -149,8 +149,10 @@ class _EchoHeist {
     echo = _HabitEcho(List<Offset>.from(_routeTrace));
     _echoCooldown = 7.5;
     message = 'ECHO CAST · THE NEXT FOLD WILL FOLLOW YOUR OLD ROUTE.';
-    GameFeedback.lightImpact();
+    GameFeedback.pickup();
+    ArcadeAchievements.unlock('echo_decoy');
   }
+
 
   void _buildArchive() {
     for (var row = 0; row < _rows; row++) {
@@ -509,7 +511,11 @@ class _EchoHeist {
     _wardenMode = _WardenMode.recovering;
     _modeTimer = 1.35;
     message = 'HABIT FRACTURED +$bonus · THE WARDEN LOST THE THREAD.';
-    GameFeedback.mediumImpact();
+    GameFeedback.shockwave();
+    ArcadeFlash.flash(const Color(0xFFFF7B88), 0.22);
+    ArcadeShake.shake(0.38);
+    ArcadeFever.charge(0.25, currentMusicTheme: 'stealth_theme');
+    ArcadeAchievements.unlock('model_shatterer');
   }
 
   void _endFold() {
@@ -547,13 +553,14 @@ class _EchoHeist {
       message = exitOpen
           ? 'FINAL TRUTH STOLEN · BREACH OPEN. GET OUT.'
           : 'TRUTH FRAGMENT $_stolen/$requiredShards · THE ARCHIVE TIGHTENS.';
-      GameFeedback.selection();
+      GameFeedback.pickup();
+      ArcadeFever.charge(0.12, currentMusicTheme: 'stealth_theme');
     }
     if (exitOpen && (player - exit).distance < 34) {
       phase = _HabitPhase.escaped;
       score += math.max(0, 2800 - time.round() * 12) + _breakChain * 350;
       message = 'ESCAPED WITH A FALSE HABIT.';
-      GameFeedback.heavyImpact();
+      GameFeedback.victory();
     }
   }
 
@@ -561,8 +568,11 @@ class _EchoHeist {
     if (heat < 100) return;
     phase = _HabitPhase.caught;
     message = 'THE WARDEN CLOSED THE MODEL AROUND YOU.';
-    GameFeedback.heavyImpact();
+    GameFeedback.defeat();
+    ArcadeShake.shake(0.75);
+    ArcadeFlash.flash(const Color(0xFFFF2255), 0.28);
   }
+
 
   void _updateCamera(double dt) {
     final wanted = Offset(

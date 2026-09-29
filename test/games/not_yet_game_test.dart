@@ -32,4 +32,15 @@ void main() {
     expect(game.debt, 0);
     expect(game.holdPressure, 0);
   });
+
+  test('recorded run time excludes time spent on the briefing', () {
+    final game = RealityGame(random: math.Random(11));
+
+    game.step(8, Offset.zero, false);
+    expect(game.elapsedSeconds, 0);
+
+    game.startRun();
+    game.step(.5, Offset.zero, false);
+    expect(game.elapsedSeconds, closeTo(.5, 1e-9));
+  });
 }

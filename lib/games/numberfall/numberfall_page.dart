@@ -32,6 +32,7 @@ class _NumberfallPageState extends State<NumberfallPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     GamePresentation.enterLandscape();
+    GameFeedback.playMusic('platform_theme');
     _game = _NumberfallGame(
       campaignLevel: widget.level?.number ?? 1,
       random: math.Random(widget.level?.seed),
@@ -41,6 +42,8 @@ class _NumberfallPageState extends State<NumberfallPage>
     _loop = GameLoopController(
       vsync: this,
       onStep: (dt) {
+        if (ArcadeHitStop.tick(dt)) return;
+        ArcadeFever.tick(dt);
         if (_game.phase == _NumberPhase.playing) _elapsedSeconds += dt;
         _game.update(dt);
       },
@@ -55,6 +58,11 @@ class _NumberfallPageState extends State<NumberfallPage>
   void _setPaused(bool value) {
     _clearInput();
     _loop.setPaused(value);
+    if (value) {
+      GameFeedback.pauseMusic();
+    } else {
+      GameFeedback.resumeMusic();
+    }
     setState(() => _paused = value);
     if (!value) _gameFocus.requestFocus();
   }
@@ -156,6 +164,9 @@ class _NumberfallPageState extends State<NumberfallPage>
     _clearInput();
     _gameFocus.dispose();
     _loop.dispose();
+    ArcadeFlash.reset();
+    ArcadeFever.reset();
+    GameFeedback.playMusic('arcade_theme');
     if (!_continuingCampaign) GamePresentation.restore();
     super.dispose();
   }
@@ -199,8 +210,9 @@ class _NumberfallPageState extends State<NumberfallPage>
                                     color: const Color(0xFF376A78),
                                   ),
                                 ),
-                                child: Stack(
-                                  children: [
+                                child: ArcadeScreenFilter(
+                                  child: Stack(
+                                    children: [
                                     Positioned.fill(
                                       child: CustomPaint(
                                         painter: _NumberPainter(game),
@@ -258,17 +270,17 @@ class _NumberfallPageState extends State<NumberfallPage>
                                             label: 'LEFT',
                                             icon: Icons.chevron_left_rounded,
                                             color: const Color(0xFF67D9ED),
-                                            size: compact ? 58 : 66,
+                                            size: compact ? 78 : 92,
                                             onChanged: (value) => setState(
                                               () => game.left = value,
                                             ),
                                           ),
-                                          const SizedBox(width: 7),
+                                          const SizedBox(width: 9),
                                           HoldGameButton(
                                             label: 'RIGHT',
                                             icon: Icons.chevron_right_rounded,
                                             color: const Color(0xFF67D9ED),
-                                            size: compact ? 58 : 66,
+                                            size: compact ? 78 : 92,
                                             onChanged: (value) => setState(
                                               () => game.right = value,
                                             ),
@@ -283,7 +295,7 @@ class _NumberfallPageState extends State<NumberfallPage>
                                         label: 'JUMP',
                                         icon: Icons.arrow_upward_rounded,
                                         color: const Color(0xFFFFE66D),
-                                        size: compact ? 70 : 80,
+                                        size: compact ? 80 : 94,
                                         onChanged: (value) =>
                                             setState(() => game.setJump(value)),
                                       ),
@@ -356,6 +368,7 @@ class _NumberfallPageState extends State<NumberfallPage>
                                       ),
                                   ],
                                 ),
+                              ),
                               ),
                             ),
                           ),

@@ -1,40 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fluga/games/edge_load/edge_load_game.dart';
 import 'package:fluga/games/false_habit/echo_heist_game.dart';
 
-Future<void> _advanceFrames(WidgetTester tester, int count) async {
-  for (var frame = 0; frame < count; frame++) {
-    await tester.pump(const Duration(milliseconds: 16));
-  }
-}
-
 void main() {
-  test('all diamonds unlock the exit without extra common loot', () {
+  test('archive extraction and habit fractures have explicit rules', () {
+    expect(EchoHeistRules.exitsOpen(stolen: 3, required: 3), isTrue);
+    expect(EchoHeistRules.exitsOpen(stolen: 2, required: 3), isFalse);
     expect(
-      EchoHeistRules.exitUnlocked(
-        runLoot: 2400,
-        stageTarget: 9000,
-        allDiamondsTaken: true,
+      EchoHeistRules.breaksRead(
+        predicted: 'EAST',
+        actual: 'NORTH',
+        wardenReading: true,
       ),
       isTrue,
     );
+    expect(
+      EchoHeistRules.breaksRead(
+        predicted: 'EAST',
+        actual: 'EAST',
+        wardenReading: true,
+      ),
+      isFalse,
+    );
+    expect(
+      EchoHeistRules.breakBonus(chain: 3, campaignLevel: 5),
+      greaterThan(EchoHeistRules.breakBonus(chain: 1, campaignLevel: 1)),
+    );
   });
 
-  testWidgets('Echo Heist starts with its prediction controls active', (
-    tester,
-  ) async {
+  testWidgets('False Habit starts the rewired archive heist', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: EchoHeistPage()));
-    await tester.tap(find.text('START HEIST'));
+    expect(find.text('ENTER THE ARCHIVE'), findsOneWidget);
+    await tester.tap(find.text('ENTER THE ARCHIVE'));
     await tester.pump(const Duration(milliseconds: 120));
 
     expect(find.text('ECHO'), findsWidgets);
-    expect(find.text('ESCAPE'), findsOneWidget);
-    expect(find.text('WARDEN'), findsOneWidget);
+    expect(find.textContaining('FALSE HABIT · ARCHIVE 24'), findsOneWidget);
+    expect(find.textContaining('STEAL 0/3 TRUTH FRAGMENTS'), findsOneWidget);
+    expect(find.textContaining('LEARNING EAST'), findsOneWidget);
     expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
 
-    await _advanceFrames(tester, 180);
-    expect(find.textContaining('WARDEN READ:'), findsWidgets);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.escape);
+    expect(find.text('RUN PAUSED'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -57,7 +68,7 @@ void main() {
     await tester.tap(find.text('OPEN HEIST'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
-    expect(find.text('START HEIST'), findsOneWidget);
+    expect(find.text('ENTER THE ARCHIVE'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Exit game'));
     await tester.pump();
@@ -81,6 +92,12 @@ void main() {
     expect(find.text('COINS'), findsOneWidget);
     expect(find.text('STEALTH'), findsOneWidget);
     expect(find.text('\$0'), findsOneWidget);
+    expect(find.textContaining('DIAMOND 0/1'), findsOneWidget);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.escape);
+    expect(find.text('RUN PAUSED'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

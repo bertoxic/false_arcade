@@ -28,6 +28,23 @@ void main() {
     expect(find.byType(GameStageProgressMenu), findsNothing);
   });
 
+  testWidgets('False Habit briefing remains usable on compact landscape', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 360);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const MaterialApp(home: EchoHeistPage()));
+
+    expect(find.text('ENTER THE ARCHIVE'), findsOneWidget);
+    await tester.tap(find.text('ENTER THE ARCHIVE'));
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(find.textContaining('FALSE HABIT · ARCHIVE 24'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Future Debt fills the landscape game display', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: FutureDebtPage()));
 

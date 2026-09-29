@@ -1223,7 +1223,12 @@ class _FutureDebtGame {
       collector = null;
       collectorSettled = true;
       _flash('COLLECTOR PAID OFF — +2800 and +6s lifetime.');
-      GameFeedback.mediumImpact();
+      GameFeedback.shockwave();
+      ArcadeShake.shake(0.5);
+      ArcadeFlash.flash(const Color(0x66FF4F7F));
+      ArcadeHitStop.freeze(0.08);
+      ArcadeFever.charge(0.35, currentMusicTheme: 'battle_theme');
+      ArcadeAchievements.unlock('default_survivor');
     }
   }
 
@@ -1267,6 +1272,10 @@ class _FutureDebtGame {
     enemy.dead = true;
     claimsDefeated++;
     score += (enemy.value * _plan.rewardMultiplier).round();
+    ArcadeFever.charge(0.06, currentMusicTheme: 'battle_theme');
+    if (debtAmount >= 16) {
+      ArcadeAchievements.unlock('credit_limit');
+    }
     _grantLifetime(
       (enemy.type == _FutureEnemyType.bailiff
               ? 3.6
@@ -1487,7 +1496,10 @@ class _FutureDebtGame {
         : 'D-';
     message =
         'Score ${score.floor()} · form $formName · borrowed ${totalBorrowed.toStringAsFixed(1)}s · rating $rating';
-    GameFeedback.heavyImpact();
+    GameFeedback.defeat();
+    ArcadeShake.shake(0.65);
+    ArcadeFlash.flash(const Color(0x77FF2A55));
+    ArcadeFever.reset();
   }
 
   void _followCamera({double dt = 0, bool immediate = false}) {

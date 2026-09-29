@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../app/arcade_hall_of_fame_page.dart';
+import '../core/arcade_achievements.dart';
+import '../core/arcade_leaderboard.dart';
 import '../core/game_feedback.dart';
 import '../core/level_campaign.dart';
+
+
 
 class TouchStick extends StatefulWidget {
   const TouchStick({super.key, required this.onChanged, this.size = 104});
@@ -140,6 +145,7 @@ class HoldGameButton extends StatefulWidget {
     required this.color,
     required this.onChanged,
     this.size = 74,
+    this.iconSize,
   });
 
   final String label;
@@ -147,6 +153,7 @@ class HoldGameButton extends StatefulWidget {
   final Color color;
   final ValueChanged<bool> onChanged;
   final double size;
+  final double? iconSize;
 
   @override
   State<HoldGameButton> createState() => _HoldGameButtonState();
@@ -203,13 +210,17 @@ class _HoldGameButtonState extends State<HoldGameButton> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(widget.icon, size: widget.size * .28, color: Colors.white),
+              Icon(
+                widget.icon,
+                size: widget.iconSize ?? (widget.size * .36),
+                color: Colors.white,
+              ),
               const SizedBox(height: 1),
               Text(
                 widget.label,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 9,
+                style: TextStyle(
+                  fontSize: widget.size >= 80 ? 10.5 : (widget.size >= 70 ? 9.5 : 8.5),
                   height: 1,
                   fontWeight: FontWeight.w900,
                   letterSpacing: .5,
@@ -761,6 +772,17 @@ class _CampaignMissionClearOverlayState
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       GameFeedback.victory();
+      final result = LevelRunResult(
+        level: widget.level,
+        score: widget.score,
+        elapsedSeconds: widget.elapsedSeconds,
+      );
+      if (result.stars == 3) {
+        ArcadeAchievements.unlock('first_contract');
+      }
+      if (widget.score >= 5000) {
+        ArcadeAchievements.unlock('arcade_centurion');
+      }
     });
   }
 
@@ -772,6 +794,31 @@ class _CampaignMissionClearOverlayState
       elapsedSeconds: widget.elapsedSeconds,
     );
     final isFinalMission = widget.level.number >= gameCampaignLevelCount;
+    final isTopScore = ArcadeLeaderboard.isTopScore(
+      widget.level.gameId,
+      widget.score,
+    );
+
+    final String grade;
+    final Color gradeColor;
+    if (result.stars == 3 &&
+        widget.elapsedSeconds <= widget.level.parSeconds * 0.85) {
+      grade = 'S+';
+      gradeColor = const Color(0xFFFF557D);
+    } else if (result.stars == 3) {
+      grade = 'S';
+      gradeColor = const Color(0xFFFFD36A);
+    } else if (result.stars == 2) {
+      grade = 'A';
+      gradeColor = const Color(0xFF48F2C1);
+    } else if (result.stars == 1) {
+      grade = 'B';
+      gradeColor = const Color(0xFF72D6FF);
+    } else {
+      grade = 'C';
+      gradeColor = const Color(0xFF8B9FB0);
+    }
+
     return Positioned.fill(
       child: ColoredBox(
         color: const Color(0xE8080C16),
@@ -817,9 +864,13 @@ class _CampaignMissionClearOverlayState
                           Padding(
                             padding: const EdgeInsets.only(left: 3),
                             child: Icon(
-                              i <= result.stars ? Icons.star_rounded : Icons.star_outline_rounded,
+                              i <= result.stars
+                                  ? Icons.star_rounded
+                                  : Icons.star_outline_rounded,
                               size: 18,
-                              color: i <= result.stars ? const Color(0xFFFFD36A) : const Color(0xFF485A72),
+                              color: i <= result.stars
+                                  ? const Color(0xFFFFD36A)
+                                  : const Color(0xFF485A72),
                             ),
                           ),
                       ],
@@ -851,6 +902,11 @@ class _CampaignMissionClearOverlayState
                   runSpacing: 8,
                   children: [
                     _CampaignResultChip(
+                      icon: Icons.grade_rounded,
+                      label: 'RANK $grade',
+                      color: gradeColor,
+                    ),
+                    _CampaignResultChip(
                       icon: Icons.star_rounded,
                       label: '${result.stars}/3 STARS',
                       color: const Color(0xFFFFD36A),
@@ -867,7 +923,40 @@ class _CampaignMissionClearOverlayState
                     ),
                   ],
                 ),
-                const SizedBox(height: 18),
+                if (isTopScore) ...[
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => showArcadeInitialsEntryDialog(
+                        context,
+                        gameId: widget.level.gameId,
+                        score: widget.score,
+                        level: widget.level.number,
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(
+                          color: Color(0xFFFFD36A),
+                          width: 1.5,
+                        ),
+                        foregroundColor: const Color(0xFFFFD36A),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      icon: const Icon(Icons.emoji_events_rounded, size: 18),
+                      label: const Text(
+                        '★ NEW TOP SCORE! LOG INITIALS',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
                 if (!isFinalMission)
                   SizedBox(
                     width: double.infinity,
@@ -902,6 +991,7 @@ class _CampaignMissionClearOverlayState
     );
   }
 }
+
 
 class _CampaignResultChip extends StatelessWidget {
   const _CampaignResultChip({

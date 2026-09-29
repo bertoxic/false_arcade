@@ -15,6 +15,9 @@ String numberfallDisplayString(int value) =>
 @visibleForTesting
 abstract final class NumberfallTestAccess {
   static dynamic createGame() => _NumberfallGame();
+  static List<Rect> platformsFor(int value) =>
+      _NumberfallGame()._platformsFor(value);
+  static double get digitGap => _NumberfallGame()._gap;
 }
 
 class _NumberStageConfig {
@@ -105,7 +108,7 @@ class _NumberfallGame {
   static const width = 960.0;
   static const height = 540.0;
   static const _gravity = 1120.0;
-  static const _jumpImpulse = 620.0;
+  static const _jumpImpulse = 650.0;
   static const _bounceJumpImpulse = 820.0;
   static const _bounceDashLifetime = 3.0;
   static const _maxMoveSpeed = 275.0;
@@ -163,13 +166,13 @@ class _NumberfallGame {
   ];
   static const _segments = <int, List<String>>{
     0: ['a', 'b', 'c', 'd', 'e', 'f'],
-    1: ['b', 'c'],
+    1: ['b', 'c', 'g', 'd'],
     2: ['a', 'b', 'g', 'e', 'd'],
     3: ['a', 'b', 'c', 'd', 'g'],
     4: ['f', 'g', 'b', 'c'],
     5: ['a', 'f', 'g', 'c', 'd'],
     6: ['a', 'f', 'e', 'd', 'c', 'g'],
-    7: ['a', 'b', 'c'],
+    7: ['a', 'b', 'c', 'g'],
     8: ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
     9: ['a', 'b', 'c', 'd', 'f', 'g'],
   };
@@ -320,7 +323,7 @@ class _NumberfallGame {
   double get _digitHeight => 250;
   double get _thick => 21;
   double get _top => 132;
-  double get _gap => 35;
+  double get _gap => 64;
   double get _startX => (width - (_digitWidth * 3 + _gap * 2)) / 2;
 
   List<Rect> _platformsFor(int value) {
@@ -349,8 +352,8 @@ class _NumberfallGame {
     ]);
   }
 
-  Rect get exitPlatform => Rect.fromLTWH(width - 205, height - 76, 96, 14);
-  Rect get exitDoor => Rect.fromLTWH(width - 183, height - 136, 52, 60);
+  Rect get exitPlatform => Rect.fromLTWH(width - 180, height - 76, 100, 14);
+  Rect get exitDoor => Rect.fromLTWH(width - 156, height - 136, 52, 60);
 
   Map<String, Rect> _rawSegments(double x, double y) {
     final inset = _thick * .42;
@@ -398,7 +401,8 @@ class _NumberfallGame {
   /// Some seven-segment digits form fully closed counters or tight vertical columns
   /// (such as digit 1 or parallel joints). Their joins were only 21 logical pixels wide,
   /// while the actor is 22px wide and 33px tall, causing the actor to get trapped or blocked.
-  /// Opening a 48px passage ensures the actor can easily pass and jump between segments.
+  /// Opening doorway passages and providing mid-level rungs ensures the actor can easily
+  /// pass through and land in between numbers like 1, 7, etc.
   Map<String, List<Rect>> _segmentsForDigit(int digit, double x, double y) {
     final raw = _rawSegments(x, y);
     final upperCounter = digit == 0 || digit == 8 || digit == 9;
@@ -424,7 +428,7 @@ class _NumberfallGame {
               entry.value.bottom,
             ),
           ],
-          // When displaying digit 1, ensure the vertical stem 'b' and 'c' have jump-through relief
+          // When displaying digit 1, ensure vertical stems 'b' and 'c' have jump-through relief
           'b' when digit == 1 => [
             Rect.fromLTRB(
               entry.value.left,
@@ -439,6 +443,50 @@ class _NumberfallGame {
               entry.value.top + 44,
               entry.value.right,
               entry.value.bottom,
+            ),
+          ],
+          // Mid-shelf landing platform for digit 1
+          'g' when digit == 1 => [
+            Rect.fromLTWH(
+              x + 36,
+              raw['g']!.top,
+              _digitWidth - 36 - (_thick * .42),
+              _thick,
+            ),
+          ],
+          // Base pedestal landing platform for digit 1
+          'd' when digit == 1 => [
+            Rect.fromLTWH(
+              x + 44,
+              raw['d']!.top,
+              _digitWidth - 44 - (_thick * .42),
+              _thick,
+            ),
+          ],
+          // When displaying digit 7, ensure vertical stems 'b' and 'c' have doorway relief
+          'b' when digit == 7 => [
+            Rect.fromLTRB(
+              entry.value.left,
+              entry.value.top,
+              entry.value.right,
+              entry.value.bottom - 40,
+            ),
+          ],
+          'c' when digit == 7 => [
+            Rect.fromLTRB(
+              entry.value.left,
+              entry.value.top + 40,
+              entry.value.right,
+              entry.value.bottom,
+            ),
+          ],
+          // Crossbar landing platform for digit 7
+          'g' when digit == 7 => [
+            Rect.fromLTWH(
+              x + 32,
+              raw['g']!.top,
+              _digitWidth - 32 - (_thick * .42),
+              _thick,
             ),
           ],
           _ => [entry.value],
@@ -581,6 +629,13 @@ class _NumberfallGame {
           player.vy = -300;
           _enemyRespawnTimer = .85;
           _requestRewrite(3, 'ENEMY DROP +3', opensExit: false);
+          GameFeedback.explosion();
+          ArcadeShake.shake(0.48);
+          ArcadeFlash.flash(const Color(0x66FF5376));
+          ArcadeHitStop.freeze(0.08);
+          ArcadeFever.charge(0.25, currentMusicTheme: 'platform_theme');
+          ArcadeAchievements.unlock('digit_stomp');
+          _burst(enemy.center.dx, enemy.center.dy, 28, const Color(0xFFFF5376), 160);
         } else {
           _die('A red digit knocked you out of the equation.');
         }
@@ -605,7 +660,15 @@ class _NumberfallGame {
         80,
       );
       pickupsOnField.clear();
-      GameFeedback.pickup();
+      if (collected.risky) {
+        ArcadeAchievements.unlock('calculated_risk');
+        ArcadeFever.charge(0.20, currentMusicTheme: 'platform_theme');
+        GameFeedback.combo();
+        ArcadeFlash.flash(const Color(0x44FF9F68));
+      } else {
+        GameFeedback.pickup();
+        ArcadeFever.charge(0.08, currentMusicTheme: 'platform_theme');
+      }
       final target = collected.applyTo(score);
       _requestRewriteTarget(
         target,
@@ -967,7 +1030,10 @@ class _NumberfallGame {
     phase = _NumberPhase.dead;
     clearInput();
     message = reason;
-    GameFeedback.explosion();
+    GameFeedback.defeat();
+    ArcadeShake.shake(0.65);
+    ArcadeFlash.flash(const Color(0x77FF2A55));
+    ArcadeFever.reset();
   }
   void _burst(double x, double y, int count, Color color, [double speed = 60]) {
     if (particles.length > 80) particles.removeRange(0, particles.length - 80);
