@@ -3,282 +3,850 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Privacy Policy - False Arcade</title>
+  <title>Privacy Policy | False Arcade - Oraezu</title>
+  <meta name="description" content="Official Privacy Policy for False Arcade (com.bertoxic.fluga), developed by Oraezu. Fully compliant with Google Play Store and Apple App Store privacy standards.">
+  <meta name="theme-color" content="#090d16">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-color: #0f141c;
-      --card-bg: #18202c;
-      --text-color: #e2e8f0;
-      --text-muted: #94a3b8;
-      --accent-color: #38bdf8;
-      --accent-hover: #0ea5e9;
-      --border-color: #334155;
-      --highlight: #22c55e;
+      --bg: #090d16;
+      --surface: #101726;
+      --surface-elevated: #161f33;
+      --surface-border: #1e293b;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      
+      --text-main: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.15);
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.15);
+      --warning: #f59e0b;
+      
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
     }
+
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      line-height: 1.65;
-      background-color: var(--bg-color);
-      color: var(--text-color);
-      padding: 40px 20px;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      padding-bottom: 80px;
     }
-    .container {
-      max-width: 840px;
+
+    /* Ambient top glow */
+    body::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1000px;
+      height: 420px;
+      background: radial-gradient(ellipse at top, rgba(56, 189, 248, 0.12), transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Navigation Bar */
+    .top-nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      background: rgba(9, 13, 22, 0.82);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .nav-content {
+      max-width: 980px;
       margin: 0 auto;
-      background: var(--card-bg);
-      padding: 40px;
-      border-radius: 12px;
-      border: 1px solid var(--border-color);
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
-    h1 {
-      font-size: 2.2rem;
-      margin-bottom: 8px;
-      color: #ffffff;
-      letter-spacing: -0.5px;
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text-main);
     }
-    .effective-date {
-      color: var(--accent-color);
-      font-size: 0.95rem;
-      font-weight: 500;
-      margin-bottom: 24px;
-    }
-    h2 {
-      font-size: 1.4rem;
-      margin-top: 32px;
-      margin-bottom: 12px;
-      padding-bottom: 6px;
-      border-bottom: 1px solid var(--border-color);
-      color: #f8fafc;
-    }
-    h3 {
+
+    .app-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #0284c7, #38bdf8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(56, 189, 248, 0.3);
+      font-weight: 800;
       font-size: 1.1rem;
-      margin-top: 20px;
-      margin-bottom: 8px;
-      color: #e2e8f0;
+      color: #fff;
     }
-    p {
-      margin-bottom: 14px;
+
+    .brand-title {
+      font-weight: 700;
+      font-size: 1.05rem;
+      letter-spacing: -0.3px;
+    }
+
+    .brand-subtitle {
+      font-size: 0.75rem;
       color: var(--text-muted);
+      font-weight: 500;
+      display: block;
+      margin-top: -2px;
     }
-    ul {
-      margin-bottom: 16px;
-      padding-left: 24px;
-    }
-    li {
-      margin-bottom: 8px;
-      color: var(--text-muted);
-    }
-    strong {
-      color: #f1f5f9;
-    }
-    .badge {
-      display: inline-block;
-      padding: 4px 10px;
-      font-size: 0.8rem;
+
+    .nav-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: var(--success-glow);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399;
+      font-size: 0.75rem;
       font-weight: 600;
+      padding: 5px 12px;
       border-radius: 9999px;
-      background: rgba(34, 197, 94, 0.15);
-      color: var(--highlight);
-      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    .nav-badge .pulse {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 10px #10b981;
+    }
+
+    /* Container */
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 980px;
+      margin: 40px auto 0;
+      padding: 0 24px;
+    }
+
+    /* Hero Section */
+    .hero {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius-lg);
+      padding: 44px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+    }
+
+    .hero-glow {
+      position: absolute;
+      top: -120px;
+      right: -120px;
+      width: 320px;
+      height: 320px;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.18), transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1.2;
+      margin-bottom: 12px;
+      background: linear-gradient(180deg, #ffffff 30%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-lead {
+      color: var(--text-secondary);
+      font-size: 1.1rem;
+      max-width: 680px;
+      margin-bottom: 28px;
+    }
+
+    /* Metadata Grid */
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .meta-item {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+    }
+
+    .meta-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .meta-value {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.84rem;
+      color: var(--accent);
+    }
+
+    /* Key Guarantees Cards */
+    .guarantees-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px;
+      margin: 32px 0 44px;
+    }
+
+    .guarantee-card {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .guarantee-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(56, 189, 248, 0.35);
+    }
+
+    .card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       margin-bottom: 16px;
     }
-    .table-container {
-      overflow-x: auto;
-      margin: 20px 0;
+
+    .card-icon.blue { background: rgba(56, 189, 248, 0.12); color: var(--accent); }
+    .card-icon.green { background: rgba(16, 185, 129, 0.12); color: var(--success); }
+    .card-icon.amber { background: rgba(245, 158, 11, 0.12); color: var(--warning); }
+    .card-icon.purple { background: rgba(168, 85, 247, 0.12); color: #c084fc; }
+
+    .guarantee-card h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #fff;
     }
+
+    .guarantee-card p {
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      line-height: 1.55;
+    }
+
+    /* Content Body */
+    .content-card {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius-lg);
+      padding: 44px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .section {
+      margin-bottom: 44px;
+    }
+
+    .section:last-child {
+      margin-bottom: 0;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #fff;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .section-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.95rem;
+      color: var(--accent);
+      background: var(--accent-glow);
+      padding: 3px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+    }
+
+    p {
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+      font-size: 0.97rem;
+    }
+
+    ul {
+      list-style: none;
+      margin-bottom: 20px;
+    }
+
+    li {
+      position: relative;
+      padding-left: 28px;
+      margin-bottom: 12px;
+      color: var(--text-secondary);
+      font-size: 0.96rem;
+    }
+
+    li::before {
+      content: "";
+      position: absolute;
+      left: 8px;
+      top: 10px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    strong {
+      color: #fff;
+      font-weight: 600;
+    }
+
+    /* Highlight Notice Box */
+    .notice-box {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(16, 185, 129, 0.05));
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: var(--radius-md);
+      padding: 20px 24px;
+      margin: 24px 0;
+      display: flex;
+      gap: 16px;
+    }
+
+    .notice-icon {
+      flex-shrink: 0;
+      color: var(--accent);
+      margin-top: 2px;
+    }
+
+    .notice-box p {
+      margin-bottom: 0;
+      color: #e2e8f0;
+      font-size: 0.93rem;
+    }
+
+    /* Table Design */
+    .table-wrapper {
+      margin: 24px 0;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--surface-border);
+      overflow: hidden;
+      background: var(--surface-elevated);
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
       text-align: left;
+      font-size: 0.92rem;
     }
-    th, td {
-      padding: 12px 16px;
-      border: 1px solid var(--border-color);
-      font-size: 0.95rem;
-    }
-    th {
-      background-color: rgba(255, 255, 255, 0.05);
-      color: #ffffff;
-    }
-    td {
-      color: var(--text-muted);
-    }
-    .callout {
-      background: rgba(56, 189, 248, 0.08);
-      border-left: 4px solid var(--accent-color);
-      padding: 14px 18px;
-      border-radius: 4px;
-      margin: 20px 0;
+
+    thead th {
+      background: rgba(0, 0, 0, 0.3);
       color: #cbd5e1;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 0.76rem;
+      letter-spacing: 0.6px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--surface-border);
     }
-    a {
-      color: var(--accent-color);
+
+    tbody td {
+      padding: 16px 20px;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    .status-pill.success {
+      background: var(--success-glow);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .status-pill.info {
+      background: var(--accent-glow);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    /* Permissions Section */
+    .permission-badge {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border-subtle);
+      padding: 3px 8px;
+      border-radius: 6px;
+      color: #f1f5f9;
+      margin-right: 6px;
+    }
+
+    /* Contact & Support Section */
+    .contact-card {
+      background: var(--surface-elevated);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      margin-top: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .contact-info h4 {
+      font-size: 1.1rem;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .contact-info p {
+      margin-bottom: 0;
+      font-size: 0.9rem;
+    }
+
+    .contact-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #0284c7;
+      color: #ffffff;
+      padding: 10px 22px;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: 0.9rem;
+      text-decoration: none;
+      transition: background 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+    }
+
+    .contact-btn:hover {
+      background: #0369a1;
+      box-shadow: 0 6px 16px rgba(2, 132, 199, 0.45);
+    }
+
+    /* Footer */
+    footer {
+      max-width: 980px;
+      margin: 40px auto 0;
+      padding: 24px;
+      text-align: center;
+      border-top: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      font-size: 0.86rem;
+    }
+
+    footer a {
+      color: var(--text-secondary);
       text-decoration: none;
     }
-    a:hover {
-      text-decoration: underline;
+
+    footer a:hover {
+      color: var(--accent);
     }
-    footer {
-      margin-top: 40px;
-      padding-top: 20px;
-      border-top: 1px solid var(--border-color);
-      text-align: center;
-      font-size: 0.85rem;
-      color: var(--text-muted);
+
+    @media (max-width: 768px) {
+      .hero {
+        padding: 28px 20px;
+      }
+      .hero h1 {
+        font-size: 1.9rem;
+      }
+      .content-card {
+        padding: 24px 20px;
+      }
+      .meta-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Print Optimization */
+    @media print {
+      body {
+        background: #fff;
+        color: #000;
+      }
+      .top-nav, body::before, .hero-glow {
+        display: none;
+      }
+      .container {
+        margin: 0;
+        max-width: 100%;
+        padding: 0;
+      }
+      .hero, .content-card, .guarantee-card {
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        background: transparent;
+      }
+      h1, h2, h3, strong {
+        color: #000 !important;
+        -webkit-text-fill-color: initial !important;
+      }
+      p, li, td {
+        color: #333 !important;
+      }
     }
   </style>
 </head>
 <body>
 
-<div class="container">
-  <div class="badge">Privacy-First &bull; Zero Data Collection</div>
-  <h1>Privacy Policy for False Arcade</h1>
-  <div class="effective-date">Effective Date: September 29, 2026</div>
+  <!-- Top Navigation -->
+  <header class="top-nav">
+    <div class="nav-content">
+      <a href="#" class="brand">
+        <div class="app-icon">FA</div>
+        <div>
+          <span class="brand-title">False Arcade</span>
+          <span class="brand-subtitle">by Oraezu</span>
+        </div>
+      </a>
+      <div class="nav-badge">
+        <span class="pulse"></span>
+        <span>Google &amp; Apple Compliant</span>
+      </div>
+    </div>
+  </header>
 
-  <p>Welcome to <strong>False Arcade</strong> ("the Application", "the App", "we", "us", or "our"), created and published by <strong>Bertoxic</strong>. We respect your privacy and are committed to ensuring complete transparency and security for all players.</p>
+  <main class="container">
 
-  <p>This Privacy Policy outlines how your information is handled when you download, install, and enjoy False Arcade via the <strong>Google Play Store</strong> and the <strong>Apple App Store</strong>.</p>
+    <!-- Hero Card -->
+    <div class="hero">
+      <div class="hero-glow"></div>
+      <h1>Privacy Policy</h1>
+      <p class="hero-lead">
+        Transparent, offline-first, and zero telemetry. False Arcade is engineered so that your gameplay and personal identity remain 100% private to you.
+      </p>
 
-  <h2>1. Summary of Key Principles</h2>
-  <ul>
-    <li><strong>No Account Required:</strong> No registration, phone number, email address, or third-party sign-in is required to play.</li>
-    <li><strong>Zero Remote Data Collection:</strong> We do not operate remote user tracking servers, databases, or analytics engines.</li>
-    <li><strong>No Third-Party Tracking or Ads:</strong> The app contains no ad networks, no data brokers, and no tracking libraries.</li>
-    <li><strong>100% Local Device Storage:</strong> All scores, arcade initials, achievements, and settings remain strictly within your device's isolated storage sandbox.</li>
-    <li><strong>Store Compliant:</strong> Fully aligned with Google Play Data Safety policies, Apple App Store Review Guidelines (App Privacy Nutrition Labels), GDPR, and COPPA.</li>
-  </ul>
+      <div class="meta-grid">
+        <div class="meta-item">
+          <div class="meta-label">Application</div>
+          <div class="meta-value">False Arcade</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Package ID</div>
+          <div class="meta-value mono">com.bertoxic.fluga</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Developer</div>
+          <div class="meta-value">Oraezu</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Effective Date</div>
+          <div class="meta-value">September 29, 2026</div>
+        </div>
+      </div>
+    </div>
 
-  <h2>2. Information We Do NOT Collect</h2>
-  <p>False Arcade does not collect, transmit, or share:</p>
-  <ul>
-    <li><strong>Personal Identifiable Information:</strong> Name, physical address, email, telephone number, or government identifiers.</li>
-    <li><strong>Account Credentials:</strong> Passwords, login tokens, or social profiles.</li>
-    <li><strong>Location Data:</strong> Neither precise nor approximate GPS/cellular/Wi-Fi location.</li>
-    <li><strong>Financial Data:</strong> Bank accounts, credit cards, or billing info (False Arcade does not charge subscriptions or in-app purchases).</li>
-    <li><strong>Sensory / Media:</strong> Photos, camera, microphone, or biometric identification (Face ID/Touch ID).</li>
-    <li><strong>Advertising Identifiers:</strong> Apple IDFA, Google Advertising ID (GAID/AAID), or persistent device fingerprints.</li>
-  </ul>
+    <!-- Guarantees Grid -->
+    <div class="guarantees-grid">
+      <div class="guarantee-card">
+        <div class="card-icon blue">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <h3>Zero Data Collection</h3>
+        <p>No accounts, no email prompts, no profile creation. We never ask for or store your personal identity.</p>
+      </div>
 
-  <h2>3. Information Stored Locally on Your Device</h2>
-  <p>To support arcade gameplay, False Arcade saves non-personal game states locally using platform-native secure key-value stores (<code>SharedPreferences</code> on Android, <code>NSUserDefaults</code> / local sandbox on iOS):</p>
-  <ul>
-    <li><strong>Leaderboard & High Scores:</strong> 3-character retro arcade initials (e.g., <code>AAA</code>, <code>VEX</code>), numeric scores, levels achieved, and local timestamps.</li>
-    <li><strong>Game Progression & Unlocks:</strong> Campaign levels cleared, high score records, and challenge medals.</li>
-    <li><strong>Game Settings:</strong> Audio preferences (sound effects volume, chiptune music toggle) and haptic feedback toggles.</li>
-  </ul>
-  <div class="callout">
-    <strong>Guarantee:</strong> This data remains strictly offline on your physical hardware. It is never transmitted across the network or shared with Bertoxic or any third party.
-  </div>
+      <div class="guarantee-card">
+        <div class="card-icon green">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
+        </div>
+        <h3>No Ads &amp; No Tracking</h3>
+        <p>Contains 0 advertising libraries, 0 user tracking SDKs, and 0 third-party analytics telemetry.</p>
+      </div>
 
-  <h2>4. Device Permissions</h2>
-  <h3>Android</h3>
-  <ul>
-    <li><code>android.permission.VIBRATE</code>: Provides tactile feedback during gameplay collisions, scoring, and fever modes.</li>
-    <li><strong>Internet Access:</strong> False Arcade does <em>not</em> declare the <code>android.permission.INTERNET</code> permission. The app has no technical capability to connect to the internet.</li>
-  </ul>
+      <div class="guarantee-card">
+        <div class="card-icon amber">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 7h10"/><path d="M7 12h10"/><path d="M7 17h10"/></svg>
+        </div>
+        <h3>100% On-Device</h3>
+        <p>Your high scores, initials, and unlocked achievements live solely inside your device's local storage.</p>
+      </div>
 
-  <h3>iOS / iPadOS</h3>
-  <ul>
-    <li><strong>Taptic Engine / Haptics:</strong> Provides subtle haptic sensations.</li>
-    <li><strong>No Sensitive Permissions:</strong> No permissions for camera, microphone, photo library, contacts, tracking (ATT), or background processing are requested.</li>
-  </ul>
+      <div class="guarantee-card">
+        <div class="card-icon purple">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+        </div>
+        <h3>Total Deletion Control</h3>
+        <p>You can purge all game data anytime by clearing the app cache or simply uninstalling the application.</p>
+      </div>
+    </div>
 
-  <h2>5. Third-Party Services and SDKs</h2>
-  <p>False Arcade does not bundle any third-party monetization or telemetry SDKs:</p>
-  <ul>
-    <li>No advertising networks (e.g., AdMob, Unity Ads, AppLovin).</li>
-    <li>No analytics suites (e.g., Firebase Analytics, Mixpanel, Adjust, AppsFlyer).</li>
-    <li>No external authentication services.</li>
-  </ul>
+    <!-- Main Content Card -->
+    <div class="content-card">
 
-  <h2>6. Data Retention and Deletion (Your Rights)</h2>
-  <p>Because all data is stored strictly on your local device:</p>
-  <ul>
-    <li><strong>Clearing Storage:</strong> You can wipe all high scores and settings anytime via your device's application manager (<strong>Settings &rarr; Apps &rarr; False Arcade &rarr; Clear Storage</strong> on Android).</li>
-    <li><strong>Uninstalling:</strong> Deleting the app from your device instantaneously and permanently deletes 100% of saved data.</li>
-    <li><strong>Account Deletion Compliance:</strong> In accordance with Apple App Store Guideline 5.1.1(v) and Google Play policy, since no user accounts exist and no cloud storage is utilized, no server account deletion request is necessary.</li>
-  </ul>
+      <!-- Section 1 -->
+      <section class="section">
+        <h2><span class="section-num">01</span> Introduction &amp; Architectural Overview</h2>
+        <p>
+          This Privacy Policy applies to the <strong>False Arcade</strong> mobile application (Package Identifier: <code class="mono">com.bertoxic.fluga</code>), created, developed, and published by independent developer <strong>Oraezu</strong> ("we", "us", or "our").
+        </p>
+        <p>
+          False Arcade is an offline, minimalist skill-game suite designed for Android and iOS/iPadOS devices. The application is built upon a strict <strong>Privacy-by-Design</strong> principle: we believe that a game does not need to harvest your personal information, follow you across the internet, or run background analytics in order to deliver an engaging arcade experience.
+        </p>
+      </section>
 
-  <h2>7. Children's Privacy (COPPA & Global Standards)</h2>
-  <p>False Arcade is family-friendly and suitable for players of all ages:</p>
-  <ul>
-    <li>We strictly comply with the <strong>Children's Online Privacy Protection Act (COPPA)</strong> and the <strong>EU General Data Protection Regulation (GDPR)</strong>.</li>
-    <li>We do not knowingly collect or request personal information from children under 13 (or under 16 in the EU).</li>
-    <li>Because zero personal data is collected from any user, no child data is ever captured or processed.</li>
-  </ul>
+      <!-- Section 2 -->
+      <section class="section">
+        <h2><span class="section-num">02</span> Information We Do NOT Collect</h2>
+        <p>False Arcade does not collect, record, harvest, transmit, or share any of the following categories of information:</p>
+        <ul>
+          <li><strong>Personal Identifiable Information (PII):</strong> Your name, email address, home address, phone number, government ID, or age.</li>
+          <li><strong>Account &amp; Social Credentials:</strong> Passwords, login tokens, or social logins (e.g. Google Sign-In, Sign in with Apple, Facebook).</li>
+          <li><strong>Geolocation Data:</strong> Precise GPS coordinates, cell tower data, or IP-derived geographical points.</li>
+          <li><strong>Financial &amp; In-App Purchase Data:</strong> Credit cards, bank accounts, or billing information. The app contains no in-app purchases, microtransactions, or paid subscriptions.</li>
+          <li><strong>Biometric &amp; Sensory Hardware:</strong> Camera streams, microphone audio, Face ID, or fingerprint sensors.</li>
+          <li><strong>Persistent Advertising Identifiers:</strong> Apple IDFA (Identifier for Advertisers), Google Advertising ID (GAID/AAID), or persistent device fingerprints.</li>
+          <li><strong>Device Content:</strong> Your contacts, photo albums, files, or documents stored outside the app's sandboxed container.</li>
+        </ul>
+      </section>
 
-  <h2>8. Store-Specific Disclosure Mapping</h2>
+      <!-- Section 3 -->
+      <section class="section">
+        <h2><span class="section-num">03</span> Information Processed Locally on Your Device</h2>
+        <p>
+          To maintain your gaming state between sessions, False Arcade utilizes platform-standard local key-value storage (<code class="mono">SharedPreferences</code> on Android, <code class="mono">NSUserDefaults</code> / local container on iOS).
+        </p>
+        <p>The following non-identifiable gameplay data is stored strictly on your local device:</p>
+        <ul>
+          <li><strong>Arcade Hall of Fame:</strong> Up to 3 retro arcade initials of your choosing (e.g., <code class="mono">AAA</code>, <code class="mono">SAM</code>, <code class="mono">VEX</code>) and corresponding high scores, levels reached, and local timestamps.</li>
+          <li><strong>Campaign Progression:</strong> Unlocked difficulty levels, star thresholds, and achievement badges.</li>
+          <li><strong>Audio &amp; Tactile Preferences:</strong> Sound effect volume, chiptune music toggle state, and haptic feedback settings.</li>
+        </ul>
 
-  <h3>Google Play Store: Data Safety Form</h3>
-  <div class="table-container">
-    <table>
-      <thead>
-        <tr>
-          <th>Play Console Question</th>
-          <th>Accurate Answer</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Does your app collect or share any user data?</td>
-          <td><strong>No</strong></td>
-        </tr>
-        <tr>
-          <td>Is data encrypted in transit?</td>
-          <td><strong>Not Applicable</strong> (no data is collected or transferred)</td>
-        </tr>
-        <tr>
-          <td>Can users request data deletion?</td>
-          <td><strong>Yes</strong> (via local app uninstall or clearing cache/data)</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+        <div class="notice-box">
+          <div class="notice-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+          </div>
+          <div>
+            <strong>Strict Offline Guarantee:</strong> None of this information is ever uploaded to a remote server, shared with Oraezu, or made accessible to third parties. It remains safely sandboxed within your device hardware.
+          </div>
+        </div>
+      </section>
 
-  <h3>Apple App Store: App Privacy Details</h3>
-  <div class="table-container">
-    <table>
-      <thead>
-        <tr>
-          <th>App Store Connect Category</th>
-          <th>Accurate Declaration</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Data Collection</td>
-          <td><strong>Data Not Collected</strong> ("We do not collect data from this app")</td>
-        </tr>
-        <tr>
-          <td>Tracking</td>
-          <td><strong>No Tracking</strong> (App does not track users)</td>
-        </tr>
-        <tr>
-          <td>App Tracking Transparency (ATT)</td>
-          <td><strong>Not Required</strong> (No IDFA requested)</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+      <!-- Section 4 -->
+      <section class="section">
+        <h2><span class="section-num">04</span> Device Permissions</h2>
+        <p>False Arcade requests only the absolute bare minimum platform permissions necessary to deliver responsive tactile gameplay:</p>
 
-  <h2>9. Contact Us</h2>
-  <p>If you have any questions or feedback regarding this Privacy Policy, please reach out:</p>
-  <ul>
-    <li><strong>Developer / Publisher:</strong> Bertoxic</li>
-    <li><strong>Email:</strong> <a href="mailto:support@bertoxic.com">support@bertoxic.com</a></li>
-    <li><strong>Repository / Web:</strong> <a href="https://github.com/bertoxic/false_arcade" target="_blank" rel="noopener">https://github.com/bertoxic/false_arcade</a></li>
-  </ul>
+        <p><strong>Android:</strong></p>
+        <ul>
+          <li><span class="permission-badge">android.permission.VIBRATE</span> Used exclusively to trigger the device haptic motor during edge collisions, game over states, and arcade fever modes.</li>
+          <li><strong>Internet Permission:</strong> False Arcade deliberately does <em>not</em> declare <code class="mono">android.permission.INTERNET</code> in its manifest. The Android operating system enforces that the application has zero technical capability to initiate or accept network connections.</li>
+        </ul>
 
-  <footer>
-    &copy; 2026 Bertoxic &bull; False Arcade. All rights reserved.
-  </footer>
-</div>
+        <p><strong>iOS / iPadOS:</strong></p>
+        <ul>
+          <li><span class="permission-badge">Taptic Engine</span> Utilized for tactile haptic feedback during gameplay.</li>
+          <li><strong>Zero Sensitive Entitlements:</strong> Does not request permissions for Camera, Microphone, Photo Library, Contacts, Location, or App Tracking Transparency (ATT).</li>
+        </ul>
+      </section>
+
+      <!-- Section 5 -->
+      <section class="section">
+        <h2><span class="section-num">05</span> Third-Party Services and Analytics</h2>
+        <p>False Arcade does not bundle, load, or initialize any external telemetry or monetization SDKs:</p>
+        <ul>
+          <li><strong>Zero Advertising SDKs:</strong> No Google AdMob, Unity Ads, AppLovin, ironSource, or similar ad networks.</li>
+          <li><strong>Zero Analytics Platforms:</strong> No Google Analytics for Firebase, Firebase Crashlytics, Mixpanel, Adjust, or AppsFlyer.</li>
+          <li><strong>Zero Social Media Frameworks:</strong> No Meta/Facebook SDKs, TikTok SDKs, or social trackers.</li>
+        </ul>
+      </section>
+
+      <!-- Section 6 -->
+      <section class="section">
+        <h2><span class="section-num">06</span> Store-Specific Disclosures &amp; Nutrition Labels</h2>
+
+        <p>The following declarations align directly with Google Play Console and Apple App Store Connect developer questionnaires:</p>
+
+        <h3 style="color: #fff; font-size: 1.15rem; margin: 24px 0 12px;">Google Play Console: Data Safety Form</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Play Console Questionnaire Field</th>
+                <th>Accurate Submission Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Does your app collect or share any user data?</strong></td>
+                <td><span class="status-pill success">No</span></td>
+              </tr>
+              <tr>
+                <td><strong>Is user data encrypted in transit?</strong></td>
+                <td><span class="status-pill info">Not Applicable (No network data transfer)</span></td>
+              </tr>
+              <tr>
+                <td><strong>Do you provide a way for users to request data deletion?</strong></td>
+                <td><span class="status-pill success">Yes (Via local cache clear or app uninstall)</span></td>
+              </tr>
+              <tr>
+                <td><strong>Target Audience / Families Policy</strong></td>
+                <td>Safe for all audiences (Zero personal data collected from anyone)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 style="color: #fff; font-size: 1.15rem; margin: 28px 0 12px;">Apple App Store Connect: App Privacy "Nutrition Labels"</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>App Store Connect Category</th>
+                <th>Accurate Submission Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Data Collection</strong></td>
+                <td><span class="status-pill success">Data Not Collected ("We do not collect data from this app")</span></td>
+              </tr>
+              <tr>
+                <td><strong>User Tracking</strong></td>
+                <td><span class="status-pill success">No Tracking</span></td>
+              </tr>
+              <tr>
+                <td><strong>App Tracking Transparency (ATT) Framework</strong></td>
+                <td><span class="status-pill info">Not Required (No IDFA requested)</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Section 7 -->
+      <section class="section">
+        <h2><span class="section-num">07</span> Data Retention, Deletion &amp; User Rights</h2>
+        <p>Because all data is stored exclusively on your physical device:</p>
+        <ul>
+          <li><strong>Instant Erasure on Android:</strong> Open <em>Settings &rarr; Apps &rarr; False Arcade &rarr; Storage & Cache</em> and tap <strong>Clear Storage</strong>. This permanently purges all saved scores and settings.</li>
+          <li><strong>Instant Erasure on iOS:</strong> Touch and hold the False Arcade icon on your home screen and select <strong>Delete App</strong>. iOS completely destroys the app's local sandbox storage.</li>
+          <li><strong>Apple Guideline 5.1.1(v) Compliance:</strong> Because False Arcade requires no user accounts and maintains no remote database, an in-app "Delete Account" button is not applicable. Deleting the app or clearing device storage immediately destroys all associated user data.</li>
+        </ul>
+      </section>
+
+      <!-- Section 8 -->
+      <section class="section">
+        <h2><span class="section-num">08</span> Children's Privacy (COPPA &amp; GDPR-K)</h2>
+        <p>
+          False Arcade is family-safe and suitable for audiences of all ages. We strictly adhere to the <strong>Children's Online Privacy Protection Act (COPPA)</strong> in the United States and the <strong>General Data Protection Regulation (GDPR)</strong> in Europe.
+        </p>
+        <p>
+          We do not knowingly solicit, collect, or process personal data from children under 13 (or under 16 in the European Union). In fact, because the app collects zero personal information from *any* player, children can enjoy the game in total privacy without risk of data harvesting or targeted tracking.
+        </p>
+      </section>
+
+      <!-- Section 9 -->
+      <section class="section">
+        <h2><span class="section-num">09</span> Global Privacy Rights</h2>
+        <ul>
+          <li><strong>European Union / United Kingdom (GDPR / UK GDPR):</strong> Local state processing is carried out solely for the execution of the requested game functionality (Art. 6(1)(b) GDPR). Because Oraezu holds no personal data on servers, we cannot identify individual users.</li>
+          <li><strong>California Consumer Privacy Act (CCPA / CPRA):</strong> We do not sell, rent, or share consumer personal information for monetary or valuable consideration ("Do Not Sell or Share My Personal Information").</li>
+          <li><strong>Non-Discrimination:</strong> We will never discriminate against any user for exercising any of their privacy rights.</li>
+        </ul>
+      </section>
+
+      <!-- Section 10 -->
+      <section class="section">
+        <h2><span class="section-num">10</span> Policy Updates &amp; Inquiries</h2>
+        <p>
+          We may update this Privacy Policy from time to time to maintain alignment with evolving Google Play and Apple App Store requirements. Any modifications will be reflected with a revised "Effective Date" at the top of this page.
+        </p>
+
+        <div class="contact-card">
+          <div class="contact-info">
+            <h4>Questions or Feedback?</h4>
+            <p>If you have any questions regarding this Privacy Policy or False Arcade, contact the developer:</p>
+            <p style="margin-top: 6px;"><strong>Developer:</strong> Oraezu &bull; <strong>Package:</strong> <code class="mono">com.bertoxic.fluga</code></p>
+          </div>
+          <a href="mailto:support@oraezu.com" class="contact-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+            Email Support
+          </a>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>&copy; 2026 <strong>Oraezu</strong>. All rights reserved.</p>
+      <p style="margin-top: 6px;">False Arcade &bull; <code class="mono">com.bertoxic.fluga</code></p>
+    </footer>
+
+  </main>
 
 </body>
 </html>

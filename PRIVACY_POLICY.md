@@ -1,10 +1,15 @@
 # Privacy Policy for False Arcade
 
-**Last Updated / Effective Date:** September 29, 2026
+**Last Updated / Effective Date:** September 29, 2026  
+**Application Name:** False Arcade  
+**Package Identifier (Android & iOS):** `com.bertoxic.fluga`  
+**Developer / Publisher:** Oraezu  
 
-Welcome to **False Arcade** ("the Application", "the App", "we", "us", or "our"), developed and published by **Bertoxic**. We are committed to protecting your privacy and ensuring a transparent, safe, and privacy-respecting gaming experience.
+---
 
-This Privacy Policy explains how information is handled when you download, install, and play **False Arcade** on Android devices (via the Google Play Store) and iOS devices (via the Apple App Store).
+Welcome to **False Arcade** ("the Application", "the App", "we", "us", or "our"), created and published by **Oraezu**. We are committed to protecting your privacy and ensuring a transparent, safe, and privacy-respecting gaming experience.
+
+This Privacy Policy explains how information is handled when you download, install, and play **False Arcade** on Android devices (via Google Play) and iOS/iPadOS devices (via Apple App Store).
 
 False Arcade is built with a **Privacy-First, Offline-Only Architecture**. We do not collect, harvest, transmit, share, or sell your personal data.
 
@@ -16,7 +21,7 @@ False Arcade is built with a **Privacy-First, Offline-Only Architecture**. We do
 * **Zero Remote Data Collection:** We do not operate remote game servers, databases, or user telemetry endpoints.
 * **No Third-Party Tracking or Ads:** The app contains zero advertising SDKs, zero user tracking libraries, and zero behavioral analytics.
 * **100% Local Device Storage:** Your high scores, arcade initials, achievements, and gameplay settings stay exclusively on your device.
-* **Fully Compliant:** Designed to satisfy Google Play Developer Policy (Data Safety), Apple App Store Review Guidelines (App Privacy details), GDPR, and COPPA.
+* **Fully Compliant:** Designed to satisfy Google Play Developer Policy (Data Safety), Apple App Store Review Guidelines (App Privacy details), GDPR, CCPA/CPRA, and COPPA.
 
 ---
 
@@ -48,7 +53,7 @@ To deliver arcade gameplay features, False Arcade stores a minimal set of non-pe
    * Chiptune music toggle.
    * Haptic vibration toggle.
 
-> **Important:** This data never leaves your device. It is never transmitted across the internet, never backed up to developer servers, and is completely inaccessible to Bertoxic or any third parties.
+> **Guarantee:** This data never leaves your device. It is never transmitted across the internet, never backed up to developer servers, and is completely inaccessible to Oraezu or any third parties.
 
 ---
 
@@ -102,8 +107,6 @@ False Arcade is an offline, family-friendly skill arcade game suitable for all a
 * Because the app does not collect personal data from *any* user, no child data is ever captured, tracked, or transmitted.
 * The application does not contain chat rooms, open text fields, user-to-user messaging, or unvetted external web links.
 
-If a parent or guardian believes their child has somehow provided personal data, please contact us immediately, though by architectural design no such mechanism exists in the app.
-
 ---
 
 ## 8. Compliance with Global Privacy Regulations
@@ -128,7 +131,7 @@ When submitting or updating False Arcade in the Google Play Console:
 | **Does your app collect or share any of the required user data types?** | **No** |
 | **Is all of the user data collected by your app encrypted in transit?** | **Not Applicable** (no data is collected or transferred) |
 | **Do you provide a way for users to request that their data is deleted?** | **Yes** (users delete data by clearing storage or uninstalling the app) |
-| **Does your app target children?** | Depends on Target Audience selection (App is safe for all ages, zero data collection) |
+| **Target Audience** | Safe for all age groups (Zero personal data collected) |
 
 ### Apple App Store: App Privacy "Nutrition Labels"
 When completing the App Privacy section in App Store Connect:
@@ -141,24 +144,11 @@ When completing the App Privacy section in App Store Connect:
 
 ---
 
-## 10. Security of Your Information
-
-Because False Arcade operates offline without server infrastructure:
-* Game data is secured by your operating system’s sandboxing mechanisms (Android Application Sandbox and iOS App Sandbox).
-* No data travels across public networks, eliminating risks associated with man-in-the-middle attacks, database breaches, or credential leaks.
-
----
-
-## 11. Changes to This Privacy Policy
-
-We may update this Privacy Policy from time to time to reflect modifications in platform policies (Google Play or Apple App Store) or regulatory updates. Any changes will be posted with an updated "Last Updated" date at the top of this document. Continued use of False Arcade constitutes acceptance of any revised terms.
-
----
-
-## 12. Contact Us
+## 10. Developer Contact Information
 
 If you have questions, comments, or concerns regarding this Privacy Policy or the privacy practices of False Arcade, please contact us at:
 
-* **Developer / Publisher:** Bertoxic
-* **Contact Email:** [support@bertoxic.com](mailto:support@bertoxic.com) *(or your dedicated support email)*
-* **Developer Website / Repository:** [https://github.com/bertoxic/false_arcade](https://github.com/bertoxic/false_arcade)
+* **Developer / Publisher:** Oraezu
+* **Package Identifier:** `com.bertoxic.fluga`
+* **Contact Email:** [support@oraezu.com](mailto:support@oraezu.com)
+* **Developer Repository:** [https://github.com/bertoxic/false_arcade](https://github.com/bertoxic/false_arcade)
