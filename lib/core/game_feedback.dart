@@ -6,6 +6,26 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'arcade_hitstop.dart';
+
+/// Scales audio frequency along a pentatonic scale for musical game-feel feedback.
+abstract final class HarmonicJuice {
+  static const List<double> pentatonic = [
+    1.000, // C4 (Root)
+    1.122, // D4
+    1.260, // E4
+    1.498, // G4
+    1.682, // A4
+    2.000, // C5 (Octave)
+  ];
+
+  static double pitchFor(int combo) {
+    if (combo <= 0) return 1.0;
+    final idx = (combo - 1).clamp(0, pentatonic.length - 1);
+    return pentatonic[idx];
+  }
+}
+
 /// Internal audio effect pool for responsive, zero-latency arcade audio.
 abstract final class _AudioPool {
   static final bool _isTest =
@@ -13,7 +33,7 @@ abstract final class _AudioPool {
   static final Map<String, List<AudioPlayer>> _pools = {};
   static final Map<String, int> _poolIndices = {};
 
-  static void play(String soundName, {int poolSize = 2}) {
+  static void play(String soundName, {int poolSize = 2, double playbackRate = 1.0}) {
     if (_isTest) return;
     try {
       final pool = _pools.putIfAbsent(soundName, () {
@@ -27,7 +47,12 @@ abstract final class _AudioPool {
       _poolIndices[soundName] = idx + 1;
       final player = pool[idx];
       unawaited(
-        player.stop().then((_) {
+        player.stop().then((_) async {
+          if (playbackRate != 1.0) {
+            try {
+              await player.setPlaybackRate(playbackRate);
+            } catch (_) {}
+          }
           return player.play(AssetSource('audio/$soundName.wav'));
         }).catchError((_) {}),
       );
@@ -97,12 +122,8 @@ abstract final class _MusicPlayer {
       _player?.pause();
       _isPlaying = false;
     } else if (_currentTheme != null) {
-      if (_player != null) {
-        _player!.resume();
-        _isPlaying = true;
-      } else {
-        play(_currentTheme!);
-      }
+      // The selected theme may have changed while music was disabled.
+      unawaited(play(_currentTheme!));
     }
   }
 }
@@ -111,7 +132,7 @@ abstract final class _MusicPlayer {
 @immutable
 class GameFeedbackSettings {
   const GameFeedbackSettings({
-    this.musicEnabled = true,
+    this.musicEnabled = false,
     this.soundEnabled = true,
     this.hapticsEnabled = true,
     this.crtEnabled = true,
@@ -150,7 +171,7 @@ abstract final class GameFeedback {
   static Future<void> load() async {
     final preferences = await SharedPreferences.getInstance();
     settings.value = GameFeedbackSettings(
-      musicEnabled: preferences.getBool(_musicKey) ?? true,
+      musicEnabled: preferences.getBool(_musicKey) ?? false,
       soundEnabled: preferences.getBool(_soundKey) ?? true,
       hapticsEnabled: preferences.getBool(_hapticsKey) ?? true,
       crtEnabled: preferences.getBool(_crtKey) ?? true,
@@ -265,16 +286,32 @@ abstract final class GameFeedback {
     _AudioPool.play('pickup', poolSize: 2);
   }
 
-  /// Deep bass pulse on debt settlement and consequence resolution.
-  static void settlement() {
+  /// Melodic harmonic pickup chime scaling along pentatonic scale with combo streak.
+  static void harmonicPickup([int combo = 0]) {
+    if (settings.value.hapticsEnabled) {
+      unawaited(HapticFeedback.lightImpact());
+    }
+    if (!settings.value.soundEnabled) return;
+    final pitch = HarmonicJuice.pitchFor(combo);
+    _AudioPool.play('pickup', poolSize: 3, playbackRate: pitch);
+  }
+
+  /// Deep bass pulse on debt settlement and consequence resolution with impact hitstop.
+  static void settlement({int consequenceCount = 1}) {
     heavyImpact();
+    if (consequenceCount >= 3) {
+      ArcadeHitstop.freeze(const Duration(milliseconds: 40));
+    }
     if (!settings.value.soundEnabled) return;
     _AudioPool.play('settlement', poolSize: 2);
   }
 
-  /// Heavy explosion punch for volatile drum blast or defeat.
-  static void explosion() {
+  /// Heavy explosion punch for volatile drum blast or defeat with impact hitstop.
+  static void explosion({bool heavy = false}) {
     heavyImpact();
+    if (heavy) {
+      ArcadeHitstop.freeze(const Duration(milliseconds: 45));
+    }
     if (!settings.value.soundEnabled) return;
     _AudioPool.play('explosion', poolSize: 2);
   }

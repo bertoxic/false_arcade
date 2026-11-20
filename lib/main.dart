@@ -1,9 +1,13 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/widgets.dart';
 
 import 'app/false_arcade_app.dart';
 import 'core/arcade_achievements.dart';
+import 'core/arcade_ads.dart';
+import 'core/arcade_daily_shift.dart';
 import 'core/arcade_leaderboard.dart';
+import 'core/arcade_theme_palette.dart';
 import 'core/game_feedback.dart';
 import 'ui/arcade_crash_recovery_view.dart';
 
@@ -31,12 +35,18 @@ Future<void> main() async {
     return ArcadeCrashRecoveryView(details: details);
   };
 
+  // Ad SDK initialization must not delay the first screen if a network or
+  // platform call takes a long time.
+  unawaited(ArcadeAds.initialize());
+
   // Safe storage initialization: never fail to boot if disk read is interrupted
   try {
     await Future.wait([
       GameFeedback.load(),
       ArcadeLeaderboard.load(),
       ArcadeAchievements.load(),
+      DailyShiftManager.load(),
+      ArcadeThemeManager.load(),
     ]);
   } catch (e, st) {
     debugPrint('Arcade Cold-Boot Warning: $e\n$st');

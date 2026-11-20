@@ -2,15 +2,15 @@ part of 'future_debt_game.dart';
 
 enum _FuturePhase { intro, playing, dead }
 
-enum _DebtKind { move, shoot, dash, life }
+enum _DebtKind { move, dash }
 
 enum _FutureEnemyType { hound, auditor, interest, bailiff }
 
-enum _FutureEchoType { runner, auditor, anchor, claim }
+enum _FutureEchoType { runner, anchor }
 
-enum _FuturePickupKind { time, writeoff, ghost, compound, reverse, caseFile }
+enum _FuturePickupKind { time, writeoff, compound, cashOut, caseFile }
 
-enum _FutureShotType { player, audit, echo, collector }
+enum _FutureShotType { player, audit, collector }
 
 enum _FutureParticleType {
   borrow,
@@ -30,6 +30,20 @@ enum _FutureParticleType {
 /// Pure helpers kept public for gameplay-rule regression tests.
 abstract final class FutureDebtRules {
   static const campaignScoreMultiplier = 1;
+  static const maturitySeconds = 5.0;
+
+  /// The amount of arena visible at a uniform scale, without letterboxing.
+  static Size arenaView(Size surface) {
+    if (surface.isEmpty) return Size.zero;
+    final aspect = surface.width / surface.height;
+    final portraitAmount = ((1.25 - aspect) / .75).clamp(0.0, 1.0);
+    final height = _FutureDebtGame.height + 160 * portraitAmount;
+    final scale = math.max(
+      surface.height / height,
+      surface.width / _FutureDebtGame.worldWidth,
+    );
+    return Size(surface.width / scale, surface.height / scale);
+  }
 
   static double interestForDelay(double delay) =>
       1 + math.max(0, delay - 4) * .11;
@@ -57,9 +71,71 @@ abstract final class FutureDebtRules {
     moveDirection.distance > .1 ? moveDirection : storedDirection,
     fallback: fireDirection,
   );
+
+  static double dashTravelFraction(double progress) {
+    final t = progress.clamp(0.0, 1.0);
+    return t + .30 * t * (1 - t);
+  }
+
+  /// First point of contact along a step, expressed as a fraction of it.
+  static double? sweptCircleImpact(
+    Offset origin,
+    Offset step,
+    Offset target,
+    double radius,
+  ) {
+    final relative = origin - target;
+    final separation = relative.distanceSquared - radius * radius;
+    if (separation <= 0) return 0;
+    final lengthSquared = step.distanceSquared;
+    final along = relative.dx * step.dx + relative.dy * step.dy;
+    if (lengthSquared <= gameEpsilon || along >= 0) return null;
+    final discriminant = along * along - lengthSquared * separation;
+    if (discriminant < 0) return null;
+    final impact = (-along - math.sqrt(discriminant)) / lengthSquared;
+    return impact <= 1 ? impact : null;
+  }
+
+  /// Sweeps a shot's round footprint against flat faces and rounded corners.
+  static double? sweptCoverImpact(
+    Offset origin,
+    Offset step,
+    Rect cover,
+    double radius,
+  ) {
+    final broadHit = _rayRectDistance(origin, step, cover.inflate(radius));
+    if (broadHit == null || broadHit > 1) return null;
+    final vertical = Rect.fromLTRB(
+      cover.left,
+      cover.top - radius,
+      cover.right,
+      cover.bottom + radius,
+    );
+    final horizontal = Rect.fromLTRB(
+      cover.left - radius,
+      cover.top,
+      cover.right + radius,
+      cover.bottom,
+    );
+    var closest = math.min(
+      _rayRectDistance(origin, step, vertical) ?? double.infinity,
+      _rayRectDistance(origin, step, horizontal) ?? double.infinity,
+    );
+    for (final corner in [
+      cover.topLeft,
+      cover.topRight,
+      cover.bottomLeft,
+      cover.bottomRight,
+    ]) {
+      final hit = sweptCircleImpact(origin, step, corner, radius);
+      if (hit != null && hit < closest) closest = hit;
+    }
+    return closest <= 1 ? closest : null;
+  }
 }
 
 class _FutureDebtGame {
+  static const musicTheme = 'ember_current';
   _FutureDebtGame({GeneratedGameLevel? campaign})
     : _campaign = campaign,
       _plan = _FutureDebtCasePlan.fromCampaign(campaign),
@@ -81,6 +157,7 @@ class _FutureDebtGame {
   static const _maxPlayerShots = 84;
   static const _maxEnemyShots = 72;
   static const _maximumLifetime = 120.0;
+  static const _dashDuration = .12;
 
   final GeneratedGameLevel? _campaign;
   final _FutureDebtCasePlan _plan;
@@ -89,12 +166,17 @@ class _FutureDebtGame {
   _FutureDebtPace _pace = _FutureDebtPace.standard;
   late math.Random _random;
   final walls = <_FutureWall>[];
+  final arenaBlocks = <_ArenaBlock>[];
+  final arenaTurf = <Rect>[];
+  final arenaGroves = <_ArenaGrove>[];
   final pickups = <_FuturePickup>[];
   final enemies = <_FutureEnemy>[];
   final portals = <_FuturePortal>[];
   final shots = <_FutureShot>[];
   final enemyShots = <_FutureShot>[];
   final particles = <_FutureParticle>[];
+  final pulses = <_FuturePowerPulse>[];
+  final ghostTrail = <({Offset position, double time})>[];
   final echoes = <_FutureEcho>[];
   final bills = <_FutureBill>[];
 
@@ -111,10 +193,19 @@ class _FutureDebtGame {
 
   _FuturePhase phase = _FuturePhase.intro;
   Offset player = const Offset(1515, 1010);
-  Offset camera = Offset.zero;
+  Offset cameraCenter = Offset.zero;
   Offset moveDirection = Offset.zero;
+  Offset velocity = Offset.zero;
   Offset aimDirection = const Offset(1, 0);
   Offset dashDirection = const Offset(1, 0);
+  Offset _dashTravelDirection = Offset.zero;
+  Offset dashOrigin = Offset.zero;
+  Offset? _lastClearGhostPosition;
+  double dashRemaining = 0;
+  bool _borrowedDash = false;
+  double lastShotAt = double.negativeInfinity;
+  double lastHitAt = double.negativeInfinity;
+  double stride = 0;
   _FutureCollector? collector;
   _FutureLevelExit? levelExit;
   double time = 0;
@@ -131,7 +222,6 @@ class _FutureDebtGame {
   double shootBoost = 0;
   double reversalBoost = 0;
   double screenShake = 0;
-  double selectedDelay = 6;
   double totalBorrowed = 0;
   double totalRepaid = 0;
   double _totalDefaultTime = 0;
@@ -156,13 +246,17 @@ class _FutureDebtGame {
   bool get isPlaying => phase == _FuturePhase.playing;
   _FutureDebtPace get pace => _pace;
   double get _enemyFlow => .7 * _pace.enemyFlow;
-  bool get totalDefaultActive => locks[_DebtKind.life] == -1;
+  bool get totalDefaultActive => _totalDefaultTime > 0;
   bool get hasAnyLock =>
       totalDefaultActive || locks.values.any((value) => value > 0);
   bool get hasCollector => collector != null;
+  bool get canBankrupt => isPlaying && !hasCollector && debtAmount >= .15;
   bool get levelExitOpen => levelExit != null;
   bool get canDash =>
-      isPlaying && !isLocked(_DebtKind.dash) && dashCooldown <= 0;
+      isPlaying &&
+      !isLocked(_DebtKind.dash) &&
+      dashCooldown <= 0 &&
+      dashRemaining <= 0;
   int get scoreTarget => _plan.scoreTarget;
   String get caseTitle => _plan.title;
   String get caseInstruction => _plan.instruction;
@@ -186,6 +280,7 @@ class _FutureDebtGame {
   };
   bool get hasOutstandingDebt =>
       bills.isNotEmpty ||
+      totalDefaultActive ||
       locks.values.any((value) => value != 0) ||
       echoes.any((echo) => !echo.dead) ||
       collector != null;
@@ -216,24 +311,16 @@ class _FutureDebtGame {
   bool _hasOutstandingCredit(_DebtKind kind) {
     if (bills.any((bill) => bill.kind == kind)) return true;
     if ((locks[kind] ?? 0) > 0) return true;
-    if (kind == _DebtKind.move && moveBoost > 0) return true;
-    if (kind == _DebtKind.shoot && shootBoost > 0) return true;
-    if (kind == _DebtKind.dash && reversalBoost > 0) return true;
-    return switch (kind) {
-      _DebtKind.move => echoes.any(
-        (echo) => !echo.dead && echo.type == _FutureEchoType.runner,
-      ),
-      _DebtKind.shoot => echoes.any(
-        (echo) => !echo.dead && echo.type == _FutureEchoType.auditor,
-      ),
-      _DebtKind.dash => echoes.any(
-        (echo) => !echo.dead && echo.type == _FutureEchoType.anchor,
-      ),
-      _DebtKind.life => echoes.any(
-        (echo) => !echo.dead && echo.type == _FutureEchoType.claim,
-      ),
-    };
+    if (borrowBoostRemaining(kind) > 0) return true;
+    final type = _echoFor(kind);
+    return echoes.any((echo) => !echo.dead && echo.type == type);
   }
+
+  double borrowBoostRemaining(_DebtKind kind) =>
+      kind == _DebtKind.move ? moveBoost : reversalBoost;
+
+  _FutureEchoType _echoFor(_DebtKind kind) =>
+      kind == _DebtKind.move ? _FutureEchoType.runner : _FutureEchoType.anchor;
 
   bool _canSpawnClaim() => FutureDebtRules.canSpawnEnemy(
     kills: claimsDefeated,
@@ -270,21 +357,15 @@ class _FutureDebtGame {
 
   double get debtAmount =>
       bills.fold(0.0, (sum, bill) => sum + bill.duration) +
-      locks.values.fold(
-        0.0,
-        (sum, value) => sum + (value == -1 ? _totalDefaultTime : value),
-      );
+      locks.values.fold(0.0, (sum, value) => sum + value) +
+      _totalDefaultTime;
+
   String get formName {
-    final debt = debtAmount;
-    return debt < 4
-        ? 'PRIME'
-        : debt < 10
-        ? 'LEVERAGED'
-        : debt < 18
-        ? 'OVERDRAWN'
-        : debt < 28
-        ? 'DEFAULTING'
-        : 'OWNED';
+    if (totalDefaultActive) return 'DEFAULT';
+    if (hasCollector) return 'IN COLLECTION';
+    if (hasAnyLock) return 'SEIZED';
+    if (bills.length > 1) return 'OVERDRAWN';
+    return hasOutstandingDebt ? 'LEVERAGED' : 'PRIME';
   }
 
   _FutureZone? get currentZone {
@@ -298,10 +379,18 @@ class _FutureDebtGame {
     _random = math.Random(_layoutSeed ^ 0x39AB71);
     phase = _FuturePhase.playing;
     player = const Offset(1515, 1010);
-    camera = Offset.zero;
+    cameraCenter = player;
     moveDirection = Offset.zero;
+    velocity = Offset.zero;
     aimDirection = const Offset(1, 0);
     dashDirection = const Offset(1, 0);
+    dashOrigin = player;
+    dashRemaining = 0;
+    _borrowedDash = false;
+    _lastClearGhostPosition = null;
+    lastShotAt = double.negativeInfinity;
+    lastHitAt = double.negativeInfinity;
+    stride = 0;
     time = 0;
     lifetime =
         (FutureDebtRules.startingLifetimeForLevel(_campaignLevel) +
@@ -320,7 +409,6 @@ class _FutureDebtGame {
     shootBoost = 0;
     reversalBoost = 0;
     screenShake = 0;
-    selectedDelay = 6;
     totalBorrowed = 0;
     totalRepaid = 0;
     defaults = 0;
@@ -340,6 +428,8 @@ class _FutureDebtGame {
     shots.clear();
     enemyShots.clear();
     particles.clear();
+    pulses.clear();
+    ghostTrail.clear();
     echoes.clear();
     collector = null;
     levelExit = null;
@@ -349,23 +439,18 @@ class _FutureDebtGame {
     }
     _buildMaze();
     _followCamera(immediate: true);
-    _flash('$caseTitle — $caseInstruction');
+    _flash(caseInstruction);
     GameFeedback.selection();
   }
 
-  void cancelTransientInput() => moveDirection = Offset.zero;
+  void cancelTransientInput() {
+    moveDirection = Offset.zero;
+    velocity = Offset.zero;
+  }
 
   void setPace(_FutureDebtPace pace) {
     if (phase != _FuturePhase.intro) return;
     _pace = pace;
-  }
-
-  void selectDelay(double delay) {
-    selectedDelay = delay;
-    _flash(
-      'MATURITY SET TO ${delay.round()} SECONDS — later credit costs more.',
-    );
-    GameFeedback.selection();
   }
 
   void update(double dt, Offset input, Offset aimInput, bool firing) {
@@ -386,7 +471,6 @@ class _FutureDebtGame {
     }
     if (_totalDefaultTime > 0) {
       _totalDefaultTime = math.max(0, _totalDefaultTime - dt);
-      if (_totalDefaultTime == 0) locks[_DebtKind.life] = 0;
     }
     if (_defaultWasActive && !totalDefaultActive) {
       score += 900 + _plan.act * 180;
@@ -397,22 +481,22 @@ class _FutureDebtGame {
     _collectDueBills();
     _openLevelExitIfReady();
 
-    if (input.distance > .1 && !isLocked(_DebtKind.move)) {
-      final direction = normalizedOr(input);
-      moveDirection = direction;
-      dashDirection = direction;
-      final speed = 205 * (moveBoost > 0 ? 2 : 1) * _anchorSlowdown;
-      final dx = direction.dx * speed * input.distance.clamp(0.0, 1.0) * dt;
-      final dy = direction.dy * speed * input.distance.clamp(0.0, 1.0) * dt;
-      player = moveBoost > 0
-          ? _clampWorld(player + Offset(dx, dy), playerRadius)
-          : _moveCircle(player, playerRadius, dx, dy);
-      _emitMovementTrail(dt);
+    if (dashRemaining > 0) {
+      _advanceDash(dt);
     } else {
-      moveDirection = Offset.zero;
-      movementTrailTimer = 0;
+      _advancePlayer(dt, input);
     }
     _updatePortals(dt);
+    if (moveBoost > 0 && !_blocked(player, playerRadius)) {
+      _lastClearGhostPosition = player;
+    }
+    ghostTrail.removeWhere((frame) => time - frame.time > .28);
+    if (moveBoost > 0 &&
+        (ghostTrail.isEmpty ||
+            (ghostTrail.last.position - player).distanceSquared >= 14 * 14)) {
+      if (ghostTrail.length >= 7) ghostTrail.removeAt(0);
+      ghostTrail.add((position: player, time: time));
+    }
     _manualAimActive = aimInput.distance > .1;
     if (_manualAimActive) {
       aimDirection = normalizedOr(aimInput, fallback: aimDirection);
@@ -467,44 +551,25 @@ class _FutureDebtGame {
       _flash(reason);
       return;
     }
-    final interest = FutureDebtRules.interestForDelay(selectedDelay);
+    const maturity = FutureDebtRules.maturitySeconds;
+    final interest = FutureDebtRules.interestForDelay(maturity);
+    final amount = kind == _DebtKind.move ? 1.7 : 1.5;
     switch (kind) {
       case _DebtKind.move:
-        moveBoost = math.max(moveBoost, 2.4);
-        _schedule(kind, 1.7 * interest);
-        totalBorrowed += 1.7;
-        _flash(
-          'GHOST WAGE — phase through walls and hostile bullets. A Runner Echo matures in ${selectedDelay.round()}s.',
-        );
-      case _DebtKind.shoot:
-        shootBoost = math.max(shootBoost, 2.4);
-        _schedule(kind, 1.6 * interest);
-        totalBorrowed += 1.6;
-        _flash(
-          'COMPOUND FIRE — triple-shot now. An Auditor Echo matures in ${selectedDelay.round()}s.',
-        );
-        _burst(player, 28, _FutureParticleType.compound);
+        moveBoost = 2.4;
+        _lastClearGhostPosition = player;
+        _powerPulse(player, const Color(0xFF9DEDF4), 52);
+        _flash('GHOST WAGE — phase through walls and hostile bullets.');
       case _DebtKind.dash:
-        reversalBoost = math.max(reversalBoost, 2.4);
-        _schedule(kind, 1.5 * interest);
-        totalBorrowed += 1.5;
-        _flash(
-          'REVERSE PAYMENT — hostile bullets and damage rebound. An Anchor Echo matures in ${selectedDelay.round()}s.',
-        );
-      case _DebtKind.life:
-        _grantLifetime(8);
-        _schedule(kind, 8 * interest);
-        totalBorrowed += 8;
-        _flash(
-          'CASH OUT TOMORROW — +8 seconds now. A Maturity Claim is waiting.',
-        );
+        reversalBoost = 2.4;
+        _powerPulse(player, _futureLilac, 56);
+        _flash('REVERSE PAYMENT — hostile bullets and damage rebound.');
     }
+    bills.add(_FutureBill(kind, amount * interest, time + maturity, player));
+    totalBorrowed += amount;
     _burst(player, 13, _FutureParticleType.borrow);
     GameFeedback.selection();
   }
-
-  void _schedule(_DebtKind kind, double duration) =>
-      bills.add(_FutureBill(kind, duration, time + selectedDelay, player));
 
   void _collectDueBills() {
     for (var index = bills.length - 1; index >= 0; index--) {
@@ -513,57 +578,25 @@ class _FutureDebtGame {
       bills.removeAt(index);
       _applyBill(bill);
     }
-    final locked = [
-      _DebtKind.move,
-      _DebtKind.shoot,
-      _DebtKind.dash,
-    ].where((kind) => locks[kind]! > 0).length;
-    if (locked >= 3 && !totalDefaultActive) {
-      _totalDefaultTime = [
-        locks[_DebtKind.move]!,
-        locks[_DebtKind.shoot]!,
-        locks[_DebtKind.dash]!,
-        .9,
-      ].reduce(math.max);
-      locks[_DebtKind.move] = 0;
-      locks[_DebtKind.shoot] = 0;
-      locks[_DebtKind.dash] = 0;
-      locks[_DebtKind.life] = -1;
+    if (_plan.act >= 2 &&
+        !totalDefaultActive &&
+        locks.values.every((value) => value > 0)) {
+      _totalDefaultTime = locks.values.reduce(math.max);
+      for (final kind in _DebtKind.values) {
+        locks[kind] = 0;
+      }
       defaults++;
       _defaultWasActive = true;
       screenShake = 12;
-      _flash(
-        'TOTAL DEFAULT — all controls seized. Survive it for a ×6 payout.',
-      );
+      _flash('TOTAL DEFAULT — all controls seized.');
       GameFeedback.heavyImpact();
     }
   }
 
   void _applyBill(_FutureBill bill) {
-    if (bill.kind == _DebtKind.life) {
-      locks[_DebtKind.life] = math.max(locks[_DebtKind.life]!, bill.duration);
-      totalRepaid += bill.duration;
-      echoes.add(
-        _FutureEcho(
-          _FutureEchoType.claim,
-          bill.origin,
-          radius: 17,
-          health: 7,
-          life: bill.duration + 3,
-          value: bill.duration,
-        ),
-      );
-      screenShake = 7;
-      _flash('MATURITY CLAIM — destroy it to release your time credit.');
-      return;
-    }
     locks[bill.kind] = math.max(locks[bill.kind]!, bill.duration);
     totalRepaid += bill.duration;
-    final type = bill.kind == _DebtKind.move
-        ? _FutureEchoType.runner
-        : bill.kind == _DebtKind.shoot
-        ? _FutureEchoType.auditor
-        : _FutureEchoType.anchor;
+    final type = _echoFor(bill.kind);
     echoes.add(
       _FutureEcho(
         type,
@@ -575,7 +608,7 @@ class _FutureDebtGame {
     );
     _burst(bill.origin, 18, _FutureParticleType.debt);
     _flash(
-      'DEBT MATURED — ${bill.kind.name.toUpperCase()} seized for ${bill.duration.toStringAsFixed(1)}s.',
+      'DEBT MATURED — ${bill.kind.name.toUpperCase()} temporarily seized.',
     );
     GameFeedback.mediumImpact();
   }
@@ -608,11 +641,14 @@ class _FutureDebtGame {
     bills.clear();
     echoes.clear();
     _totalDefaultTime = 0;
+    _defaultWasActive = false;
     for (final kind in _DebtKind.values) {
       locks[kind] = 0;
     }
-    moveBoost = 0;
-    shootBoost = 0;
+    if (moveBoost > 0) {
+      moveBoost = 0;
+      _reconcileAfterPhase();
+    }
     reversalBoost = 0;
     // I charge an immediate time fee so Bankruptcy is a risky conversion, not
     // a way to keep borrowed life while erasing every consequence.
@@ -641,50 +677,21 @@ class _FutureDebtGame {
       storedDirection: dashDirection,
       fireDirection: aimDirection,
     );
-    final borrowed = dashCharges > 0;
-    for (var index = 0; index < 12; index++) {
-      if (borrowed) {
-        player = _clampWorld(player + direction * 10, playerRadius);
-        final wall = _wallAtCircle(player, playerRadius);
-        if (wall != null) _damageWall(wall, 2.2, player);
-      } else {
-        player = _moveCircle(
-          player,
-          playerRadius,
-          direction.dx * 8,
-          direction.dy * 8,
-        );
-      }
-    }
-    invulnerable = .3;
-    dashCooldown = borrowed ? .12 : 1.15;
-    if (borrowed) dashCharges--;
-    screenShake = 6;
-    _burst(player, 22, _FutureParticleType.dash);
-
-    // KINETIC DISCHARGE: Dash shockwave destroys close enemy bullets and repels enemies
-    enemyShots.removeWhere((shot) {
-      final hit = (shot.position - player).distance < 64;
-      if (hit) _burst(shot.position, 6, _FutureParticleType.spark);
-      return hit;
-    });
-    for (final e in enemies) {
-      final delta = e.position - player;
-      final dist = delta.distance;
-      if (dist < 75 && dist > 0.01) {
-        final push = (delta / dist) * 120.0;
-        e.position = _clampWorld(e.position + push, e.radius);
-        e.health -= 0.6;
-        if (e.health <= 0) _killEnemy(e);
-        _burst(e.position, 8, _FutureParticleType.hit);
-      }
-    }
-    ArcadeShake.shake(0.3);
+    _borrowedDash = dashCharges > 0;
+    if (_borrowedDash) dashCharges--;
+    dashOrigin = player;
+    _dashTravelDirection = direction;
+    dashRemaining = _dashDuration;
+    velocity = Offset.zero;
+    invulnerable = math.max(invulnerable, _dashDuration + .3);
+    dashCooldown = _dashDuration + (_borrowedDash ? .12 : 1.15);
+    _burst(player, 8, _FutureParticleType.dash);
+    _powerPulse(player, _futureGold, 36, direction: -direction);
     GameFeedback.lightImpact();
   }
 
   void _fire() {
-    if (isLocked(_DebtKind.shoot) || shotCooldown > 0) return;
+    if (totalDefaultActive || shotCooldown > 0) return;
     aimDirection = _aimWithAssist();
     final spread = shootBoost > 0 ? const [-.13, 0.0, .13] : const [0.0];
     for (final offset in spread) {
@@ -692,7 +699,7 @@ class _FutureDebtGame {
       final direction = Offset(math.cos(angle), math.sin(angle));
       _addPlayerShot(
         _FutureShot(
-          player + direction * 25,
+          player + direction * (playerRadius - 4),
           direction * 610,
           radius: 4,
           damage: 1,
@@ -700,6 +707,7 @@ class _FutureDebtGame {
         ),
       );
     }
+    lastShotAt = time;
     shotCooldown = shootBoost > 0 ? .085 : .18;
     GameFeedback.shot();
     _burst(
@@ -756,15 +764,27 @@ class _FutureDebtGame {
     for (final wall in walls) {
       if (wall.destructible && wall.health <= 0) continue;
       final hit = _rayRectDistance(origin, direction, wall.bounds.inflate(2));
-      if (hit != null && hit > 0 && hit < distance) return false;
+      if (hit != null && hit < distance) return false;
     }
     return true;
   }
 
   void _reconcileAfterPhase() {
+    final lastClear = _lastClearGhostPosition;
+    _lastClearGhostPosition = null;
     if (!_blocked(player, playerRadius)) return;
-    // I search from the player's last position first so phasing through a
-    // barricade never arbitrarily teleports a run across the whole map.
+    final trappedAt = player;
+    if (lastClear != null &&
+        (lastClear - player).distanceSquared < 176 * 176 &&
+        !_blocked(lastClear, playerRadius)) {
+      player = lastClear;
+      velocity = Offset.zero;
+      _powerPulse(trappedAt, const Color(0xFF9DEDF4), 30);
+      _powerPulse(player, const Color(0xFF9DEDF4), 42);
+      _flash('GHOST WAGE EXPIRED — back at the last clear footing.');
+      return;
+    }
+    // Find nearby free footing when the last valid position is too far away.
     for (var ring = 1; ring <= 8; ring++) {
       final radius = ring * 18.0;
       for (var step = 0; step < 16; step++) {
@@ -775,6 +795,8 @@ class _FutureDebtGame {
         );
         if (!_blocked(candidate, playerRadius)) {
           player = candidate;
+          velocity = Offset.zero;
+          _powerPulse(player, const Color(0xFF9DEDF4), 42);
           _flash('GHOST WAGE EXPIRED — position reconciled outside the lien.');
           return;
         }
@@ -783,6 +805,8 @@ class _FutureDebtGame {
     player =
         _randomOpenPoint(player, minimumDistance: 0) ??
         const Offset(1515, 1010);
+    velocity = Offset.zero;
+    _powerPulse(player, const Color(0xFF9DEDF4), 42);
     _flash('GHOST WAGE EXPIRED — emergency relocation posted.');
   }
 
@@ -790,30 +814,45 @@ class _FutureDebtGame {
     if (!_canSpawnClaim()) return false;
     var type = force ?? _FutureEnemyType.hound;
     final roll = _random.nextDouble();
+    final liveClaims = enemies.where((enemy) => !enemy.dead).length;
     if (force == null) {
       if ((_plan.objective == _FutureObjectiveKind.reflectAudit || time > 10) &&
           roll > .5) {
         type = _FutureEnemyType.auditor;
       }
-      if ((time > 24 || _plan.act > 0) && roll > .78) {
+      if ((time > 14 || _plan.act > 0) && roll > .78) {
         type = _FutureEnemyType.interest;
       }
       if ((time > 46 || _plan.act > 1) && roll > .94) {
         type = _FutureEnemyType.bailiff;
       }
+      // The second claimant teaches ranged fire early, even in the first case.
+      if (claimsDefeated + liveClaims == 1) type = _FutureEnemyType.auditor;
     }
     final radius = _enemyRadius(type);
+    if (force == null && time < 2 && enemies.isEmpty && claimsDefeated == 0) {
+      const entrance = Offset(1808, 1046);
+      if ((entrance - player).distance > 235 &&
+          !_pointInWall(entrance, radius) &&
+          _hasClearShot(entrance, player)) {
+        enemies.add(_FutureEnemy(entrance, type, 1));
+        return true;
+      }
+    }
     Offset position = const Offset(60, 60);
     var found = false;
     for (var attempt = 0; attempt < 30; attempt++) {
       final angle = _random.nextDouble() * math.pi * 2;
-      final distance = 560 + _random.nextDouble() * 650;
+      final openingFight = time < 2 && enemies.isEmpty && claimsDefeated == 0;
+      final distance = openingFight
+          ? 340 + _random.nextDouble() * 140
+          : 560 + _random.nextDouble() * 650;
       position = _clampWorld(
         player + Offset(math.cos(angle), math.sin(angle)) * distance,
         radius,
       );
       if (!_pointInWall(position, radius) &&
-          (position - player).distance > 500 &&
+          (position - player).distance > (openingFight ? 330 : 500) &&
           !portals.any(
             (portal) =>
                 (position - portal.position).distance < portal.radius + radius,
@@ -827,87 +866,20 @@ class _FutureDebtGame {
     return true;
   }
 
-  void _updateShots(double dt) {
-    for (final shot in shots) {
-      shot.position += shot.velocity * dt;
-      shot.life -= dt;
-      if (shot.life <= 0) {
-        shot.dead = true;
-        continue;
-      }
-      final wall = _pointWall(shot.position, shot.radius);
-      if (wall != null) {
-        if (wall.destructible) {
-          _damageWall(wall, shot.damage, shot.position);
-        } else {
-          _burst(shot.position, 3, _FutureParticleType.spark);
-        }
-        shot.dead = true;
-        continue;
-      }
-      for (final enemy in enemies) {
-        if (enemy.dead ||
-            (enemy.position - shot.position).distance >=
-                enemy.radius + shot.radius) {
-          continue;
-        }
-        enemy.health -= shot.damage;
-        _burst(shot.position, 5, _FutureParticleType.spark);
-        shot.dead = true;
-        if (enemy.health <= 0) _killEnemy(enemy);
-        break;
-      }
-      if (shot.dead) continue;
-      for (final echo in echoes) {
-        if (echo.dead ||
-            echo.type == _FutureEchoType.anchor ||
-            (echo.position - shot.position).distance >=
-                echo.radius + shot.radius) {
-          continue;
-        }
-        _hitEcho(shot, echo);
-        shot.dead = true;
-        break;
-      }
-      if (shot.dead) continue;
-      if (collector != null &&
-          (collector!.position - shot.position).distance <
-              collector!.radius + shot.radius) {
-        collector!.health -= shot.damage * .35;
-        _burst(shot.position, 3, _FutureParticleType.repay);
-        shot.dead = true;
-      }
-    }
-    shots.removeWhere((shot) => shot.dead);
-
-    for (final shot in enemyShots) {
-      shot.position += shot.velocity * dt;
-      shot.life -= dt;
-      if (shot.life <= 0 || _pointWall(shot.position, shot.radius) != null) {
-        shot.dead = true;
-      } else if ((shot.position - player).distance <
-          shot.radius + playerRadius) {
-        if (moveBoost > 0) {
-          continue;
-        }
-        if (reversalBoost > 0) {
-          _reverseShot(shot);
-        } else {
-          _hitPlayer(
-            shot.type == _FutureShotType.echo ? 2.2 : 2.6,
-            source: shot.position,
-          );
-        }
-        shot.dead = true;
-      }
-    }
-    enemyShots.removeWhere((shot) => shot.dead);
-    enemies.removeWhere((enemy) => enemy.dead);
-  }
-
   void _updateEnemies(double dt) {
     for (final enemy in enemies) {
       if (enemy.dead) continue;
+      final previous = enemy.position;
+      enemy.impulse = dampOffset(enemy.impulse, .00004, dt);
+      if (enemy.impulse.distanceSquared > 4) {
+        final step = enemy.impulse * dt;
+        enemy.position = _moveCircle(
+          enemy.position,
+          enemy.radius,
+          step.dx,
+          step.dy,
+        );
+      }
       final vector = player - enemy.position;
       final distance = vector.distance;
       final angle = math.atan2(vector.dy, vector.dx);
@@ -925,6 +897,7 @@ class _FutureDebtGame {
         enemy.shotTimer -= dt;
         if (enemy.shotTimer <= 0 && distance < 520) {
           enemy.shotTimer = 1.45;
+          enemy.lastShotAt = time;
           _shootEnemy(enemy.position, angle, 230, 6, _FutureShotType.audit);
         }
       } else {
@@ -948,7 +921,13 @@ class _FutureDebtGame {
           }
         }
       }
-      if (distance < enemy.radius + playerRadius + 2) {
+      enemy.stride += (enemy.position - previous).distance * .13;
+      if (circlesOverlap(
+        player,
+        playerRadius + 2,
+        enemy.position,
+        enemy.radius,
+      )) {
         _hitPlayer(
           enemy.type == _FutureEnemyType.bailiff
               ? 3.8
@@ -957,7 +936,9 @@ class _FutureDebtGame {
               : 1.8,
           source: enemy.position,
         );
-        _tryMoveEnemy(enemy, -math.cos(angle) * 30, -math.sin(angle) * 30);
+        if (enemy.impulse.distanceSquared < 165 * 165) {
+          enemy.impulse = normalizedOr(-vector) * 165;
+        }
       }
     }
   }
@@ -1006,72 +987,28 @@ class _FutureDebtGame {
     for (final echo in echoes) {
       if (echo.dead) continue;
       echo.life -= dt;
-      final vector = player - echo.position;
-      final distance = vector.distance;
-      final angle = math.atan2(vector.dy, vector.dx);
-      switch (echo.type) {
-        case _FutureEchoType.runner:
+      if (echo.type == _FutureEchoType.runner) {
+        final vector = player - echo.position;
+        final direction = normalizedOr(vector);
+        final step = direction * (185 * dt);
+        echo.position = _moveCircle(
+          echo.position,
+          echo.radius,
+          step.dx,
+          step.dy,
+        );
+        if (vector.distance < echo.radius + playerRadius + 4) {
+          _hitPlayer(1.6, source: echo.position);
+          final recoil = direction * -40;
           echo.position = _moveCircle(
             echo.position,
             echo.radius,
-            math.cos(angle) * 185 * dt,
-            math.sin(angle) * 185 * dt,
+            recoil.dx,
+            recoil.dy,
           );
-          if (distance < echo.radius + playerRadius + 4) {
-            _hitPlayer(1.6, source: echo.position);
-            echo.position -= Offset(math.cos(angle), math.sin(angle)) * 40;
-          }
-        case _FutureEchoType.auditor:
-          echo.shotTimer -= dt;
-          if (echo.shotTimer <= 0) {
-            echo.shotTimer = .85;
-            _shootEnemy(echo.position, angle, 260, 5, _FutureShotType.echo);
-          }
-          if (distance > 340) {
-            echo.position = _moveCircle(
-              echo.position,
-              echo.radius,
-              math.cos(angle) * 65 * dt,
-              math.sin(angle) * 65 * dt,
-            );
-          }
-        case _FutureEchoType.anchor:
-          break;
-        case _FutureEchoType.claim:
-          echo.position = _moveCircle(
-            echo.position,
-            echo.radius,
-            math.cos(angle) * 105 * dt,
-            math.sin(angle) * 105 * dt,
-          );
-          if (distance < echo.radius + playerRadius + 3) {
-            if (reversalBoost > 0) {
-              _reflectDamage(echo.position, echo.value);
-            } else {
-              lifetime -= echo.value;
-              _burst(player, 26, _FutureParticleType.gold);
-              echo.dead = true;
-              locks[_DebtKind.life] = 0;
-              screenShake = 13;
-              _flash(
-                'CLAIM COLLECTED — paid ${echo.value.toStringAsFixed(1)}s of borrowed life.',
-              );
-            }
-          }
-      }
-      if (echo.life <= 0 && !echo.dead) {
-        if (echo.type == _FutureEchoType.claim) {
-          lifetime -= echo.value;
-          locks[_DebtKind.life] = 0;
-          echo.dead = true;
-          _burst(echo.position, 26, _FutureParticleType.gold);
-          _flash(
-            'MATURITY CLAIM ENFORCED — paid ${echo.value.toStringAsFixed(1)}s of borrowed life.',
-          );
-        } else {
-          _settleEcho(echo);
         }
       }
+      if (echo.life <= 0) _settleEcho(echo);
     }
     echoes.removeWhere((echo) => echo.dead);
   }
@@ -1090,15 +1027,14 @@ class _FutureDebtGame {
           _flash('LIFE SHARD — +3.5s lifetime.');
         case _FuturePickupKind.writeoff:
           forgiveDebt(2);
-        case _FuturePickupKind.ghost:
-          moveBoost = math.max(moveBoost, 3.6);
-          _flash('GHOST DROP — free wall phase and bullet slip.');
         case _FuturePickupKind.compound:
           shootBoost = math.max(shootBoost, 3.6);
-          _flash('COMPOUND DROP — free overcharge.');
-        case _FuturePickupKind.reverse:
-          reversalBoost = math.max(reversalBoost, 3.6);
-          _flash('REVERSE DROP — incoming fire rebounds.');
+          _powerPulse(player, const Color(0xFFFF9C6D), 44);
+          _flash('COMPOUND FIRE — triple-shot overcharge.');
+        case _FuturePickupKind.cashOut:
+          _grantLifetime(8);
+          _powerPulse(player, _futureGold, 47);
+          _flash('CASH OUT — +8s lifetime.');
         case _FuturePickupKind.caseFile:
           recordsRecovered++;
           score += 240;
@@ -1125,7 +1061,7 @@ class _FutureDebtGame {
     for (final portal in portals) {
       portal.phase += dt * (1.4 + portal.index * .14);
     }
-    if (portalCooldown > 0) return;
+    if (portalCooldown > 0 || dashRemaining > 0) return;
     for (final portal in portals) {
       if ((portal.position - player).distance > portal.radius + playerRadius) {
         continue;
@@ -1134,6 +1070,8 @@ class _FutureDebtGame {
       if (destination == null) return;
       final origin = player;
       player = destination;
+      ghostTrail.clear();
+      _followCamera(immediate: true);
       portalCooldown = .8;
       invulnerable = math.max(invulnerable, .35);
       screenShake = math.max(screenShake, 6);
@@ -1212,6 +1150,7 @@ class _FutureDebtGame {
     target.shotTimer -= dt;
     if (target.shotTimer <= 0) {
       target.shotTimer = 1.2;
+      target.lastShotAt = time;
       _shootEnemy(target.position, angle, 240, 7, _FutureShotType.collector);
     }
     if ((target.position - player).distance < target.radius + playerRadius) {
@@ -1227,53 +1166,32 @@ class _FutureDebtGame {
       ArcadeShake.shake(0.5);
       ArcadeFlash.flash(const Color(0x66FF4F7F));
       ArcadeHitStop.freeze(0.08);
-      ArcadeFever.charge(0.35, currentMusicTheme: 'battle_theme');
+      ArcadeFever.charge(0.35, switchMusic: false);
       ArcadeAchievements.unlock('default_survivor');
     }
   }
 
   void _hitEcho(_FutureShot shot, _FutureEcho echo) {
     echo.health -= shot.damage;
-    _burst(
-      shot.position,
-      5,
-      echo.type == _FutureEchoType.claim
-          ? _FutureParticleType.gold
-          : _FutureParticleType.debt,
-    );
+    _burst(shot.position, 5, _FutureParticleType.debt);
     if (echo.health > 0) return;
-    score += echo.type == _FutureEchoType.claim ? 1000 : 350;
-    if (echo.type == _FutureEchoType.claim) {
-      _flash(
-        'MATURITY CLAIM DESTROYED — escaped the big payment and recovered +2s.',
-      );
-    }
-    _burst(
-      echo.position,
-      20,
-      echo.type == _FutureEchoType.claim
-          ? _FutureParticleType.gold
-          : _FutureParticleType.debt,
-    );
-    _settleEcho(echo, recoveredClaim: echo.type == _FutureEchoType.claim);
+    score += 350;
+    _burst(echo.position, 20, _FutureParticleType.debt);
+    _settleEcho(echo);
   }
 
-  void _settleEcho(_FutureEcho echo, {bool recoveredClaim = false}) {
+  void _settleEcho(_FutureEcho echo) {
     if (echo.dead) return;
     echo.dead = true;
     maturitiesSurvived++;
-    if (echo.type == _FutureEchoType.claim) {
-      locks[_DebtKind.life] = 0;
-      if (recoveredClaim) _grantLifetime(2);
-    }
   }
 
   void _killEnemy(_FutureEnemy enemy) {
     enemy.dead = true;
     claimsDefeated++;
     score += (enemy.value * _plan.rewardMultiplier).round();
-    ArcadeFever.charge(0.06, currentMusicTheme: 'battle_theme');
-    if (debtAmount >= 16) {
+    ArcadeFever.charge(0.06, switchMusic: false);
+    if (_DebtKind.values.every(_hasOutstandingCredit)) {
       ArcadeAchievements.unlock('credit_limit');
     }
     _grantLifetime(
@@ -1319,12 +1237,13 @@ class _FutureDebtGame {
         ),
       );
     }
-    if (_random.nextDouble() < powerChance * .65) {
-      final power = [
-        _FuturePickupKind.ghost,
-        _FuturePickupKind.compound,
-        _FuturePickupKind.reverse,
-      ][_random.nextInt(3)];
+    if (_random.nextDouble() < powerChance) {
+      final power = switch (enemy.type) {
+        _FutureEnemyType.hound ||
+        _FutureEnemyType.interest => _FuturePickupKind.cashOut,
+        _FutureEnemyType.auditor ||
+        _FutureEnemyType.bailiff => _FuturePickupKind.compound,
+      };
       _addPickup(
         _FuturePickup(
           enemy.position + const Offset(-10, 0),
@@ -1345,14 +1264,14 @@ class _FutureDebtGame {
     );
     if (wall.health > 0) return;
     wall.health = 0;
-    wallsBreached++;
+    if (!wall.crate) wallsBreached++;
     screenShake = math.max(screenShake, 7);
     _burst(
       wall.bounds.center,
       wall.secret ? 32 : 18,
       wall.secret ? _FutureParticleType.gold : _FutureParticleType.wall,
     );
-    score += wall.secret ? 420 : 70;
+    score += wall.secret ? 420 : (wall.crate ? 40 : 70);
     if (wall.secret || _random.nextDouble() < .22) {
       _addPickup(
         _FuturePickup(
@@ -1365,18 +1284,23 @@ class _FutureDebtGame {
   }
 
   void _reverseShot(_FutureShot shot) {
+    _powerPulse(
+      shot.position,
+      _futureLilac,
+      37,
+      direction: normalizedOr(-shot.velocity),
+    );
     _addPlayerShot(
       _FutureShot(
         shot.position,
         -shot.velocity * 1.45,
         radius: shot.radius,
-        damage: shot.type == _FutureShotType.echo ? 2.2 : 2.6,
+        damage: 2.6,
         life: math.min(1.7, shot.life),
         charged: true,
       ),
     );
-    if (shot.type == _FutureShotType.audit ||
-        shot.type == _FutureShotType.echo) {
+    if (shot.type == _FutureShotType.audit) {
       auditReturns++;
       _flash(
         'AUDIT RETURN POSTED — $auditReturns / ${_plan.objectiveTarget} shots returned.',
@@ -1395,6 +1319,10 @@ class _FutureDebtGame {
     }
     lifetime -= amount;
     invulnerable = .6;
+    lastHitAt = time;
+    if (source != null && dashRemaining == 0 && !isLocked(_DebtKind.move)) {
+      velocity += normalizedOr(player - source, fallback: Offset.zero) * 115;
+    }
     screenShake = 9;
     _burst(player, 16, _FutureParticleType.hit);
     GameFeedback.lightImpact();
@@ -1420,8 +1348,8 @@ class _FutureDebtGame {
       echo.health -= reflectedDamage;
       _burst(echo.position, 10, _FutureParticleType.compound);
       if (echo.health <= 0) {
-        score += echo.type == _FutureEchoType.claim ? 1000 : 350;
-        _settleEcho(echo, recoveredClaim: echo.type == _FutureEchoType.claim);
+        score += 350;
+        _settleEcho(echo);
       }
       return;
     }
@@ -1436,22 +1364,37 @@ class _FutureDebtGame {
     for (final particle in particles) {
       particle.age += dt;
       particle.position += particle.velocity * dt;
-      particle.velocity *= .94;
+      particle.velocity = dampOffset(particle.velocity, .00058, dt);
     }
     particles.removeWhere((particle) => particle.age >= particle.life);
+    for (final pulse in pulses) {
+      pulse.age += dt;
+    }
+    pulses.removeWhere((pulse) => pulse.age >= _FuturePowerPulse.life);
+  }
+
+  void _powerPulse(
+    Offset position,
+    Color color,
+    double radius, {
+    Offset? direction,
+  }) {
+    if (pulses.length >= 20) pulses.removeAt(0);
+    pulses.add(_FuturePowerPulse(position, color, radius, direction));
   }
 
   void _emitMovementTrail(double dt) {
     movementTrailTimer -= dt;
     if (movementTrailTimer > 0) return;
     movementTrailTimer = moveBoost > 0 ? .035 : .075;
-    final side = Offset(-moveDirection.dy, moveDirection.dx);
+    final travel = normalizedOr(velocity, fallback: moveDirection);
+    final side = Offset(-travel.dy, travel.dx);
     final count = moveBoost > 0 ? 2 : 1;
     for (var index = 0; index < count; index++) {
       _addParticle(
         _FutureParticle(
-          player - moveDirection * (9 + _random.nextDouble() * 8),
-          -moveDirection * (42 + _random.nextDouble() * 65) +
+          player - travel * (9 + _random.nextDouble() * 8),
+          -travel * (42 + _random.nextDouble() * 65) +
               side * ((_random.nextDouble() - .5) * 34),
           _FutureParticleType.trail,
           .24 + _random.nextDouble() * .18,
@@ -1503,21 +1446,9 @@ class _FutureDebtGame {
   }
 
   void _followCamera({double dt = 0, bool immediate = false}) {
-    final target = Offset(
-      (player.dx - width / 2).clamp(0.0, worldWidth - width).toDouble(),
-      (player.dy - height / 2).clamp(0.0, worldHeight - height).toDouble(),
-    );
-    camera = immediate
-        ? target
-        : camera + (target - camera) * math.min(1, dt * 7.5);
-  }
-
-  Offset _moveCircle(Offset position, double radius, double dx, double dy) {
-    var result = position + Offset(dx, 0);
-    if (_blocked(result, radius)) result = position;
-    final vertical = result + Offset(0, dy);
-    if (!_blocked(vertical, radius)) result = vertical;
-    return _clampWorld(result, radius);
+    cameraCenter = immediate
+        ? player
+        : cameraCenter + (player - cameraCenter) * math.min(1, dt * 7.5);
   }
 
   Offset _clampWorld(Offset position, double radius) => Offset(
@@ -1559,51 +1490,6 @@ class _FutureDebtGame {
 
   bool _pointInWall(Offset point, double radius) =>
       _pointWall(point, radius) != null;
-
-  /// Returns the first blocking wall along a flashlight ray. The painter uses
-  /// this rather than a circular light mask so the beam finishes at walls.
-  double _flashlightRayDistance(
-    Offset origin,
-    double angle,
-    double maximumDistance,
-  ) {
-    final direction = Offset(math.cos(angle), math.sin(angle));
-    var closest = maximumDistance;
-    for (final wall in walls) {
-      if (wall.destructible && wall.health <= 0) continue;
-      final hit = _rayRectDistance(origin, direction, wall.bounds.inflate(1));
-      if (hit != null && hit >= 0 && hit < closest) closest = hit;
-    }
-    return closest;
-  }
-
-  double? _rayRectDistance(Offset origin, Offset direction, Rect rect) {
-    var enter = 0.0;
-    var exit = double.infinity;
-
-    bool clip(
-      double originAxis,
-      double directionAxis,
-      double low,
-      double high,
-    ) {
-      if (directionAxis.abs() < .000001) {
-        return originAxis >= low && originAxis <= high;
-      }
-      final near = (low - originAxis) / directionAxis;
-      final far = (high - originAxis) / directionAxis;
-      enter = math.max(enter, math.min(near, far)).toDouble();
-      exit = math.min(exit, math.max(near, far)).toDouble();
-      return enter <= exit;
-    }
-
-    if (!clip(origin.dx, direction.dx, rect.left, rect.right) ||
-        !clip(origin.dy, direction.dy, rect.top, rect.bottom) ||
-        exit < 0) {
-      return null;
-    }
-    return enter >= 0 ? enter : exit;
-  }
 
   /// Finds a destination the player can occupy, away from the portal entrance
   /// and every gate so a transit cannot immediately loop into another transit.
@@ -1757,6 +1643,24 @@ class _FutureDebtGame {
       }
     }
     _addCampaignGeometry();
+    for (final center in const [
+      Offset(1286, 1010),
+      Offset(1322, 1037),
+      Offset(1745, 939),
+      Offset(1781, 967),
+      Offset(1775, 1170),
+      Offset(930, 835),
+      Offset(2117, 1160),
+      Offset(1220, 1475),
+    ]) {
+      if (!_blocked(center, 26)) {
+        _addWall(center.dx - 17, center.dy - 16, 34, 32, hp: 3, crate: true);
+      }
+    }
+    const openingShard = Offset(1662, 1000);
+    if (!_blocked(openingShard, 11)) {
+      _addPickup(_FuturePickup(openingShard, _FuturePickupKind.time, .4));
+    }
     for (final position in const [
       Offset(290, 220),
       Offset(1700, 840),
@@ -1765,6 +1669,7 @@ class _FutureDebtGame {
     ]) {
       _addPortal(position);
     }
+    _buildArenaScenery();
   }
 
   void _addPortal(Offset preferredPosition) {
@@ -1889,6 +1794,7 @@ class _FutureDebtGame {
     double hp = 8,
     bool destructible = true,
     bool secret = false,
+    bool crate = false,
   }) {
     walls.add(
       _FutureWall(
@@ -1896,6 +1802,7 @@ class _FutureDebtGame {
         hp: hp,
         destructible: destructible,
         secret: secret,
+        crate: crate,
       ),
     );
   }
@@ -1921,11 +1828,13 @@ class _FutureWall {
     required double hp,
     required this.destructible,
     required this.secret,
+    required this.crate,
   }) : health = hp,
        maxHealth = hp;
   final Rect bounds;
   final bool destructible;
   final bool secret;
+  final bool crate;
   final double maxHealth;
   double health;
 }
@@ -1976,6 +1885,10 @@ class _FutureEnemy {
   final double steer;
   double health;
   double shotTimer = .8;
+  double lastShotAt = double.negativeInfinity;
+  double lastHitAt = double.negativeInfinity;
+  double stride = 0;
+  Offset impulse = Offset.zero;
   double pulseTimer = 1.8;
   bool dead = false;
   double get maxHealth => switch (type) {
@@ -2006,7 +1919,6 @@ class _FutureEcho {
     required this.radius,
     required this.health,
     required this.life,
-    this.value = 0,
   }) : maxHealth = health;
   final _FutureEchoType type;
   Offset position;
@@ -2014,8 +1926,6 @@ class _FutureEcho {
   final double maxHealth;
   double health;
   double life;
-  final double value;
-  double shotTimer = .35;
   bool dead = false;
 }
 
@@ -2048,6 +1958,8 @@ class _FutureCollector {
   double health;
   final double maxHealth;
   double shotTimer = 1;
+  double lastShotAt = double.negativeInfinity;
+  double lastHitAt = double.negativeInfinity;
 }
 
 class _FutureParticle {
@@ -2063,5 +1975,16 @@ class _FutureParticle {
   final _FutureParticleType type;
   final double life;
   final double size;
+  double age = 0;
+}
+
+class _FuturePowerPulse {
+  _FuturePowerPulse(this.position, this.color, this.radius, this.direction);
+
+  static const life = .46;
+  final Offset position;
+  final Color color;
+  final double radius;
+  final Offset? direction;
   double age = 0;
 }

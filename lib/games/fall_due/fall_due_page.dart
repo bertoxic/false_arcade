@@ -32,7 +32,7 @@ class _FallDuePageState extends State<FallDuePage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     GamePresentation.enterLandscape();
-    GameFeedback.playMusic('platform_theme');
+    GameFeedback.playMusic(_FallDueGame.musicTheme);
     _game = _FallDueGame(
       campaignLevel: widget.level?.number ?? 1,
       campaign: widget.level,
@@ -81,10 +81,7 @@ class _FallDuePageState extends State<FallDuePage>
       _isAnyPressed({LogicalKeyboardKey.space, LogicalKeyboardKey.arrowUp}),
     );
     _game.setSlam(
-      _isAnyPressed({
-        LogicalKeyboardKey.keyS,
-        LogicalKeyboardKey.arrowDown,
-      }),
+      _isAnyPressed({LogicalKeyboardKey.keyS, LogicalKeyboardKey.arrowDown}),
     );
 
     if (freshPress && key == LogicalKeyboardKey.keyQ) {
@@ -125,6 +122,14 @@ class _FallDuePageState extends State<FallDuePage>
   void _clearInput() {
     _pressedKeys.clear();
     _game.clearInput();
+  }
+
+  void _selectPlayfieldTarget(Offset point, Size size) {
+    final viewport = LogicalViewport.fit(size, _duePlayfieldSize);
+    if (!viewport.screenWorldRect.contains(point)) return;
+    final worldPoint = viewport.screenToWorld(point) + Offset(_game.camera, 0);
+    final padding = (10 / viewport.scale).clamp(6.0, 24.0);
+    setState(() => _game.selectTargetAt(worldPoint, padding));
   }
 
   void _setPaused(bool value) {
@@ -192,482 +197,383 @@ class _FallDuePageState extends State<FallDuePage>
   @override
   Widget build(BuildContext context) {
     final game = _game;
+    final stageIndex = game.phase == _DuePhase.intro
+        ? game._initialLevelIndex
+        : game.levelIndex;
+    final landscape =
+        _DueLandscape.values[stageIndex % _DueLandscape.values.length];
+    final playing = game.phase == _DuePhase.playing;
     return Scaffold(
+      backgroundColor: _dueInk,
       body: Focus(
         focusNode: _gameFocus,
         autofocus: true,
         onKeyEvent: _onKeyEvent,
-        child: DecoratedBox(
-          decoration: const BoxDecoration(
-            gradient: RadialGradient(
-              center: Alignment(0, -1),
-              radius: 1.3,
-              colors: [Color(0xFF202A43), Color(0xFF0B0E15), Color(0xFF030406)],
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _DueBackdrop(landscape, camera: game.camera),
+            LayoutBuilder(
+              builder: (context, bounds) => GestureDetector(
+                key: const ValueKey('fall-due-playfield'),
+                behavior: HitTestBehavior.opaque,
+                onTapUp: playing && !_paused
+                    ? (event) => _selectPlayfieldTarget(
+                        event.localPosition,
+                        bounds.biggest,
+                      )
+                    : null,
+                child: RepaintBoundary(
+                  child: CustomPaint(painter: _FallPainter(game, landscape)),
+                ),
+              ),
             ),
-          ),
-          child: SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final compact = constraints.maxHeight < 520;
-                return Column(
+            SafeArea(
+              child: LayoutBuilder(
+                builder: (context, bounds) => Stack(
                   children: [
-                    Offstage(
-                      offstage: true,
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          18,
-                          compact ? 6 : 10,
-                          18,
-                          0,
-                        ),
-                        child: Row(
-                          children: [
-                            const Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'FALL DUE',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 17,
-                                    letterSpacing: 2.1,
-                                  ),
-                                ),
-                                Text(
-                                  'BORROW GRAVITY. PAY IT BACK.',
-                                  style: TextStyle(
-                                    color: Color(0xFF9BB5D2),
-                                    fontSize: 9,
-                                    letterSpacing: 1,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Spacer(),
-                            _DueStat(
-                              label: 'HEARTS',
-                              value: '♥ ${game.lives}',
-                              color: const Color(0xFFFF7186),
-                            ),
-                            const SizedBox(width: 8),
-                            _DueStat(
-                              label: 'SEALS',
-                              value:
-                                  '${game.collectedSeals}/${game.seals.length}',
-                              color: const Color(0xFFFFD86E),
-                            ),
-                            const SizedBox(width: 8),
-                            _DueStat(
-                              label: 'SCORE',
-                              value: '${game.score}',
-                              color: const Color(0xFF8CFFB1),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: Center(
-                          child: SizedBox.expand(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: const Color(0xFF3A4A67),
-                                  ),
-                                ),
-                                child: ArcadeScreenFilter(
-                                  child: Stack(
-                                    children: [
-                                    Positioned.fill(
-                                      child: CustomPaint(
-                                        painter: _FallPainter(game),
-                                      ),
-                                    ),
-                                    Positioned(
-                                      top: 60,
-                                      left: 12,
-                                      right: 12,
-                                      child: IgnorePointer(
-                                        child: _DueArenaHud(game: game),
-                                      ),
-                                    ),
-                                    Positioned(
-                                      top: 12,
-                                      left: 12,
-                                      child: GameExitButton(
-                                        onExit: () =>
-                                            Navigator.of(context).pop(),
-                                      ),
-                                    ),
-                                    if (game.phase == _DuePhase.playing)
-                                      Positioned(
-                                        top: 12,
-                                        right: 12,
-                                        child: GamePauseButton(
-                                          onTap: () => _setPaused(true),
-                                        ),
-                                      ),
-                                    Positioned(
-                                      left: 14,
-                                      bottom: 14,
-                                      child: Row(
-                                        children: [
-                                          HoldGameButton(
-                                            label: 'LEFT',
-                                            icon: Icons.chevron_left_rounded,
-                                            color: const Color(0xFF8DE1FF),
-                                            size: compact ? 76 : 88,
-                                            onChanged: (value) => setState(
-                                              () => game.left = value,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 7),
-                                          HoldGameButton(
-                                            label: 'RIGHT',
-                                            icon: Icons.chevron_right_rounded,
-                                            color: const Color(0xFF8DE1FF),
-                                            size: compact ? 76 : 88,
-                                            onChanged: (value) => setState(
-                                              () => game.right = value,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Positioned(
-                                      right: 14,
-                                      bottom: 14,
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.end,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              HoldGameButton(
-                                                label: 'SLAM',
-                                                icon: Icons
-                                                    .keyboard_double_arrow_down_rounded,
-                                                color: const Color(0xFFFF7186),
-                                                size: compact ? 62 : 72,
-                                                onChanged: (value) => setState(
-                                                  () => game.setSlam(value),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 7),
-                                              HoldGameButton(
-                                                label: 'BORROW',
-                                                icon:
-                                                    Icons.arrow_upward_rounded,
-                                                color: const Color(0xFFFFD86E),
-                                                size: compact ? 70 : 80,
-                                                onChanged: (value) => setState(
-                                                  () => game.setBorrow(value),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 7),
-                                          Row(
-                                            children: [
-                                              TapGameButton(
-                                                label: 'CYCLE',
-                                                icon:
-                                                    Icons.track_changes_rounded,
-                                                color: const Color(0xFFB3A0FF),
-                                                width: compact ? 56 : 67,
-                                                onTap: () =>
-                                                    setState(game.cycleTarget),
-                                              ),
-                                              const SizedBox(width: 7),
-                                              TapGameButton(
-                                                label: 'GIVE',
-                                                icon: Icons.north_east_rounded,
-                                                color: const Color(0xFF8CFFB1),
-                                                width: compact ? 56 : 67,
-                                                onTap: () =>
-                                                    setState(game.transferDebt),
-                                              ),
-                                              const SizedBox(width: 7),
-                                              TapGameButton(
-                                                label: 'TAKE',
-                                                icon: Icons.south_west_rounded,
-                                                color: const Color(0xFFFFD86E),
-                                                width: compact ? 56 : 67,
-                                                onTap: () =>
-                                                    setState(game.stealDebt),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    if (game.phase == _DuePhase.intro)
-                                      _DueOverlay(
-                                        title: 'FALL DUE',
-                                        copy:
-                                            'Jump and feather BORROW to glide. SLAM down to discharge debt into a destructive shockwave. TAKE unweights crates into lifts and PARRIES plasma back at turrets. GIVE anchors bridges and crushes enemies. Touch blue SAVE beacons to keep your progress.',
-                                        button: 'ENTER THE LEDGER',
-                                        onTap: () => setState(game.start),
-                                        showLoop: true,
-                                      ),
-                                    if (game.phase == _DuePhase.dead)
-                                      _DueOverlay(
-                                        title: 'FELL DUE',
-                                        copy: game.message,
-                                        button: 'RESUME FROM SAVE',
-                                        onTap: () =>
-                                            setState(game.retryFromCheckpoint),
-                                        danger: true,
-                                      ),
-                                    if (game.phase == _DuePhase.stageClear)
-                                      if (widget.level != null)
-                                        CampaignMissionClearOverlay(
-                                          level: widget.level!,
-                                          score: game.score,
-                                          elapsedSeconds: _elapsedSeconds,
-                                          accent: const Color(0xFF8DE1FF),
-                                          onNextLevel: _continueCampaign,
-                                          onExit: () =>
-                                              Navigator.of(context).pop(),
-                                        )
-                                      else
-                                        _DueOverlay(
-                                          title: 'STAGE CLEAR',
-                                          copy: game.message,
-                                          button: 'NEXT STAGE',
-                                          onTap: () => setState(game.nextStage),
-                                        ),
-                                    if (game.phase == _DuePhase.won)
-                                      if (widget.level != null)
-                                        CampaignMissionClearOverlay(
-                                          level: widget.level!,
-                                          score: game.score,
-                                          elapsedSeconds: _elapsedSeconds,
-                                          accent: const Color(0xFF8DE1FF),
-                                          onNextLevel: _continueCampaign,
-                                          onExit: () =>
-                                              Navigator.of(context).pop(),
-                                        )
-                                      else
-                                        _DueOverlay(
-                                          title: 'DEBT SETTLED',
-                                          copy:
-                                              'The campaign account is clear. Continue into escalating contract runs, or replay the authored audit.',
-                                          button: 'ENTER CONTRACT RUNS',
-                                          onTap: () => setState(
-                                            game.startEndlessContracts,
-                                          ),
-                                          secondaryButton: 'REPLAY CAMPAIGN',
-                                          onSecondaryTap: () =>
-                                              setState(game.start),
-                                        ),
-                                    if (_paused)
-                                      GamePauseOverlay(
-                                        gameName: 'FALL DUE',
-                                        onResume: () => _setPaused(false),
-                                        onRestart: () {
-                                          _loop.setPaused(false);
-                                          setState(() {
-                                            _paused = false;
-                                            game.start();
-                                          });
-                                          _gameFocus.requestFocus();
-                                        },
-                                        onExit: () =>
-                                            Navigator.of(context).pop(),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              ),
-                            ),
+                    if (playing) ...[
+                      Positioned(
+                        top: bounds.maxWidth < 370 ? 56 : 9,
+                        left: bounds.maxWidth < 370 ? 9 : 61,
+                        right: bounds.maxWidth < 370 ? 9 : 61,
+                        child: IgnorePointer(
+                          child: _DueArenaHud(
+                            game: game,
+                            landscape: landscape,
+                            campaign: widget.level != null,
+                            compact: bounds.maxWidth < 560,
                           ),
                         ),
                       ),
-                    ),
-                    Offstage(
-                      offstage: true,
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          18,
-                          0,
-                          18,
-                          compact ? 6 : 10,
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.info_outline_rounded,
-                              color: Color(0xFFFFD86E),
-                              size: 15,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                '${game.message}   •   Keyboard: A/D move · Space jump · W borrow · S slam · Q give · E take · F cycle',
-                                style: const TextStyle(
-                                  color: Color(0xFFBAC8DF),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
+                      Positioned(
+                        top: 7,
+                        right: 8,
+                        child: _DueIconButton(
+                          icon: Icons.pause_rounded,
+                          tooltip: 'Pause game',
+                          onTap: () => _setPaused(true),
                         ),
                       ),
+                      Positioned(
+                        left: 8,
+                        right: 8,
+                        bottom: 8,
+                        child: _DueControls(
+                          game: game,
+                          availableSize: bounds.biggest,
+                        ),
+                      ),
+                    ],
+                    if (game.phase == _DuePhase.intro)
+                      _DueOverlay(
+                        landscape: landscape,
+                        title: 'Fall Due',
+                        copy:
+                            'Borrow gravity to glide and Slam to discharge it. Tap a target, then Give or Take its weight. Collect seals and touch blue Save beacons to keep your progress.',
+                        button: 'ENTER THE LEDGER',
+                        onTap: () => setState(game.start),
+                      ),
+                    if (game.phase == _DuePhase.dead)
+                      _DueOverlay(
+                        title: 'Fell Due',
+                        copy: game.message,
+                        button: 'RESUME FROM SAVE',
+                        onTap: () => setState(game.retryFromCheckpoint),
+                        danger: true,
+                      ),
+                    if (game.phase == _DuePhase.stageClear ||
+                        game.phase == _DuePhase.won)
+                      if (widget.level case final level?)
+                        CampaignMissionClearOverlay(
+                          level: level,
+                          score: game.score,
+                          elapsedSeconds: _elapsedSeconds,
+                          accent: _dueGold,
+                          onNextLevel: _continueCampaign,
+                          onExit: () => Navigator.of(context).pop(),
+                        )
+                      else if (game.phase == _DuePhase.stageClear)
+                        _DueOverlay(
+                          title: 'Stage Clear',
+                          copy: game.message,
+                          button: 'NEXT STAGE',
+                          onTap: () => setState(game.nextStage),
+                        )
+                      else
+                        _DueOverlay(
+                          title: 'Debt Settled',
+                          copy:
+                              'Continue into escalating contract runs or replay the campaign.',
+                          button: 'ENTER CONTRACT RUNS',
+                          onTap: () => setState(game.startEndlessContracts),
+                          secondaryButton: 'REPLAY CAMPAIGN',
+                          onSecondaryTap: () => setState(game.start),
+                        ),
+                    Positioned(
+                      top: 7,
+                      left: 8,
+                      child: _DueIconButton(
+                        icon: Icons.arrow_back_rounded,
+                        tooltip: 'Exit game',
+                        onTap: () => Navigator.of(context).pop(),
+                      ),
                     ),
+                    if (_paused)
+                      GamePauseOverlay(
+                        gameName: 'FALL DUE',
+                        onResume: () => _setPaused(false),
+                        onRestart: () {
+                          setState(game.start);
+                          _setPaused(false);
+                        },
+                        onExit: () => Navigator.of(context).pop(),
+                      ),
                   ],
-                );
-              },
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _DueStat extends StatelessWidget {
-  const _DueStat({
-    required this.label,
-    required this.value,
-    required this.color,
+class _DueIconButton extends StatelessWidget {
+  const _DueIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
   });
-  final String label;
-  final String value;
-  final Color color;
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          const Color(0xEE111A2B),
-          const Color(0xDD090F1B),
-        ],
-      ),
-      border: Border.all(
-        color: color.withValues(alpha: 0.38),
-        width: 1.2,
-      ),
-      borderRadius: BorderRadius.circular(8),
-      boxShadow: [
-        BoxShadow(
-          color: color.withValues(alpha: 0.12),
-          blurRadius: 6,
-          spreadRadius: -1,
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 7,
-            color: Color(0xFF90A4C8),
-            fontWeight: FontWeight.w900,
-            letterSpacing: .8,
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 11,
-            color: color,
-            fontWeight: FontWeight.w900,
-            letterSpacing: .3,
-          ),
-        ),
-      ],
+  Widget build(BuildContext context) => IconButton.filled(
+    onPressed: () {
+      GameFeedback.selection();
+      onTap();
+    },
+    icon: Icon(icon, size: 20),
+    tooltip: tooltip,
+    style: IconButton.styleFrom(
+      backgroundColor: const Color(0xDC2F2536),
+      foregroundColor: _dueCream,
+      minimumSize: const Size.square(44),
+      side: const BorderSide(color: Color(0x56FFE1AC)),
     ),
   );
 }
 
 class _DueArenaHud extends StatelessWidget {
-  const _DueArenaHud({required this.game});
+  const _DueArenaHud({
+    required this.game,
+    required this.landscape,
+    required this.campaign,
+    required this.compact,
+  });
 
   final _FallDueGame game;
+  final _DueLandscape landscape;
+  final bool campaign;
+  final bool compact;
 
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: const BoxDecoration(),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
+  Widget build(BuildContext context) {
+    final meterColor = game.inPayback ? _dueGold : _dueBlue;
+    final stage = campaign ? 'Stage ${game.stageNumber}' : game.stageProgress;
+    return Column(
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _DueHudTile(
+              label: 'HEARTS',
+              child: Semantics(
+                label: '${game.lives} of 5 hearts remaining',
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: List.generate(
+                    5,
+                    (index) => Icon(
+                      index < game.lives
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      color: index < game.lives
+                          ? _dueCoral
+                          : const Color(0xFF937C8C),
+                      size: compact ? 11 : 16,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            _DueHudTile(
+              label: 'SEALS',
+              child: Text(
+                '${game.collectedSeals}/${game.seals.length}',
+                style: const TextStyle(
+                  color: _dueGold,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  height: 1,
+                ),
+              ),
+            ),
+            if (!compact) ...[
+              if (game.lockedGates > 0) ...[
+                const SizedBox(width: 4),
+                _DueHudTile(
+                  label: 'LOCKS',
+                  child: Text(
+                    '${game.lockedGates}',
+                    style: const TextStyle(
+                      color: _dueCoral,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(width: 4),
+              _DueHudTile(
+                label: 'SCORE',
+                child: Text(
+                  '${game.score}',
+                  style: const TextStyle(
+                    color: _dueCream,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 6,
+                  ),
+                  child: Text(
+                    '${landscape.title}  ·  $stage',
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _dueCream,
+                      fontFamily: 'Georgia',
+                      fontFamilyFallback: ['Noto Serif', 'serif'],
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      shadows: [
+                        Shadow(
+                          color: _dueInk,
+                          blurRadius: 8,
+                          offset: Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ] else
+              const Spacer(),
+            _DueHudTile(
+              label: game.inPayback ? 'HEAVY' : 'GRAVITY',
+              child: SizedBox(
+                width: compact ? 53 : 103,
+                height: 12,
+                child: Row(
                   children: [
-                    const Text(
-                      'FALL DUE',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.3,
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: (game.gravityMeter / 100).clamp(0.0, 1.0),
+                          minHeight: 4,
+                          backgroundColor: const Color(0xFF5A4A61),
+                          color: meterColor,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 4),
                     Text(
-                      game.objectiveReadout,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF9BB5D2),
-                        fontSize: 7,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: .5,
+                      game.gravityReadout,
+                      style: TextStyle(
+                        color: meterColor,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        height: 1,
                       ),
                     ),
                   ],
                 ),
               ),
-              _DueStat(
-                label: 'HEARTS',
-                value: '♥ ${game.lives}',
-                color: const Color(0xFFFF7186),
-              ),
-              const SizedBox(width: 4),
-              _DueStat(
-                label: 'SEALS',
-                value: '${game.collectedSeals}/${game.seals.length}',
-                color: const Color(0xFFFFD86E),
-              ),
-              const SizedBox(width: 4),
-              _DueStat(
-                label: 'SCORE',
-                value: '${game.score}',
-                color: const Color(0xFF8CFFB1),
-              ),
-            ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xC52F2536),
+            borderRadius: BorderRadius.circular(9),
           ),
-          const SizedBox(height: 3),
-          Text(
-            game.message,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFFBAC8DF),
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Text(
+              game.message,
+              textAlign: TextAlign.center,
+              maxLines: compact ? 2 : 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: _dueCream,
+                fontSize: 9,
+                height: 1.20,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DueHudTile extends StatelessWidget {
+  const _DueHudTile({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+    decoration: BoxDecoration(
+      color: const Color(0xE42F2536),
+      border: Border.all(color: const Color(0x54FFE1AC)),
+      borderRadius: BorderRadius.circular(9),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFFE6CDB7),
+            fontWeight: FontWeight.w900,
+            fontSize: 8,
+            letterSpacing: .75,
+            height: 1,
+          ),
+        ),
+        const SizedBox(height: 3),
+        child,
+      ],
     ),
   );
 }
@@ -678,177 +584,110 @@ class _DueOverlay extends StatelessWidget {
     required this.copy,
     required this.button,
     required this.onTap,
+    this.landscape,
     this.danger = false,
-    this.showLoop = false,
     this.secondaryButton,
     this.onSecondaryTap,
   });
+
   final String title;
   final String copy;
   final String button;
   final VoidCallback onTap;
+  final _DueLandscape? landscape;
   final bool danger;
-  final bool showLoop;
   final String? secondaryButton;
   final VoidCallback? onSecondaryTap;
+
   @override
   Widget build(BuildContext context) => Positioned.fill(
     child: ColoredBox(
-      color: const Color(0xCA070910),
+      color: const Color(0x4921192C),
       child: Center(
         child: Container(
-          width: 430,
-          margin: const EdgeInsets.all(20),
-          padding: const EdgeInsets.all(23),
+          width: 370,
+          margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           decoration: BoxDecoration(
-            color: const Color(0xFF151B2A),
-            borderRadius: BorderRadius.circular(19),
-            border: Border.all(
-              color: danger ? const Color(0xFF954B5B) : const Color(0xFF526D96),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xF04A3545), Color(0xFA292330)],
             ),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: danger ? _dueCoral : const Color(0x89F7CB91),
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x5423192A),
+                blurRadius: 32,
+                offset: Offset(0, 10),
+              ),
+            ],
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                danger
-                    ? 'THE LEDGER COLLECTED'
-                    : 'A PLATFORMER ABOUT CONSEQUENCES',
-                style: const TextStyle(
-                  color: Color(0xFFFFD86E),
-                  fontSize: 9,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.1,
+          clipBehavior: Clip.antiAlias,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 19, 24, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (landscape case final scene?)
+                  Text(
+                    scene.title.toUpperCase(),
+                    style: const TextStyle(
+                      color: _dueGold,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: 'Georgia',
+                    fontFamilyFallback: const ['Noto Serif', 'serif'],
+                    fontSize: 41,
+                    height: 1.13,
+                    fontWeight: FontWeight.w700,
+                    color: danger ? _dueCoral : _dueCream,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
-                  color: danger ? const Color(0xFFFF8B9B) : Colors.white,
+                const SizedBox(height: 8),
+                Text(
+                  copy,
+                  style: const TextStyle(
+                    color: Color(0xFFF0DEC8),
+                    fontSize: 13,
+                    height: 1.36,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                copy,
-                style: const TextStyle(
-                  color: Color(0xFFC7D2E5),
-                  fontSize: 13,
-                  height: 1.35,
-                ),
-              ),
-              if (showLoop) ...[
-                const SizedBox(height: 15),
-                const _GravityLoopGuide(),
-              ],
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
+                const SizedBox(height: 14),
+                FilledButton(
                   onPressed: onTap,
                   style: FilledButton.styleFrom(
-                    backgroundColor: danger
-                        ? const Color(0xFFC44A62)
-                        : const Color(0xFF5979B6),
-                    foregroundColor: Colors.white,
+                    backgroundColor: danger ? _dueCoral : _dueGold,
+                    foregroundColor: _dueInk,
                   ),
                   child: Text(
                     button,
                     style: const TextStyle(
                       fontWeight: FontWeight.w900,
-                      letterSpacing: .7,
+                      letterSpacing: .65,
                     ),
                   ),
                 ),
-              ),
-              if (secondaryButton != null && onSecondaryTap != null) ...[
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
+                if (secondaryButton != null && onSecondaryTap != null)
+                  OutlinedButton(
                     onPressed: onSecondaryTap,
+                    style: OutlinedButton.styleFrom(foregroundColor: _dueCream),
                     child: Text(secondaryButton!),
                   ),
-                ),
               ],
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _GravityLoopGuide extends StatelessWidget {
-  const _GravityLoopGuide();
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-    decoration: BoxDecoration(
-      color: const Color(0xFF0D1320),
-      borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: const Color(0xFF344865)),
-    ),
-    child: const Row(
-      children: [
-        _LoopStep(number: '1', label: 'BORROW', color: Color(0xFF8DE1FF)),
-        Icon(Icons.arrow_forward_rounded, size: 13, color: Color(0xFF8E9DBB)),
-        _LoopStep(number: '2', label: 'GIVE', color: Color(0xFFFFD86E)),
-        Icon(Icons.arrow_forward_rounded, size: 13, color: Color(0xFF8E9DBB)),
-        _LoopStep(number: '3', label: 'TAKE', color: Color(0xFF8CFFB1)),
-        Icon(Icons.arrow_forward_rounded, size: 13, color: Color(0xFF8E9DBB)),
-        _LoopStep(number: '4', label: 'SLAM', color: Color(0xFFFF7186)),
-      ],
-    ),
-  );
-}
-
-class _LoopStep extends StatelessWidget {
-  const _LoopStep({
-    required this.number,
-    required this.label,
-    required this.color,
-  });
-
-  final String number;
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          width: 17,
-          height: 17,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          child: Text(
-            number,
-            style: const TextStyle(
-              color: Color(0xFF071018),
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
             ),
           ),
         ),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: 9,
-            fontWeight: FontWeight.w900,
-            letterSpacing: .5,
-          ),
-        ),
-      ],
+      ),
     ),
   );
 }

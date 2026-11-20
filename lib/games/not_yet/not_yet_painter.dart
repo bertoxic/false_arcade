@@ -51,50 +51,90 @@ class GamePainter extends CustomPainter {
   }
 
   void _paintBackground(Canvas canvas) {
-    final center = Offset(480 + math.sin(game.time * .22) * 22, 248);
-    final paint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          game.holding ? const Color(0xFF243451) : const Color(0xFF172B41),
-          const Color(0xFF07101D),
-          const Color(0xFF04060B),
-        ],
-        stops: const [0, .48, 1],
-      ).createShader(Rect.fromCircle(center: center, radius: 650));
-    canvas.drawRect(
-      const Rect.fromLTWH(
-        0,
-        0,
-        RealityGame.worldWidth,
-        RealityGame.worldHeight,
-      ),
-      paint,
+    const arena = Rect.fromLTWH(
+      0,
+      0,
+      RealityGame.worldWidth,
+      RealityGame.worldHeight,
     );
-    final grid = Paint()
+    final accent = game.holding
+        ? const Color(0xFFFF527C)
+        : const Color(0xFF49DCEB);
+    canvas.drawRect(
+      arena,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(0, -.15),
+          radius: .85,
+          colors: [
+            game.holding ? const Color(0xFF302037) : const Color(0xFF102C3D),
+            const Color(0xFF09131F),
+            const Color(0xFF03070E),
+          ],
+          stops: const [0, .55, 1],
+        ).createShader(arena),
+    );
+
+    // Recessed floor plates give the arena scale without competing with combat.
+    final minor = Paint()
+      ..color = const Color(0xFF83C8D7).withValues(alpha: .055)
+      ..strokeWidth = 1;
+    final major = Paint()
+      ..color = accent.withValues(alpha: .11)
+      ..strokeWidth = 1;
+    for (var x = 0.0; x <= RealityGame.worldWidth; x += 40) {
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x, RealityGame.worldHeight),
+        (x % 160 == 0) ? major : minor,
+      );
+    }
+    for (var y = 0.0; y <= RealityGame.worldHeight; y += 40) {
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(RealityGame.worldWidth, y),
+        (y % 160 == 0) ? major : minor,
+      );
+    }
+    final cross = Paint()
+      ..color = accent.withValues(alpha: .19)
+      ..strokeWidth = 1;
+    for (var x = 80.0; x < RealityGame.worldWidth; x += 160) {
+      for (var y = 80.0; y < RealityGame.worldHeight; y += 160) {
+        canvas.drawLine(Offset(x - 3, y), Offset(x + 3, y), cross);
+        canvas.drawLine(Offset(x, y - 3), Offset(x, y + 3), cross);
+      }
+    }
+
+    // A segmented perimeter reads as an illuminated containment chamber.
+    final frame = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1
-      ..color =
-          (game.holding ? const Color(0xFF885069) : const Color(0xFF29415C))
-              .withValues(alpha: .38);
-    for (var x = -24.0; x <= RealityGame.worldWidth + 24; x += 48) {
-      canvas.drawLine(Offset(x, 0), Offset(x, RealityGame.worldHeight), grid);
-    }
-    for (var y = -12.0; y <= RealityGame.worldHeight + 12; y += 48) {
-      canvas.drawLine(Offset(0, y), Offset(RealityGame.worldWidth, y), grid);
-    }
-    final border = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..color = const Color(0xFF40577A).withValues(alpha: .58);
-    canvas.drawRect(
-      const Rect.fromLTWH(
-        1.5,
-        1.5,
-        RealityGame.worldWidth - 3,
-        RealityGame.worldHeight - 3,
-      ),
-      border,
+      ..color = accent.withValues(alpha: .24);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(arena.deflate(12), const Radius.circular(12)),
+      frame,
     );
+    final corner = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.square
+      ..strokeWidth = 3
+      ..color = accent.withValues(alpha: .65);
+    for (final point in [
+      const Offset(12, 12),
+      const Offset(948, 12),
+      const Offset(12, 528),
+      const Offset(948, 528),
+    ]) {
+      final dx = point.dx < 480 ? 1.0 : -1.0;
+      final dy = point.dy < 270 ? 1.0 : -1.0;
+      final path = Path()
+        ..moveTo(point.dx, point.dy + 24 * dy)
+        ..lineTo(point.dx, point.dy + 8 * dy)
+        ..quadraticBezierTo(point.dx, point.dy, point.dx + 8 * dx, point.dy)
+        ..lineTo(point.dx + 24 * dx, point.dy);
+      canvas.drawPath(path, corner);
+    }
   }
 
   void _paintDebtTethers(Canvas canvas) {
@@ -141,14 +181,20 @@ class GamePainter extends CustomPainter {
         Paint()..color = const Color(0xFF281C14),
       );
       canvas.drawRRect(
-        RRect.fromRectAndRadius(barrelRect.deflate(2), const Radius.circular(4)),
+        RRect.fromRectAndRadius(
+          barrelRect.deflate(2),
+          const Radius.circular(4),
+        ),
         Paint()..color = const Color(0xFFB56A2B),
       );
 
       // Hazard diagonal stripes
       canvas.save();
       canvas.clipRRect(
-        RRect.fromRectAndRadius(barrelRect.deflate(2), const Radius.circular(4)),
+        RRect.fromRectAndRadius(
+          barrelRect.deflate(2),
+          const Radius.circular(4),
+        ),
       );
       final stripePaint = Paint()
         ..color = const Color(0xFF2B190B)
@@ -258,10 +304,44 @@ class GamePainter extends CustomPainter {
       final color = enemy.pending
           ? const Color(0xFF7E4357)
           : _enemyColor(enemy.kind);
-      final glow = Paint()
-        ..color = color.withValues(alpha: enemy.pending ? .15 : .27);
-      canvas.drawCircle(enemy.position, enemy.radius + 7, glow);
-      final body = Paint()..color = color;
+      canvas.drawCircle(
+        enemy.position,
+        enemy.radius + 10,
+        Paint()
+          ..shader =
+              RadialGradient(
+                colors: [
+                  color.withValues(alpha: enemy.pending ? .14 : .26),
+                  color.withValues(alpha: 0),
+                ],
+              ).createShader(
+                Rect.fromCircle(
+                  center: enemy.position,
+                  radius: enemy.radius + 10,
+                ),
+              ),
+      );
+      canvas.drawCircle(
+        enemy.position,
+        enemy.radius + 4,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = .8
+          ..color = color.withValues(alpha: .4),
+      );
+      final body = Paint()
+        ..shader =
+            RadialGradient(
+              center: const Alignment(-.4, -.5),
+              colors: [
+                Color.lerp(color, Colors.white, .48)!,
+                color,
+                Color.lerp(color, Colors.black, .55)!,
+              ],
+              stops: const [0, .5, 1],
+            ).createShader(
+              Rect.fromCircle(center: enemy.position, radius: enemy.radius),
+            );
       final outline = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2
@@ -276,7 +356,8 @@ class GamePainter extends CustomPainter {
             ..strokeCap = StrokeCap.round;
           for (var i = 0; i < 3; i++) {
             final a = rotorAngle + (i * 2 * math.pi / 3);
-            final tip = enemy.position +
+            final tip =
+                enemy.position +
                 Offset(math.cos(a), math.sin(a)) * (enemy.radius + 3);
             canvas.drawLine(enemy.position, tip, bladePaint);
             canvas.drawCircle(
@@ -319,7 +400,22 @@ class GamePainter extends CustomPainter {
             ..lineTo(-enemy.radius * 0.2, 0)
             ..lineTo(-enemy.radius * 0.6, enemy.radius * 0.85)
             ..close();
-          canvas.drawPath(path, body);
+          canvas.drawPath(
+            path,
+            Paint()
+              ..shader =
+                  LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color.lerp(color, Colors.white, .4)!,
+                      color,
+                      Color.lerp(color, Colors.black, .5)!,
+                    ],
+                  ).createShader(
+                    Rect.fromCircle(center: Offset.zero, radius: enemy.radius),
+                  ),
+          );
           canvas.drawPath(path, outline);
           canvas.drawCircle(
             const Offset(3, 0),
@@ -442,9 +538,25 @@ class GamePainter extends CustomPainter {
         : game._overdriveTimer > 0
         ? const Color(0xFFFFD166)
         : const Color(0xFF63E8F6);
-    final glow = Paint()
-      ..color = color.withValues(alpha: player.invulnerable > 0 ? .14 : .32);
-    canvas.drawCircle(player.position, 28, glow);
+    canvas.drawCircle(
+      player.position,
+      40,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            color.withValues(alpha: player.invulnerable > 0 ? .18 : .32),
+            color.withValues(alpha: 0),
+          ],
+        ).createShader(Rect.fromCircle(center: player.position, radius: 40)),
+    );
+    canvas.drawCircle(
+      player.position,
+      25,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = color.withValues(alpha: .35),
+    );
     canvas.save();
     canvas.translate(player.position.dx, player.position.dy);
     canvas.rotate(math.atan2(player.aim.dy, player.aim.dx));
@@ -465,10 +577,11 @@ class GamePainter extends CustomPainter {
         canvas.drawPath(
           outerFlame,
           Paint()
-            ..color = (game.holding
-                    ? const Color(0xFFFF4870)
-                    : const Color(0xFF4EE8FF))
-                .withValues(alpha: 0.65),
+            ..color =
+                (game.holding
+                        ? const Color(0xFFFF4870)
+                        : const Color(0xFF4EE8FF))
+                    .withValues(alpha: 0.65),
         );
         final innerFlame = Path()
           ..moveTo(-7, ey - 1.2)
@@ -500,7 +613,16 @@ class GamePainter extends CustomPainter {
         ? const Color(0xFFEAFDFF)
         : color;
 
-    canvas.drawPath(hullPath, Paint()..color = shipColor);
+    canvas.drawPath(
+      hullPath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [const Color(0xFFE7FFFF), shipColor, const Color(0xFF145068)],
+          stops: const [0, .46, 1],
+        ).createShader(const Rect.fromLTWH(-9, -16, 31, 32)),
+    );
     canvas.drawPath(
       hullPath,
       Paint()
@@ -508,6 +630,16 @@ class GamePainter extends CustomPainter {
         ..strokeWidth = 1.6
         ..color = const Color(0xFF091420),
     );
+
+    // Insets split the wings into armor panels and keep the nose readable.
+    final panel = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = const Color(0xFF092534).withValues(alpha: .65);
+    canvas.drawLine(const Offset(-5, -11), const Offset(8, -3), panel);
+    canvas.drawLine(const Offset(-5, 11), const Offset(8, 3), panel);
+    canvas.drawLine(const Offset(-2, -5), const Offset(12, 0), panel);
+    canvas.drawLine(const Offset(-2, 5), const Offset(12, 0), panel);
 
     // Wingtip plasma cannon emitters
     final emitterPaint = Paint()..color = const Color(0xFFFFFFFF);
@@ -524,12 +656,12 @@ class GamePainter extends CustomPainter {
     );
 
     // Glowing cockpit canopy with glass reflection
-    final canopyRect =
-        Rect.fromCenter(center: const Offset(4, 0), width: 9, height: 5.5);
-    canvas.drawOval(
-      canopyRect,
-      Paint()..color = const Color(0xFF07121E),
+    final canopyRect = Rect.fromCenter(
+      center: const Offset(4, 0),
+      width: 9,
+      height: 5.5,
     );
+    canvas.drawOval(canopyRect, Paint()..color = const Color(0xFF07121E));
     canvas.drawOval(
       canopyRect.deflate(0.8),
       Paint()

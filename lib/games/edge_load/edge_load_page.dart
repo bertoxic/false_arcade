@@ -183,7 +183,7 @@ class _EdgeLoadPageState extends State<EdgeLoadPage>
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final compact = constraints.maxHeight < 470;
-                final control = compact ? 54.0 : 62.0;
+                final control = compact ? 68.0 : 76.0;
                 return Stack(
                   fit: StackFit.expand,
                   children: [
@@ -211,7 +211,7 @@ class _EdgeLoadPageState extends State<EdgeLoadPage>
                         left: 56,
                         child: _MansionRunHud(
                           game: game,
-                          width: compact ? 170 : 202,
+                          width: constraints.maxWidth < 420 ? 170 : 202,
                         ),
                       ),
                       Positioned(
@@ -219,7 +219,7 @@ class _EdgeLoadPageState extends State<EdgeLoadPage>
                         bottom: 16,
                         child: TouchStick(
                           key: ValueKey(_stickEpoch),
-                          size: compact ? 94 : 116,
+                          size: compact ? 116 : 140,
                           onChanged: _movement.setAnalog,
                         ),
                       ),
@@ -440,14 +440,20 @@ class _MansionStat extends StatelessWidget {
           letterSpacing: .45,
         ),
       ),
-      const Spacer(),
-      Text(
-        value,
-        style: const TextStyle(
-          color: Color(0xFFEAF2FF),
-          fontSize: 11,
-          height: 1,
-          fontWeight: FontWeight.w900,
+      const SizedBox(width: 4),
+      Expanded(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerRight,
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: Color(0xFFEAF2FF),
+              fontSize: 11,
+              height: 1,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
         ),
       ),
     ],
@@ -469,18 +475,23 @@ class _MansionMeter extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     children: [
       SizedBox(
-        width: 42,
-        child: Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: 7,
-            height: 1,
-            fontWeight: FontWeight.w900,
-            letterSpacing: .45,
+        width: 38,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 7,
+              height: 1,
+              fontWeight: FontWeight.w900,
+              letterSpacing: .45,
+            ),
           ),
         ),
       ),
+      const SizedBox(width: 4),
       Expanded(
         child: ClipRRect(
           borderRadius: BorderRadius.circular(3),
@@ -522,46 +533,48 @@ class _MansionOverlay extends StatelessWidget {
             color: danger ? const Color(0xFFFF6672) : const Color(0xFF72D6FF),
           ),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: danger
-                    ? const Color(0xFFFF6672)
-                    : const Color(0xFF72F1B8),
-                fontSize: 21,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.2,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: danger
+                      ? const Color(0xFFFF6672)
+                      : const Color(0xFF72F1B8),
+                  fontSize: 21,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.2,
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              copy,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFFC0CDDF),
-                height: 1.35,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: 14),
+              Text(
+                copy,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFFC0CDDF),
+                  height: 1.35,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: onTap,
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: Text(button),
-              style: FilledButton.styleFrom(
-                backgroundColor: danger
-                    ? const Color(0xFFC73D54)
-                    : const Color(0xFF297B99),
-                foregroundColor: Colors.white,
-                shape: const RoundedRectangleBorder(),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: onTap,
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: Text(button),
+                style: FilledButton.styleFrom(
+                  backgroundColor: danger
+                      ? const Color(0xFFC73D54)
+                      : const Color(0xFF297B99),
+                  foregroundColor: Colors.white,
+                  shape: const RoundedRectangleBorder(),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     ),

@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../core/canvas_text.dart';
 import '../../core/game_feedback.dart';
 import '../../core/game_loop.dart';
 import '../../core/level_campaign.dart';
@@ -13,14 +12,17 @@ import '../../core/gameplay.dart';
 import '../../core/logical_viewport.dart';
 import '../../core/arcade_achievements.dart';
 import '../../core/arcade_fever.dart';
-import '../../ui/arcade_screen_filter.dart';
 import '../../ui/game_controls.dart';
 import '../../ui/screen_shake.dart';
 
 part 'fall_due_page.dart';
+part 'fall_due_controls.dart';
 part 'fall_due_simulation.dart';
 part 'fall_due_painter.dart';
+part 'fall_due_scenery.dart';
 part 'fall_due_level_generator.dart';
+
+const _duePlayfieldSize = Size(FallDueTuning.viewWidth, FallDueTuning.viewHeight);
 
 /// Central tuning for Fall Due's deliberately arcade-like physics.
 ///
@@ -55,9 +57,14 @@ abstract final class FallDueTuning {
   static const slamSpeed = 820.0;
   static const shockwaveRadius = 80.0;
   static const dashImpulse = 350.0;
+  static const airDashDuration = .18;
   static const dashDebtCost = 22.0;
   static const parryRange = 170.0;
   static const parryBonusScore = 450;
+
+  static double airDashSpeedLimit(double remaining) =>
+      runSpeed + (dashImpulse - runSpeed) *
+          (remaining / airDashDuration).clamp(0.0, 1.0);
 
   /// Borrow starts as strong lift, then smoothly exhausts over the final 35%.
   static double borrowLiftAcceleration(double debt) {

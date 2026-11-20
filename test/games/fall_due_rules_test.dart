@@ -1,3 +1,5 @@
+import 'package:fluga/core/level_campaign.dart';
+import 'package:fluga/core/logical_viewport.dart';
 import 'package:fluga/games/fall_due/fall_due_game.dart';
 import 'package:fluga/ui/game_controls.dart';
 import 'package:flutter/material.dart';
@@ -5,6 +7,18 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('Fall Due gravity tuning', () {
+    test('air dash keeps its burst speed before returning to run speed', () {
+      expect(
+        FallDueTuning.airDashSpeedLimit(FallDueTuning.airDashDuration),
+        FallDueTuning.dashImpulse,
+      );
+      expect(
+        FallDueTuning.airDashSpeedLimit(FallDueTuning.airDashDuration / 2),
+        closeTo((FallDueTuning.runSpeed + FallDueTuning.dashImpulse) / 2, 1e-8),
+      );
+      expect(FallDueTuning.airDashSpeedLimit(0), FallDueTuning.runSpeed);
+    });
+
     test('borrow exhaustion is continuous and changes lift into payback', () {
       expect(FallDueTuning.borrowNetAcceleration(0), lessThan(0));
       expect(
@@ -60,25 +74,31 @@ void main() {
   });
 
   group('Fall Due procedural level generation', () {
-    test('contract stages generate sprawling long routes over 5,000 pixels', () {
-      final lengthRun1 = FallDueRules.generatedStageLength(6);
-      final lengthRun2 = FallDueRules.generatedStageLength(7);
-      expect(lengthRun1, greaterThan(5000));
-      expect(lengthRun2, greaterThan(5000));
-    });
+    test(
+      'contract stages generate sprawling long routes over 5,000 pixels',
+      () {
+        final lengthRun1 = FallDueRules.generatedStageLength(6);
+        final lengthRun2 = FallDueRules.generatedStageLength(7);
+        expect(lengthRun1, greaterThan(5000));
+        expect(lengthRun2, greaterThan(5000));
+      },
+    );
 
-    test('different contract runs produce unique layouts, titles, and sections', () {
-      final titleRun1 = FallDueRules.generatedStageTitle(6);
-      final titleRun2 = FallDueRules.generatedStageTitle(7);
-      expect(titleRun1, isNotEmpty);
-      expect(titleRun2, isNotEmpty);
-      expect(titleRun1, isNot(equals(titleRun2)));
+    test(
+      'different contract runs produce unique layouts, titles, and sections',
+      () {
+        final titleRun1 = FallDueRules.generatedStageTitle(6);
+        final titleRun2 = FallDueRules.generatedStageTitle(7);
+        expect(titleRun1, isNotEmpty);
+        expect(titleRun2, isNotEmpty);
+        expect(titleRun1, isNot(equals(titleRun2)));
 
-      final sections1 = FallDueRules.generatedStageSectionCount(6);
-      final sections2 = FallDueRules.generatedStageSectionCount(7);
-      expect(sections1, greaterThanOrEqualTo(3));
-      expect(sections2, greaterThanOrEqualTo(3));
-    });
+        final sections1 = FallDueRules.generatedStageSectionCount(6);
+        final sections2 = FallDueRules.generatedStageSectionCount(7);
+        expect(sections1, greaterThanOrEqualTo(3));
+        expect(sections2, greaterThanOrEqualTo(3));
+      },
+    );
   });
 
   group('Fall Due character powers tuning', () {
@@ -93,20 +113,23 @@ void main() {
       expect(FallDueTuning.parryBonusScore, greaterThanOrEqualTo(400));
     });
 
-    test('slam descent velocity scales with borrow power and requires borrow', () {
-      expect(FallDueRules.canInitiateSlam(0), isFalse);
-      expect(FallDueRules.canInitiateSlam(5), isFalse);
-      expect(FallDueRules.canInitiateSlam(8), isTrue);
-      expect(FallDueRules.canInitiateSlam(50), isTrue);
+    test(
+      'slam descent velocity scales with borrow power and requires borrow',
+      () {
+        expect(FallDueRules.canInitiateSlam(0), isFalse);
+        expect(FallDueRules.canInitiateSlam(5), isFalse);
+        expect(FallDueRules.canInitiateSlam(8), isTrue);
+        expect(FallDueRules.canInitiateSlam(50), isTrue);
 
-      expect(FallDueRules.slamDescentSpeed(0), 640.0);
-      expect(FallDueRules.slamDescentSpeed(50), 860.0);
-      expect(FallDueRules.slamDescentSpeed(100), 1080.0);
-      expect(
-        FallDueRules.slamDescentSpeed(100),
-        greaterThan(FallDueRules.slamDescentSpeed(20)),
-      );
-    });
+        expect(FallDueRules.slamDescentSpeed(0), 640.0);
+        expect(FallDueRules.slamDescentSpeed(50), 860.0);
+        expect(FallDueRules.slamDescentSpeed(100), 1080.0);
+        expect(
+          FallDueRules.slamDescentSpeed(100),
+          greaterThan(FallDueRules.slamDescentSpeed(20)),
+        );
+      },
+    );
 
     test('only highest borrow tier causes gravitational shockwaves', () {
       expect(FallDueRules.slamCausesShockwave(0), isFalse);
@@ -129,14 +152,17 @@ void main() {
   });
 
   group('Fall Due unique enemies with powers', () {
-    test('procedural generator spawns drones, heavy enforcers, and leechers', () {
-      final kinds = FallDueRules.generatedStageTargetKinds(6);
-      expect(kinds.contains('crate'), isTrue);
-      expect(kinds.contains('enemy'), isTrue);
-      expect(kinds.contains('drone'), isTrue);
-      expect(kinds.contains('heavy'), isTrue);
-      expect(kinds.contains('leecher'), isTrue);
-    });
+    test(
+      'procedural generator spawns drones, heavy enforcers, and leechers',
+      () {
+        final kinds = FallDueRules.generatedStageTargetKinds(6);
+        expect(kinds.contains('crate'), isTrue);
+        expect(kinds.contains('enemy'), isTrue);
+        expect(kinds.contains('drone'), isTrue);
+        expect(kinds.contains('heavy'), isTrue);
+        expect(kinds.contains('leecher'), isTrue);
+      },
+    );
 
     test('drone GIVE shoves downward and TAKE blasts across screen', () {
       expect(FallDueRules.droneGiveDownwardSpeed(), 750.0);
@@ -147,6 +173,52 @@ void main() {
       expect(FallDueRules.enemyTakeBlastSpeed(), greaterThan(500.0));
       expect(FallDueRules.enemyTakeBlastSpeed(), lessThan(1000.0));
     });
+  });
+
+  testWidgets('Fall Due taps select a crate through the fitted viewport', (
+    tester,
+  ) async {
+    const surface = Size(800, 600);
+    tester.view.physicalSize = surface;
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FallDuePage(level: GameLevelGenerator.generate('fall_due', 2)),
+      ),
+    );
+    await tester.tap(find.text('ENTER THE LEDGER'));
+    await tester.pump();
+
+    final viewport = LogicalViewport.fit(
+      surface,
+      const Size(FallDueTuning.viewWidth, FallDueTuning.viewHeight),
+    );
+    await tester.tapAt(viewport.worldToScreen(const Offset(652, 410)));
+    await tester.pump();
+    expect(find.textContaining('CRATE OUT OF RANGE'), findsOneWidget);
+
+    await tester.tap(find.text('TAKE'));
+    await tester.pump();
+    expect(find.textContaining('CRATE OUT OF RANGE'), findsOneWidget);
+
+    await tester.tapAt(const Offset(350, 60));
+    await tester.pump();
+    expect(find.textContaining('CRATE OUT OF RANGE'), findsOneWidget);
+
+    await tester.tapAt(viewport.worldToScreen(const Offset(450, 220)));
+    await tester.pump();
+    expect(find.textContaining('TARGET CLEARED'), findsOneWidget);
+
+    // This tap is just outside the crate bounds to check the touch padding.
+    await tester.tapAt(viewport.worldToScreen(const Offset(214, 410)));
+    await tester.pump();
+    expect(find.textContaining('SELECTED CRATE'), findsOneWidget);
+    await tester.tap(find.text('TAKE'));
+    await tester.pump();
+    expect(find.textContaining('YELLOW CRATE UNWEIGHTED'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Fall Due starts, accepts borrow, slam, and pauses cleanly', (
@@ -162,7 +234,7 @@ void main() {
     expect(find.text('SLAM'), findsOneWidget);
     expect(find.text('GIVE'), findsOneWidget);
     expect(find.text('TAKE'), findsOneWidget);
-    expect(find.text('CYCLE'), findsOneWidget);
+    expect(find.text('CYCLE'), findsNothing);
     expect(find.text('HEARTS'), findsOneWidget);
     expect(find.text('SEALS'), findsOneWidget);
     expect(find.text('PAYBACK'), findsNothing);
@@ -171,7 +243,9 @@ void main() {
     await tester.tap(find.text('SLAM'));
     await tester.pump(const Duration(milliseconds: 50));
 
-    final borrow = await tester.startGesture(tester.getCenter(find.text('BORROW')));
+    final borrow = await tester.startGesture(
+      tester.getCenter(find.text('BORROW')),
+    );
     await tester.pump(const Duration(milliseconds: 80));
     await borrow.up();
     await tester.pump();

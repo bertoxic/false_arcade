@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../core/arcade_achievements.dart';
 import '../core/arcade_fever.dart';
+import '../core/arcade_theme_palette.dart';
 import '../core/game_feedback.dart';
 import 'screen_shake.dart';
 
 /// Wraps game content with an authentic CRT arcade monitor overlay,
-/// screen shake, full-screen impact flashes, Fever border glow, and
-/// live achievement unlock notifications.
+/// screen shake, full-screen impact flashes, Fever border glow,
+/// live achievement unlock notifications, and retro hardware palette matrix filters.
 class ArcadeScreenFilter extends StatelessWidget {
   const ArcadeScreenFilter({super.key, required this.child});
 
@@ -19,7 +20,17 @@ class ArcadeScreenFilter extends StatelessWidget {
       child: Stack(
         fit: StackFit.passthrough,
         children: [
-          child,
+          ValueListenableBuilder<ArcadePalette>(
+            valueListenable: ArcadeThemeManager.current,
+            builder: (context, palette, _) {
+              final matrix = palette.colorMatrix;
+              if (matrix == null) return child;
+              return ColorFiltered(
+                colorFilter: ColorFilter.matrix(matrix),
+                child: child,
+              );
+            },
+          ),
           // 1. Full-screen screen flash on explosions / impacts
           ValueListenableBuilder<Color?>(
             valueListenable: ArcadeFlash.flashNotifier,
@@ -40,9 +51,7 @@ class ArcadeScreenFilter extends StatelessWidget {
             builder: (context, isFever, _) {
               if (!isFever) return const SizedBox.shrink();
               return const Positioned.fill(
-                child: IgnorePointer(
-                  child: _FeverBorderOverlay(),
-                ),
+                child: IgnorePointer(child: _FeverBorderOverlay()),
               );
             },
           ),
@@ -54,9 +63,7 @@ class ArcadeScreenFilter extends StatelessWidget {
               return const Positioned.fill(
                 child: IgnorePointer(
                   child: RepaintBoundary(
-                    child: CustomPaint(
-                      painter: _CrtOverlayPainter(),
-                    ),
+                    child: CustomPaint(painter: _CrtOverlayPainter()),
                   ),
                 ),
               );
@@ -141,91 +148,101 @@ class _AchievementNotificationBanner extends StatelessWidget {
       valueListenable: ArcadeAchievements.latestUnlockNotifier,
       builder: (context, achievement, _) {
         if (achievement == null) return const SizedBox.shrink();
-        return Align(
-          alignment: Alignment.topCenter,
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 20),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xF209121E),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: achievement.color,
-                width: 1.8,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: achievement.color.withValues(alpha: 0.45),
-                  blurRadius: 24,
-                  spreadRadius: 2,
+        return IgnorePointer(
+          child: Material(
+            type: MaterialType.transparency,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
                 ),
-                const BoxShadow(
-                  color: Colors.black87,
-                  blurRadius: 16,
-                  offset: Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: achievement.color.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: achievement.color),
-                  ),
-                  child: Icon(
-                    achievement.icon,
-                    color: achievement.color,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.military_tech_rounded,
-                          color: Color(0xFFFFD36A),
-                          size: 13,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'ACHIEVEMENT UNLOCKED',
-                          style: TextStyle(
-                            color: achievement.color,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                            fontFamily: 'PressStart2P',
-                            letterSpacing: 1.1,
-                          ),
-                        ),
-                      ],
+                decoration: BoxDecoration(
+                  color: const Color(0xF209121E),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: achievement.color, width: 1.8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: achievement.color.withValues(alpha: 0.45),
+                      blurRadius: 24,
+                      spreadRadius: 2,
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      achievement.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
+                    const BoxShadow(
+                      color: Colors.black87,
+                      blurRadius: 16,
+                      offset: Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: achievement.color.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: achievement.color),
+                      ),
+                      child: Icon(
+                        achievement.icon,
+                        color: achievement.color,
+                        size: 20,
                       ),
                     ),
-                    Text(
-                      achievement.description,
-                      style: const TextStyle(
-                        color: Color(0xFFBACADB),
-                        fontSize: 10,
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.military_tech_rounded,
+                                color: Color(0xFFFFD36A),
+                                size: 13,
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  'ACHIEVEMENT UNLOCKED',
+                                  style: TextStyle(
+                                    color: achievement.color,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                    fontFamily: 'PressStart2P',
+                                    letterSpacing: 1.1,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            achievement.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          Text(
+                            achievement.description,
+                            style: const TextStyle(
+                              color: Color(0xFFBACADB),
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
         );
@@ -264,20 +281,14 @@ class _CrtOverlayPainter extends CustomPainter {
       stops: const [0.0, 0.65, 0.88, 1.0],
     ).createShader(Offset.zero & size);
 
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()..shader = vignetteShader,
-    );
+    canvas.drawRect(Offset.zero & size, Paint()..shader = vignetteShader);
 
     // 3. Subtle glass highlight at the top edge
     final topGleam = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [
-          Colors.white.withValues(alpha: 0.025),
-          Colors.transparent,
-        ],
+        colors: [Colors.white.withValues(alpha: 0.025), Colors.transparent],
         stops: const [0.0, 0.15],
       ).createShader(Offset.zero & size);
 

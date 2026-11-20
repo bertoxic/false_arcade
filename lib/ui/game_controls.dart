@@ -3,13 +3,14 @@ import 'package:flutter/material.dart';
 import '../app/arcade_hall_of_fame_page.dart';
 import '../core/arcade_achievements.dart';
 import '../core/arcade_leaderboard.dart';
+import '../core/arcade_theme_palette.dart';
 import '../core/game_feedback.dart';
 import '../core/level_campaign.dart';
 
 
 
 class TouchStick extends StatefulWidget {
-  const TouchStick({super.key, required this.onChanged, this.size = 104});
+  const TouchStick({super.key, required this.onChanged, this.size = 128});
 
   final ValueChanged<Offset> onChanged;
   final double size;
@@ -144,8 +145,10 @@ class HoldGameButton extends StatefulWidget {
     required this.icon,
     required this.color,
     required this.onChanged,
-    this.size = 74,
+    this.size = 90,
     this.iconSize,
+    this.labelSize,
+    this.backgroundColor = const Color(0xEE0B1220),
   });
 
   final String label;
@@ -154,6 +157,8 @@ class HoldGameButton extends StatefulWidget {
   final ValueChanged<bool> onChanged;
   final double size;
   final double? iconSize;
+  final double? labelSize;
+  final Color backgroundColor;
 
   @override
   State<HoldGameButton> createState() => _HoldGameButtonState();
@@ -194,7 +199,7 @@ class _HoldGameButtonState extends State<HoldGameButton> {
             shape: BoxShape.circle,
             color: _held
                 ? widget.color.withValues(alpha: .85)
-                : const Color(0xEE0B1220),
+                : widget.backgroundColor,
             border: Border.all(
               color: widget.color.withValues(alpha: _held ? 1 : .72),
               width: _held ? 2.5 : 1.8,
@@ -220,7 +225,8 @@ class _HoldGameButtonState extends State<HoldGameButton> {
                 widget.label,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: widget.size >= 80 ? 10.5 : (widget.size >= 70 ? 9.5 : 8.5),
+                  fontSize: widget.labelSize ??
+                      (widget.size >= 80 ? 10.5 : (widget.size >= 70 ? 9.5 : 8.5)),
                   height: 1,
                   fontWeight: FontWeight.w900,
                   letterSpacing: .5,
@@ -244,7 +250,7 @@ class AimGameButton extends StatefulWidget {
     required this.color,
     required this.onFiringChanged,
     required this.onAimChanged,
-    this.size = 96,
+    this.size = 116,
   });
 
   final String label;
@@ -372,7 +378,8 @@ class TapGameButton extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.onTap,
-    this.width = 74,
+    this.width = 88,
+    this.height = 66,
   });
 
   final String label;
@@ -380,6 +387,7 @@ class TapGameButton extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
   final double width;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -396,7 +404,7 @@ class TapGameButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           child: Ink(
             width: width,
-            height: 54,
+            height: height,
             decoration: BoxDecoration(
               color: const Color(0xEE0B1220),
               borderRadius: BorderRadius.circular(16),
@@ -414,11 +422,11 @@ class TapGameButton extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, size: 19, color: color),
+                Icon(icon, size: 23 * height / 66, color: color),
                 Text(
                   label,
-                  style: const TextStyle(
-                    fontSize: 8,
+                  style: TextStyle(
+                    fontSize: 9 * height / 66,
                     fontWeight: FontWeight.w900,
                     letterSpacing: .5,
                   ),
@@ -535,84 +543,86 @@ class GamePauseOverlay extends StatelessWidget {
               BoxShadow(color: Color(0x66000000), blurRadius: 26),
             ],
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'RUN PAUSED',
-                style: TextStyle(
-                  color: Color(0xFF8FEAFF),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.4,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                gameName,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.5,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'The arena and timer are frozen. Resume when you are ready.',
-                style: TextStyle(
-                  color: Color(0xFFC3D0E7),
-                  fontSize: 13,
-                  height: 1.3,
-                ),
-              ),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: onResume,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF68DFF0),
-                    foregroundColor: const Color(0xFF07111A),
-                  ),
-                  child: const Text(
-                    'RESUME',
-                    style: TextStyle(fontWeight: FontWeight.w900),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'RUN PAUSED',
+                  style: TextStyle(
+                    color: Color(0xFF8FEAFF),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.4,
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => showGameFeedbackSettings(context),
-                  icon: const Icon(Icons.tune_rounded, size: 18),
-                  label: const Text(
-                    'FEEDBACK SETTINGS',
-                    style: TextStyle(fontWeight: FontWeight.w900),
+                const SizedBox(height: 5),
+                Text(
+                  gameName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: onRestart,
-                      child: const Text('RESTART'),
+                const SizedBox(height: 8),
+                const Text(
+                  'The arena and timer are frozen. Resume when you are ready.',
+                  style: TextStyle(
+                    color: Color(0xFFC3D0E7),
+                    fontSize: 13,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: onResume,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF68DFF0),
+                      foregroundColor: const Color(0xFF07111A),
+                    ),
+                    child: const Text(
+                      'RESUME',
+                      style: TextStyle(fontWeight: FontWeight.w900),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: onExit,
-                      child: const Text('EXIT'),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => showGameFeedbackSettings(context),
+                    icon: const Icon(Icons.tune_rounded, size: 18),
+                    label: const Text(
+                      'FEEDBACK SETTINGS',
+                      style: TextStyle(fontWeight: FontWeight.w900),
                     ),
                   ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: onRestart,
+                        child: const Text('RESTART'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: onExit,
+                        child: const Text('EXIT'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -703,6 +713,103 @@ class _FeedbackSettingsSheet extends StatelessWidget {
                   subtitle: 'Retro scanlines & phosphor vignette',
                   value: settings.crtEnabled,
                   onChanged: GameFeedback.setCrtEnabled,
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'DISPLAY PALETTE',
+                  style: TextStyle(
+                    color: Color(0xFF8FEAFF),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                ValueListenableBuilder<ArcadePalette>(
+                  valueListenable: ArcadeThemeManager.current,
+                  builder: (context, activePalette, _) => Column(
+                    children: ArcadePalette.all.map((palette) {
+                      final isSelected = palette.id == activePalette.id;
+                      return InkWell(
+                        onTap: () {
+                          GameFeedback.selection();
+                          ArcadeThemeManager.selectPalette(palette.id);
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? palette.primary.withValues(alpha: 0.15)
+                                : const Color(0xFF070E1A),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isSelected
+                                  ? palette.primary
+                                  : const Color(0xFF263A50),
+                              width: isSelected ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: palette.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: palette.secondary,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      palette.name,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? Colors.white
+                                            : const Color(0xFFBDCEE2),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    Text(
+                                      palette.tagline,
+                                      style: const TextStyle(
+                                        color: Color(0xFF7E97AF),
+                                        fontSize: 9,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (isSelected)
+                                Icon(
+                                  Icons.check_circle_rounded,
+                                  color: palette.primary,
+                                  size: 16,
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ),
               ],
             ),
@@ -841,10 +948,11 @@ class _CampaignMissionClearOverlayState
                 ),
               ],
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -988,10 +1096,10 @@ class _CampaignMissionClearOverlayState
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }
-
+}
 
 class _CampaignResultChip extends StatelessWidget {
   const _CampaignResultChip({

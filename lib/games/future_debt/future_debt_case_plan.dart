@@ -81,7 +81,7 @@ class _FutureDebtCasePlan {
       _FutureObjectiveKind.surviveMaturities =>
         'Take credit, let it mature, then survive the Echo it creates.',
       _FutureObjectiveKind.settleCollector =>
-        'Declare bankruptcy only when you are ready to defeat the Collector.',
+        'Borrow credit, then use the gavel by the debt meter to summon the Collector.',
       _FutureObjectiveKind.closeLedger =>
         'Reach the target with no bill, Echo, lock, or Collector outstanding.',
     };
@@ -101,7 +101,7 @@ class _FutureDebtCasePlan {
           .toInt(),
       spawnInterval: (1.08 / pressure).clamp(.44, 1.05).toDouble(),
       rewardMultiplier: rewardRate.clamp(.82, 1.25).toDouble(),
-      contractLimit: (1 + act).clamp(1, 3).toInt(),
+      contractLimit: act == 0 ? 1 : 2,
       exitAnchor: anchors[(level - 1) % anchors.length],
       title: title,
       instruction: instruction,

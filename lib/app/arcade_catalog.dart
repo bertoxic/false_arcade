@@ -93,7 +93,7 @@ final arcadeCatalog = <ArcadeGameDefinition>[
     missionLabel: 'LEDGER STAGES',
     campaignStages: gameCampaignLevelCount,
     icon: Icons.south_rounded,
-    colors: [Color(0xFF8DE1FF), Color(0xFFFFD86E)],
+    colors: [Color(0xFFFFD56F), Color(0xFFC5ABD8)],
     levelPageBuilder: _fallDueLevelPage,
   ),
   const ArcadeGameDefinition(
@@ -104,7 +104,7 @@ final arcadeCatalog = <ArcadeGameDefinition>[
     missionLabel: 'DEBT SECTORS',
     campaignStages: gameCampaignLevelCount,
     icon: Icons.schedule_rounded,
-    colors: [Color(0xFF4BE4FF), Color(0xFFFF4F7F)],
+    colors: [Color(0xFFFFCD70), Color(0xFFFF766C)],
     levelPageBuilder: _futureDebtLevelPage,
   ),
 ];

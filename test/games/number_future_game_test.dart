@@ -1,5 +1,7 @@
+import 'package:fluga/core/game_loop.dart';
 import 'package:fluga/games/future_debt/future_debt_game.dart';
 import 'package:fluga/games/numberfall/numberfall_game.dart';
+import 'package:fluga/ui/screen_shake.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -82,6 +84,38 @@ void main() {
       expect(NumberfallTestAccess.digitGap, greaterThan(50.0));
     });
 
+    test('hitting enemy stomps it, triggers hitstop, and unfreezes properly without hanging', () {
+      final game = NumberfallTestAccess.createGame();
+      game.start();
+      expect(game.enemy.alive, isTrue);
+
+      // Position player directly overlapping the top of the enemy falling down onto it
+      game.player.x = game.enemy.x;
+      game.player.y = game.enemy.y - game.player.h + 8;
+      game.player.vy = 200.0;
+
+      // Update one step to trigger collision
+      game.update(0.016);
+
+      // Enemy was stomped!
+      expect(game.enemy.alive, isFalse);
+      expect(ArcadeHitStop.isActive, isTrue);
+
+      // Advance clock through the hitstop duration
+      final clock = FixedStepClock();
+      var advancedSteps = 0;
+      for (var i = 0; i < 15; i++) {
+        clock.advance(0.016, (dt) {
+          game.update(dt);
+          advancedSteps++;
+        });
+      }
+
+      // Hitstop must have expired and simulation stepped forward cleanly!
+      expect(ArcadeHitStop.isActive, isFalse);
+      expect(advancedSteps, greaterThan(0));
+    });
+
     test('actor can land on mid-shelf of digit 1 and crossbar of digit 7', () {
       final game = NumberfallTestAccess.createGame();
       game.start();
@@ -125,6 +159,12 @@ void main() {
   });
 
   group('Future Debt rules', () {
+    test('dash eases out without changing its total distance', () {
+      expect(FutureDebtRules.dashTravelFraction(0), 0);
+      expect(FutureDebtRules.dashTravelFraction(.5), greaterThan(.5));
+      expect(FutureDebtRules.dashTravelFraction(1), 1);
+    });
+
     test('campaign runs use an extended survival window and score target', () {
       expect(FutureDebtRules.startingLifetimeForLevel(1), 90);
       expect(FutureDebtRules.startingLifetimeForLevel(21), 105);
@@ -167,6 +207,41 @@ void main() {
       );
     });
 
+    test('fast shots hit targets crossed between updates', () {
+      final strike = FutureDebtRules.sweptCircleImpact(
+        const Offset(0, 5),
+        const Offset(100, 0),
+        const Offset(40, 5),
+        4,
+      );
+      expect(strike, closeTo(.36, 1e-9));
+      expect(
+        FutureDebtRules.sweptCircleImpact(
+          const Offset(0, 10),
+          const Offset(100, 0),
+          const Offset(40, 5),
+          4,
+        ),
+        isNull,
+      );
+    });
+
+    test('thin cover blocks fast shots without false hits at corners', () {
+      const cover = Rect.fromLTWH(0, 0, 4, 80);
+      expect(
+        FutureDebtRules.sweptCoverImpact(
+          const Offset(-40, 20), const Offset(100, 0), cover, 3,
+        ),
+        closeTo(.37, 1e-9),
+      );
+      expect(
+        FutureDebtRules.sweptCoverImpact(
+          const Offset(-4, -2.9), const Offset(1.1, 0), cover, 3,
+        ),
+        isNull,
+      );
+    });
+
     test('dash direction is independent from auto-fire aim', () {
       expect(
         FutureDebtRules.dashVector(
@@ -194,13 +269,38 @@ void main() {
     await tester.tap(find.text('ENTER THE LEDGER'));
     await tester.pump(const Duration(milliseconds: 100));
 
-    await tester.tap(find.text('1 — GHOST WAGE'));
+    await tester.tap(find.byTooltip('Ghost Wage'));
     await tester.pump();
 
-    await tester.tap(find.textContaining('BANKRUPT').first);
+    await tester.tap(find.byTooltip('Declare bankruptcy'));
     await tester.pump();
 
     expect(find.textContaining('BANKRUPTCY FEE POSTED'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Future Debt matures borrowed credit after five seconds', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: FutureDebtPage()));
+    await tester.tap(find.text('ENTER THE LEDGER'));
+    await tester.pump(const Duration(milliseconds: 16));
+
+    await tester.tap(find.byTooltip('Reverse Payment'));
+    await tester.pump();
+    expect(find.textContaining('REVERSE PAYMENT — hostile bullets'), findsOneWidget);
+    expect(find.textContaining('matures in'), findsNothing);
+    expect(find.byTooltip('Compound Fire'), findsNothing);
+    expect(find.byTooltip('Cash Out'), findsNothing);
+
+    for (var i = 0; i < 98; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(find.textContaining('DEBT MATURED'), findsNothing);
+    for (var i = 0; i < 4; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(find.textContaining('DEBT MATURED'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

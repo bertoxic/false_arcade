@@ -14,6 +14,7 @@ class ArcadeFever {
   static double _energy = 0.0;
   static double _feverTimer = 0.0;
   static String _previousMusicTheme = 'arcade_theme';
+  static bool _switchMusic = true;
 
   static double get energy => _energy;
   static bool get isActive => _feverTimer > 0;
@@ -28,25 +29,30 @@ class ArcadeFever {
   }
 
   /// Charges the Fever gauge by [amount] (between 0.05 and 0.35).
-  static void charge(double amount, {String currentMusicTheme = 'arcade_theme'}) {
+  static void charge(
+    double amount, {
+    String currentMusicTheme = 'arcade_theme',
+    bool switchMusic = true,
+  }) {
     if (isActive) return; // Already in fever mode
     _energy = math.min(1.0, _energy + amount);
     energyNotifier.value = _energy;
 
     if (_energy >= 1.0) {
-      _activate(currentMusicTheme);
+      _activate(currentMusicTheme, switchMusic);
     }
   }
 
-  static void _activate(String musicTheme) {
+  static void _activate(String musicTheme, bool switchMusic) {
     _energy = 1.0;
     _feverTimer = 7.0;
     _previousMusicTheme = musicTheme;
+    _switchMusic = switchMusic;
     activeNotifier.value = true;
     energyNotifier.value = 1.0;
 
     GameFeedback.feverStart();
-    GameFeedback.playMusic('fever_theme');
+    if (_switchMusic) GameFeedback.playMusic('fever_theme');
     ArcadeAchievements.unlock('fever_overdrive');
   }
 
@@ -59,7 +65,7 @@ class ArcadeFever {
         energyNotifier.value = 0.0;
         activeNotifier.value = false;
         // Resume underlying game theme
-        GameFeedback.playMusic(_previousMusicTheme);
+        if (_switchMusic) GameFeedback.playMusic(_previousMusicTheme);
       }
     } else if (_energy > 0) {
       // Natural slow decay if player stops chaining actions

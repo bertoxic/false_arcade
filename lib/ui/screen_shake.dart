@@ -90,9 +90,17 @@ abstract final class ArcadeFlash {
 abstract final class ArcadeHitStop {
   static double _freezeRemaining = 0.0;
 
+  /// Whether a freeze-frame hit-stop is currently active.
+  static bool get isActive => _freezeRemaining > 0;
+
   /// Freezes simulation advancement for [seconds] (typical 0.04 to 0.08).
   static void freeze([double seconds = 0.06]) {
     _freezeRemaining = math.max(_freezeRemaining, seconds);
+  }
+
+  /// Cancels any active hitstop immediately.
+  static void cancel() {
+    _freezeRemaining = 0.0;
   }
 
   /// Ticks hit stop timer. Returns `true` if currently frozen.

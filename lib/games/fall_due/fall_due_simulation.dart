@@ -3,6 +3,7 @@ part of 'fall_due_game.dart';
 enum _DuePhase { intro, playing, stageClear, dead, won }
 
 class _FallDueGame {
+  static const musicTheme = 'sunset_steps';
   static const viewWidth = FallDueTuning.viewWidth;
   static const viewHeight = FallDueTuning.viewHeight;
   static const interactionRange = FallDueTuning.interactionRange;
@@ -847,11 +848,12 @@ class _FallDueGame {
   final List<_DueSafeDebtPad> safeDebtPads = [];
   final List<_DueParticle> particles = [];
   final List<_FallDueShockwave> shockwaves = [];
+  final List<_DueTransferArc> transferArcs = [];
   final Set<int> disabledSpikes = {};
   final Set<int> rewardedSpikes = {};
   Rect? _activeExit;
   _DueBody player = _DueBody(70, 370, 27, 37);
-  _DueTarget? _selectedTarget;
+  _DueGravityTarget? _selectedTarget;
   _DuePhase phase = _DuePhase.intro;
   int levelIndex = 0;
   bool left = false;
@@ -862,6 +864,9 @@ class _FallDueGame {
   double _slamBorrowPower = 0.0;
   bool _slamHeld = false;
   bool _hasAirDashed = false;
+  double _airDashRemaining = 0;
+  double _landedAt = double.negativeInfinity;
+  double _landingForce = 0;
   bool _antiGravityActive = false;
   double _jumpBuffer = 0;
   double debt = 0;
@@ -976,7 +981,7 @@ class _FallDueGame {
     _checkpointSnapshot = null;
     _sectionIndex = -1;
     _stageStartScore = score;
-    message = 'STAGE $stageNumber: $stage.briefing';
+    message = 'Stage $stageNumber · ${stage.briefing}';
   }
 
   void _buildStageWorld(_DueStage stage) {
@@ -1015,6 +1020,7 @@ class _FallDueGame {
     bullets.clear();
     particles.clear();
     shockwaves.clear();
+    transferArcs.clear();
     disabledSpikes.clear();
     rewardedSpikes.clear();
     _appendCampaignAnnex();
@@ -1090,13 +1096,13 @@ class _FallDueGame {
   }
 
   void setBorrow(bool value) {
-    if (value && !_borrowHeld && phase == _DuePhase.playing) {
-      final hasHorizontal = left || right;
-      if (!player.grounded && hasHorizontal && !_hasAirDashed) {
+    if (value && !_borrowHeld && !_slamming && phase == _DuePhase.playing) {
+      final direction = (right ? 1.0 : 0.0) - (left ? 1.0 : 0.0);
+      if (!player.grounded && direction != 0 && !_hasAirDashed) {
         // GRAVITY DASH: Directional horizontal aerial impulse (once per jump)
         _hasAirDashed = true;
-        final dir = (right ? 1.0 : 0.0) - (left ? 1.0 : 0.0);
-        player.vx = dir * FallDueTuning.dashImpulse;
+        _airDashRemaining = FallDueTuning.airDashDuration;
+        player.vx = direction * FallDueTuning.dashImpulse;
         player.vy = math.min(player.vy, -130.0);
         debt = math.min(
           FallDueTuning.maxDebt,
@@ -1120,7 +1126,7 @@ class _FallDueGame {
         GameFeedback.jump();
       }
     }
-    if (!value && _borrowHeld) {
+    if (!value && _antiGravityActive) {
       _openSettlementWindow();
     }
     _borrowHeld = value;
@@ -1160,7 +1166,7 @@ class _FallDueGame {
     final scaledSpeed = FallDueRules.slamDescentSpeed(currentPower);
     player.vy = scaledSpeed;
     _antiGravityActive = false;
-    _borrowHeld = false;
+    _airDashRemaining = 0;
     _burst(player.center, const Color(0xFFFF7186), 14);
     GameFeedback.jump();
     if (currentPower >= 70) {
@@ -1173,25 +1179,30 @@ class _FallDueGame {
     }
   }
 
-  Set<_DueTarget> _triggerGravitationalShockwave(Offset center, {bool isSlam = false}) {
+  Set<_DueTarget> _triggerGravitationalShockwave(
+    Offset center, {
+    bool isSlam = false,
+  }) {
     final discharged = _payback > 0 ? _payback : debt;
     // Discharges 65% of debt/payback into kinetic blast, leaving 35% due
     _payback = discharged * 0.35;
     debt = math.max(0, debt - discharged);
-    final dynamicRadius = FallDueTuning.shockwaveRadius +
-        (discharged * 0.3).clamp(0.0, 30.0);
+    final dynamicRadius =
+        FallDueTuning.shockwaveRadius + (discharged * 0.3).clamp(0.0, 30.0);
 
     shockwaves.add(
       _FallDueShockwave(
-        position: center,
+        position: isSlam ? player.rect.bottomCenter : center,
         color: isSlam ? const Color(0xFFFF7186) : const Color(0xFFFFD86E),
         maxRadius: dynamicRadius,
       ),
     );
     ArcadeShake.shake(0.48);
-    ArcadeFlash.flash(isSlam ? const Color(0x66FF7186) : const Color(0x55FFD86E));
+    ArcadeFlash.flash(
+      isSlam ? const Color(0x66FF7186) : const Color(0x55FFD86E),
+    );
     ArcadeHitStop.freeze(0.08);
-    ArcadeFever.charge(0.25, currentMusicTheme: 'platform_theme');
+    ArcadeFever.charge(0.25, switchMusic: false);
     GameFeedback.shockwave();
     if (isSlam) {
       ArcadeAchievements.unlock('gravity_hammer');
@@ -1208,7 +1219,7 @@ class _FallDueGame {
         final damage = discharged >= 45 ? 2 : 1;
         enemy.health -= damage;
         final pushDir = enemy.center.dx >= center.dx ? 1.0 : -1.0;
-        enemy.vx += pushDir * 95.0;
+        enemy.vx += pushDir * 95.0 * (1 - .65 * dist / dynamicRadius);
         enemy.vy = math.min(enemy.vy, -35.0);
         if (enemy.kind == _TargetKind.drone) {
           enemy.droneRecoveryTimer = 0.4;
@@ -1237,7 +1248,7 @@ class _FallDueGame {
       if (dist < dynamicRadius + 20) {
         affectedTargets.add(crate);
         final pushDir = crate.center.dx >= center.dx ? 1.0 : -1.0;
-        crate.vx += pushDir * 75.0;
+        crate.vx += pushDir * 75.0 * (1 - .65 * dist / (dynamicRadius + 20));
         crate.vy = math.min(crate.vy, -25.0);
         _burst(crate.center, const Color(0xFFFFD86E), 12);
       }
@@ -1306,6 +1317,7 @@ class _FallDueGame {
     right = false;
     _jumpHeld = false;
     _borrowHeld = false;
+    _slamHeld = false;
     if (_antiGravityActive) _openSettlementWindow();
   }
 
@@ -1365,9 +1377,9 @@ class _FallDueGame {
         dt,
       );
     }
-    player.vx = player.vx
-        .clamp(-FallDueTuning.runSpeed, FallDueTuning.runSpeed)
-        .toDouble();
+    final speedLimit = FallDueTuning.airDashSpeedLimit(_airDashRemaining);
+    player.vx = player.vx.clamp(-speedLimit, speedLimit);
+    _airDashRemaining = math.max(0, _airDashRemaining - dt);
     player.coyote = player.grounded ? .12 : math.max(0, player.coyote - dt);
     if (_jumpBuffer > 0 && player.coyote > 0) {
       final onCrate = targets.any(
@@ -1427,15 +1439,34 @@ class _FallDueGame {
     final wasSlamming = _slamming;
     final slamPower = _slamBorrowPower;
     Set<_DueTarget> shockwaveHitTargets = const {};
+    final wasGrounded = player.grounded;
     final landed = _resolve(player, dt, gravity);
     if (landed) {
       _hasAirDashed = false;
+      _airDashRemaining = 0;
+      if (!wasGrounded && impactSpeed > 105) {
+        _landedAt = time;
+        _landingForce = (impactSpeed / 820).clamp(.25, 1.0);
+        if (!wasSlamming || !FallDueRules.slamCausesShockwave(slamPower)) {
+          shockwaves.add(
+            _FallDueShockwave(
+              position: player.rect.bottomCenter,
+              color: wasSlamming
+                  ? const Color(0xFFFF827A)
+                  : const Color(0xFFE5B58D),
+              maxRadius: (wasSlamming ? 56 : 26) * (.4 + .6 * _landingForce),
+            ),
+          );
+        }
+      }
       if (wasSlamming) {
         _slamming = false;
         if (FallDueRules.slamCausesShockwave(slamPower)) {
           // Highest borrow causes shockwaves!
-          shockwaveHitTargets =
-              _triggerGravitationalShockwave(player.center, isSlam: true);
+          shockwaveHitTargets = _triggerGravitationalShockwave(
+            player.center,
+            isSlam: true,
+          );
         } else if (slamPower >= 35.0) {
           // Medium slam: heavy landing, breaks panels directly underfoot, no radial shockwave
           final discharged = _payback > 0 ? _payback : debt;
@@ -1455,7 +1486,8 @@ class _FallDueGame {
           debt = math.max(0, debt - discharged);
           _burst(player.center, const Color(0xFFFF7186), 10);
           GameFeedback.lightImpact();
-          message = 'LIGHT SLAM: Borrow more gravity to unleash heavier impact.';
+          message =
+              'LIGHT SLAM: Borrow more gravity to unleash heavier impact.';
         }
       }
       _settleDebtOnSafePad();
@@ -1546,7 +1578,10 @@ class _FallDueGame {
         }
       }
     }
-    if (wasSlamming) {
+    if (wasSlamming && (landed || directlyStompedEnemy != null)) {
+      final impact = landed
+          ? player.rect.bottomCenter
+          : directlyStompedEnemy!.center;
       // Concussion push: if slam fails to land a direct hit, at least push nearby enemies away!
       final radius = FallDueRules.slamConcussionRadius(slamPower);
       final pushForce = FallDueRules.slamConcussionPush(slamPower);
@@ -1557,13 +1592,14 @@ class _FallDueGame {
             shockwaveHitTargets.contains(target)) {
           continue;
         }
-        final dist = (target.center - player.center).distance;
+        final dist = (target.center - impact).distance;
         if (dist > radius) continue;
 
-        final pushDir = target.center.dx >= player.center.dx ? 1.0 : -1.0;
+        final pushDir = target.center.dx >= impact.dx ? 1.0 : -1.0;
+        final localPush = pushForce * (1 - .65 * dist / radius);
         if (target.kind!.isEnemy) {
           enemiesPushed++;
-          target.vx += pushDir * pushForce;
+          target.vx += pushDir * localPush;
           target.vy = math.min(target.vy, -35.0);
           if (target.kind == _TargetKind.drone) {
             target.droneRecoveryTimer = 0.4;
@@ -1571,7 +1607,7 @@ class _FallDueGame {
           }
           _burst(target.center, const Color(0xFFFF7186), 8);
         } else if (target.kind == _TargetKind.crate && !target.anchored) {
-          target.vx += pushDir * (pushForce * 0.5);
+          target.vx += pushDir * localPush * .5;
           target.vy = math.min(target.vy, -25.0);
           _burst(target.center, const Color(0xFFFFD86E), 6);
         }
@@ -1767,7 +1803,10 @@ class _FallDueGame {
       message = 'GATE LOCKED: latch $lockedGates remaining gravity lock(s).';
       return;
     }
-    final cleanBonus = FallDueRules.cleanExitBonus(carriedDebt: debt, payback: _payback);
+    final cleanBonus = FallDueRules.cleanExitBonus(
+      carriedDebt: debt,
+      payback: _payback,
+    );
     score += 800 + cleanBonus;
     if (debt <= 1.0 && _payback <= 1.0) {
       ArcadeAchievements.unlock('zero_sum');
@@ -1795,6 +1834,22 @@ class _FallDueGame {
       wave.time += dt;
     }
     shockwaves.removeWhere((wave) => wave.time >= _FallDueShockwave.life);
+    for (final arc in transferArcs) {
+      arc.time += dt;
+    }
+    transferArcs.removeWhere((arc) => arc.time >= _DueTransferArc.life);
+  }
+
+  void _showTransfer(Offset target, {bool taking = false}) {
+    final origin = player.center;
+    final color = taking ? const Color(0xFFA4DDFF) : const Color(0xFFFFD56F);
+    transferArcs.add(
+      _DueTransferArc(
+        taking ? target : origin,
+        taking ? origin : target,
+        color,
+      ),
+    );
   }
 
   void _burst(Offset position, Color color, int count) {
@@ -1847,8 +1902,10 @@ class _FallDueGame {
       } else if (target.kind == _TargetKind.drone) {
         // Aerial drone floats, stabilizes, and bobs
         if (target.droneRecoveryTimer > 0) {
-          target.droneRecoveryTimer =
-              math.max(0, target.droneRecoveryTimer - dt);
+          target.droneRecoveryTimer = math.max(
+            0,
+            target.droneRecoveryTimer - dt,
+          );
           target.vx = damp(target.vx, 0.28, dt);
           final altitudeErr = target.droneHomeY - target.y;
           if (target.grounded && target.droneRecoveryTimer < 1.4) {
@@ -1881,11 +1938,13 @@ class _FallDueGame {
               player.vx += (pushDir.dx / pushDir.distance) * 260.0;
               player.vy = math.min(player.vy, -160.0);
             }
-            shockwaves.add(_FallDueShockwave(
-              position: target.center,
-              color: const Color(0xFF6DE8FF),
-              maxRadius: 70,
-            ));
+            shockwaves.add(
+              _FallDueShockwave(
+                position: target.center,
+                color: const Color(0xFF6DE8FF),
+                maxRadius: 70,
+              ),
+            );
             debt = math.min(FallDueTuning.maxDebt, debt + 10.0);
             message = 'REPULSOR PULSE! Drone blast pushed you with +10% debt.';
             GameFeedback.lightImpact();
@@ -1917,17 +1976,20 @@ class _FallDueGame {
           final dist = (target.center - player.center).distance;
           if (dist < 240 && player.grounded) {
             target.abilityCooldown = 3.2;
-            shockwaves.add(_FallDueShockwave(
-              position: target.rect.bottomCenter,
-              color: const Color(0xFFFF5277),
-              maxRadius: 90,
-            ));
+            shockwaves.add(
+              _FallDueShockwave(
+                position: target.rect.bottomCenter,
+                color: const Color(0xFFFF5277),
+                maxRadius: 90,
+              ),
+            );
             ArcadeShake.shake(0.28);
             GameFeedback.heavyImpact();
             if (dist < 180 && player.grounded) {
               player.vy = -260.0;
               player.grounded = false;
-              message = 'QUAKE STOMP! Enforcer ground tremor popped you into the air!';
+              message =
+                  'QUAKE STOMP! Enforcer ground tremor popped you into the air!';
             }
           }
         }
@@ -2072,9 +2134,7 @@ class _FallDueGame {
 
   void _launchEnemyIntoTargets(_DueTarget launched) {
     for (final other in targets) {
-      if (!other.alive ||
-          other == launched ||
-          !other.kind!.isEnemy) {
+      if (!other.alive || other == launched || !other.kind!.isEnemy) {
         continue;
       }
       if (!launched.rect.overlaps(other.rect)) continue;
@@ -2208,11 +2268,13 @@ class _FallDueGame {
       bullet.x += bullet.vx * dt;
       bullet.y += bullet.vy * dt;
       if (bullet.debt > 0) bullet.debt = math.max(0, bullet.debt - 5 * dt);
-      if (_spawnGrace <= 0 && player.rect.overlaps(bullet.rect)) {
+      if (!bullet.reflected &&
+          _spawnGrace <= 0 &&
+          player.rect.overlaps(bullet.rect)) {
         _die('Projectile due.');
         return;
       }
-      if (bullet.debt > 3 && bullet.alive) {
+      if ((bullet.reflected || bullet.debt > 3) && bullet.alive) {
         for (final target in targets) {
           if (!target.alive ||
               !target.kind!.isEnemy ||
@@ -2234,7 +2296,8 @@ class _FallDueGame {
             message = 'PARRIED PLASMA SHREDDED ENEMY +$killScore';
             _burst(target.center, const Color(0xFFFFD86E), 18);
           } else {
-            message = 'PARRIED PLASMA STRUCK ENFORCER! ${target.health} HP LEFT';
+            message =
+                'PARRIED PLASMA STRUCK ENFORCER! ${target.health} HP LEFT';
             _burst(target.center, const Color(0xFFFFD86E), 12);
           }
           bullet.alive = false;
@@ -2312,9 +2375,7 @@ class _FallDueGame {
       if (body == player) ...heavyEnemies,
     ];
     final canRiseThroughPlatforms =
-        (body is _DueTarget &&
-            body.kind!.isCrate &&
-            body.debt < -1) ||
+        (body is _DueTarget && body.kind!.isCrate && body.debt < -1) ||
         (body == player && _ridingLightBox);
     final distance = math.max(body.vx.abs(), body.vy.abs()) * dt;
     final steps = (distance / 5).ceil().clamp(1, 16);
@@ -2361,60 +2422,104 @@ class _FallDueGame {
     return landed;
   }
 
-  _DueTarget? _nearestTarget() {
-    final candidates = _targetCandidates();
-    if (_selectedTarget != null && candidates.contains(_selectedTarget)) {
-      return _selectedTarget;
+  _DueGravityTarget? get _manualTarget {
+    final selected = _selectedTarget;
+    return selected != null && selected.alive ? selected : null;
+  }
+
+  Iterable<_DueGravityTarget> get _gravityTargets sync* {
+    yield* targets.where((target) => target.alive);
+    yield* emitters;
+  }
+
+  double _distanceToTarget(_DueGravityTarget target) =>
+      (target.center - player.center).distanceSquared;
+
+  bool _targetInRange(_DueGravityTarget target) =>
+      _distanceToTarget(target) < interactionRange * interactionRange;
+
+  _DueGravityTarget? get _gravityRecipient =>
+      _manualTarget ?? _closestGravityTarget(_gravityTargets);
+
+  T? _closestGravityTarget<T extends _DueGravityTarget>(
+    Iterable<T> candidates,
+  ) {
+    T? closest;
+    var distance = interactionRange * interactionRange;
+    for (final target in candidates) {
+      if (!target.alive) continue;
+      final next = _distanceToTarget(target);
+      if (next < distance) {
+        closest = target;
+        distance = next;
+      }
     }
-    return candidates.isEmpty ? null : candidates.first;
+    return closest;
   }
 
-  List<_DueTarget> _targetCandidates() {
-    final candidates =
-        targets
-            .where(
-              (target) =>
-                  target.alive &&
-                  (target.center - player.center).distance < interactionRange,
-            )
-            .toList()
-          ..sort(
-            (a, b) => (a.center - player.center).distance.compareTo(
-              (b.center - player.center).distance,
-            ),
-          );
-    return candidates;
+  void selectTargetAt(Offset point, double padding) {
+    if (phase != _DuePhase.playing) return;
+    _DueGravityTarget? closest;
+    var closestDistance = double.infinity;
+    var hitBody = false;
+    for (final target in _gravityTargets) {
+      if (!target.rect.inflate(padding).contains(point)) continue;
+      final onBody = target.rect.contains(point);
+      final distance = (point - target.center).distanceSquared;
+      if (closest == null ||
+          (onBody && !hitBody) ||
+          (onBody == hitBody && distance < closestDistance)) {
+        closest = target;
+        closestDistance = distance;
+        hitBody = onBody;
+      }
+    }
+
+    if (closest == null) {
+      if (_manualTarget == null) return;
+      _selectedTarget = null;
+      message = 'TARGET CLEARED — automatic targeting active.';
+      GameFeedback.selection();
+    } else {
+      _selectTarget(closest);
+    }
   }
 
+  // Keep the existing shortcut available when playing without a pointer.
   void cycleTarget() {
     if (phase != _DuePhase.playing) return;
-    final candidates = _targetCandidates();
+    final candidates = _gravityTargets.where(_targetInRange).toList()
+      ..sort((a, b) => _distanceToTarget(a).compareTo(_distanceToTarget(b)));
     if (candidates.isEmpty) {
-      message = 'NO TARGETS IN RANGE: move closer, then cycle with F.';
+      message = 'NO TARGETS IN RANGE — move closer.';
       return;
     }
-    final current = _selectedTarget == null
-        ? -1
-        : candidates.indexOf(_selectedTarget!);
-    _selectedTarget = candidates[(current + 1) % candidates.length];
-    final label = switch (_selectedTarget!.kind) {
-      _TargetKind.heavy => 'ENFORCER',
-      _TargetKind.drone => 'DRONE',
-      _TargetKind.leecher => 'LEECHER',
-      _TargetKind.enemy => 'COLLECTOR',
-      _TargetKind.crate => 'CRATE',
-      null => 'TARGET',
-    };
-    message =
-        'TARGET ${candidates.indexOf(_selectedTarget!) + 1}/${candidates.length}: $label.';
+    final current = candidates.indexWhere(
+      (target) => identical(target, _manualTarget),
+    );
+    _selectTarget(candidates[(current + 1) % candidates.length]);
+  }
+
+  void _selectTarget(_DueGravityTarget target) {
+    _selectedTarget = target;
+    message = _targetInRange(target)
+        ? 'SELECTED ${target.label} — Give or Take gravity.'
+        : '${target.label} OUT OF RANGE — move closer.';
     GameFeedback.selection();
+  }
+
+  bool _checkSelectedTargetRange() {
+    final target = _manualTarget;
+    if (target == null || _targetInRange(target)) return true;
+    message = '${target.label} OUT OF RANGE — move closer.';
+    return false;
   }
 
   _DueBullet? _nearestBullet() {
     _DueBullet? closest;
     var distance = interactionRange;
     for (final bullet in bullets) {
-      if (!bullet.alive) continue;
+      if (!bullet.alive || bullet.reflected) continue;
       final dist = (bullet.rect.center - player.center).distance;
       if (dist < distance) {
         closest = bullet;
@@ -2424,29 +2529,9 @@ class _FallDueGame {
     return closest;
   }
 
-  _DueEmitter? _nearestEmitter() {
-    _DueEmitter? closest;
-    var distance = interactionRange;
-    for (final emitter in emitters) {
-      final next = (emitter.position - player.center).distance;
-      if (next < distance) {
-        closest = emitter;
-        distance = next;
-      }
-    }
-    return closest;
-  }
-
-  bool _emitterIsCloser(_DueTarget? target, _DueEmitter? emitter) {
-    if (_selectedTarget != null && target == _selectedTarget) return false;
-    if (emitter == null) return false;
-    if (target == null) return true;
-    return (emitter.position - player.center).distance <
-        (target.center - player.center).distance;
-  }
-
   void transferDebt() {
     if (phase != _DuePhase.playing) return;
+    if (!_checkSelectedTargetRange()) return;
     if (_transferCooldown.isActive) {
       message = 'GRAVITY CHANNEL RECHARGING.';
       return;
@@ -2456,50 +2541,48 @@ class _FallDueGame {
       debt = math.min(FallDueTuning.maxDebt, debt + 15.0);
       _burst(player.center, const Color(0xFFFFD86E), 6);
     }
-    final target = _nearestTarget();
-    final emitter = _nearestEmitter();
-    final bullet = _nearestBullet();
+    final selected = _gravityRecipient;
+    final bullet = selected == null ? _nearestBullet() : null;
 
     // Bullet gravity slam if bullet is nearby and no other closer target
-    if (bullet != null &&
-        (bullet.rect.center - player.center).distance < 160 &&
-        target == null &&
-        emitter == null) {
+    if (bullet != null && (bullet.rect.center - player.center).distance < 160) {
       bullet.vy = 850.0;
       bullet.debt = 35.0;
       debt = math.max(0, debt - 10.0);
       score += 200;
       _transferCooldown.tryTrigger(.35);
       _burst(bullet.rect.center, const Color(0xFFFFD86E), 14);
+      _showTransfer(bullet.rect.center);
       GameFeedback.mediumImpact();
       message = 'GRAVITY OVERLOAD: bullet grounded into the floor +200.';
       return;
     }
 
-    if (target == null && emitter == null) {
+    if (selected == null) {
       message = 'Move closer to an enemy, crate, or turret to give gravity.';
       return;
     }
     final requested = math
         .min(debt, math.min(30.0, math.max(10.0, debt * .65)))
         .toDouble();
-    if (_emitterIsCloser(target, emitter)) {
-      final amount = math.min(requested, 60 - emitter!.debt).toDouble();
+    if (selected is _DueEmitter) {
+      final amount = math.min(requested, 60 - selected.debt).toDouble();
       if (amount < 1) {
         message = 'TURRET LEDGER FULL: Take weight back before giving more.';
         return;
       }
       debt -= amount;
-      emitter.debt += amount;
-      emitter.cooldown += .3 + amount * .02;
+      selected.debt += amount;
+      selected.cooldown += .3 + amount * .02;
       _transferCooldown.tryTrigger(.35);
       message =
           'GAVE ${amount.round()}% TO TURRET: its shots slow and fall sooner.';
-      _burst(emitter.position, const Color(0xFFFFD86E), 10);
+      _burst(selected.position, const Color(0xFFFFD86E), 10);
+      _showTransfer(selected.position);
       GameFeedback.selection();
       return;
     }
-    final recipient = target!;
+    final recipient = selected as _DueTarget;
     if (recipient.kind == _TargetKind.leecher && requested >= 15.0) {
       // Overload Siphon Leecher with excess debt!
       debt -= requested;
@@ -2507,6 +2590,7 @@ class _FallDueGame {
       score += 600;
       _transferCooldown.tryTrigger(.35);
       _burst(recipient.center, const Color(0xFFC77DFF), 22);
+      _showTransfer(recipient.center);
       GameFeedback.heavyImpact();
       message = 'SIPHON OVERLOAD! Leecher detonated by excess debt +600.';
       return;
@@ -2521,6 +2605,7 @@ class _FallDueGame {
       recipient.abilityCooldown = math.max(recipient.abilityCooldown, 2.5);
       _transferCooldown.tryTrigger(.35);
       _burst(recipient.center, const Color(0xFFFFD86E), 18);
+      _showTransfer(recipient.center);
       GameFeedback.heavyImpact();
       ArcadeShake.shake(0.25);
       message =
@@ -2545,17 +2630,19 @@ class _FallDueGame {
         ? 'GAVE ${amount.round()}% TO ENFORCER: weighed down and shoved backward.'
         : 'GAVE ${amount.round()}% TO COLLECTOR: heavy, slow, and shoved toward the edge.';
     _burst(recipient.center, const Color(0xFFFFD86E), 10);
+    _showTransfer(recipient.center);
     GameFeedback.selection();
   }
 
   void stealDebt() {
     if (phase != _DuePhase.playing) return;
+    if (!_checkSelectedTargetRange()) return;
     if (_transferCooldown.isActive) {
       message = 'GRAVITY CHANNEL RECHARGING.';
       return;
     }
 
-    final bullet = _nearestBullet();
+    final bullet = _manualTarget == null ? _nearestBullet() : null;
     if (bullet != null &&
         (bullet.rect.center - player.center).distance <
             FallDueTuning.parryRange) {
@@ -2563,6 +2650,7 @@ class _FallDueGame {
       bullet.vx = -bullet.vx * 1.5;
       bullet.vy = -140.0;
       bullet.debt = 25.0;
+      bullet.reflected = true;
       debt = math.min(FallDueTuning.maxDebt, debt + 12.0);
       score += FallDueTuning.parryBonusScore;
       _settleGrace = math.max(_settleGrace, FallDueTuning.settlementWindow);
@@ -2570,18 +2658,19 @@ class _FallDueGame {
       ArcadeShake.shake(0.22);
       GameFeedback.selection();
       _burst(bullet.rect.center, const Color(0xFF8DE1FF), 18);
+      _showTransfer(bullet.rect.center, taking: true);
       message =
           'PLASMA PARRY! Shot reversed with +25 debt +${FallDueTuning.parryBonusScore}.';
       return;
     }
 
-    final target = _nearestTarget();
-    final emitter = _nearestEmitter();
-    if (target == null && emitter == null) {
+    var selected = _gravityRecipient;
+    if (selected == null) {
       message = 'Move closer to an enemy, crate, or turret to take gravity.';
       return;
     }
-    if (emitter != null && (target == null || _emitterIsCloser(target, emitter))) {
+    if (selected is _DueEmitter) {
+      final emitter = selected;
       if (emitter.debt >= 2) {
         final amount = math.min(
           math.min(emitter.debt, 18),
@@ -2598,15 +2687,20 @@ class _FallDueGame {
         message =
             'TOOK ${amount.round()}% BACK: credit is ready for your next lift.';
         _burst(emitter.position, const Color(0xFF8DE1FF), 10);
+        _showTransfer(emitter.position, taking: true);
         GameFeedback.selection();
         return;
-      } else if (target == null) {
+      }
+      final fallback = _manualTarget == null
+          ? _closestGravityTarget(targets)
+          : null;
+      if (fallback == null) {
         message = 'That turret has no borrowed gravity to take.';
         return;
       }
-      // If emitter has no debt to siphon, fallback to adjacent target!
+      selected = fallback;
     }
-    final recipient = target!;
+    final recipient = selected as _DueTarget;
     final isLiftableBox = recipient.kind == _TargetKind.crate;
     final isEnemy = recipient.kind.isEnemy;
     final reclaimingLoan = !isLiftableBox && recipient.debt > 1;
@@ -2691,6 +2785,7 @@ class _FallDueGame {
         ? 'TOOK ${amount.round()}% BACK: credit is ready for another lift.'
         : 'TOOK ${amount.round()}% OF NATURAL GRAVITY: target is light and knocked outward.';
     _burst(recipient.center, const Color(0xFF8DE1FF), isEnemy ? 18 : 10);
+    _showTransfer(recipient.center, taking: true);
     if (isEnemy) ArcadeShake.shake(0.24);
     GameFeedback.selection();
   }
@@ -2755,6 +2850,10 @@ class _FallDueGame {
     _slamBorrowPower = 0.0;
     _slamHeld = false;
     _hasAirDashed = false;
+    _airDashRemaining = 0;
+    _landedAt = double.negativeInfinity;
+    _landingForce = 0;
+    transferArcs.clear();
     player = _DueBody(position.dx, position.dy, 27, 37)..grounded = true;
   }
 }
@@ -2770,6 +2869,16 @@ class _FallDueShockwave {
   final Color color;
   final double maxRadius;
   static const double life = 0.45;
+  double time = 0;
+}
+
+class _DueTransferArc {
+  _DueTransferArc(this.origin, this.destination, this.color);
+
+  static const life = .42;
+  final Offset origin;
+  final Offset destination;
+  final Color color;
   double time = 0;
 }
 
@@ -2905,7 +3014,14 @@ class _DueBody {
   Offset get center => Offset(x + w / 2, y + h / 2);
 }
 
-class _DueTarget extends _DueBody {
+sealed class _DueGravityTarget {
+  Offset get center;
+  Rect get rect;
+  String get label;
+  bool get alive;
+}
+
+class _DueTarget extends _DueBody implements _DueGravityTarget {
   _DueTarget(
     super.x,
     super.y,
@@ -2933,11 +3049,22 @@ class _DueTarget extends _DueBody {
   double droneRecoveryTimer = 0;
   double stunTimer = 0;
   double abilityCooldown = 0;
+  @override
   bool alive = true;
   bool anchored = false;
   final int? puzzleId;
   int? bridgeSpikeIndex;
   Rect? bridgeSurface;
+
+  @override
+  String get label => switch (kind) {
+    _TargetKind.heavy => 'ENFORCER',
+    _TargetKind.drone => 'DRONE',
+    _TargetKind.leecher => 'LEECHER',
+    _TargetKind.enemy => 'COLLECTOR',
+    _TargetKind.crate => 'CRATE',
+    null => 'TARGET',
+  };
 
   _DueTarget copy() => _DueTarget(x, y, w, h, kind!, puzzleId: puzzleId)
     ..vx = vx
@@ -2966,6 +3093,7 @@ class _DueBullet {
   double vy = 0;
   double debt = 0;
   bool alive = true;
+  bool reflected = false;
   Rect get rect => Rect.fromLTWH(x, y, 14, 14);
 }
 
@@ -2978,7 +3106,7 @@ class _DueSeal {
   _DueSeal copy() => _DueSeal(position)..collected = collected;
 }
 
-class _DueEmitter {
+class _DueEmitter implements _DueGravityTarget {
   _DueEmitter(this.position, this.speed, this.interval) : cooldown = interval;
   _DueEmitter.fromSpec(_DueEmitterSpec spec)
     : this(Offset(spec.x, spec.y), spec.speed, spec.interval);
@@ -2987,6 +3115,18 @@ class _DueEmitter {
   final double interval;
   double cooldown;
   double debt = 0;
+
+  @override
+  Offset get center => position;
+
+  @override
+  Rect get rect => Rect.fromCenter(center: position, width: 30, height: 30);
+
+  @override
+  String get label => 'TURRET';
+
+  @override
+  bool get alive => true;
 
   _DueEmitter copy() => _DueEmitter(position, speed, interval)
     ..cooldown = cooldown

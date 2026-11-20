@@ -1,6 +1,8 @@
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
+import 'arcade_hitstop.dart';
+
 typedef GameStep = void Function(double seconds);
 
 /// Converts wall-clock frames into bounded fixed simulation steps.
@@ -27,6 +29,7 @@ class FixedStepClock {
 
   int advance(double frameSeconds, GameStep onStep) {
     if (!frameSeconds.isFinite || frameSeconds <= 0) return 0;
+    if (ArcadeHitstop.tick(frameSeconds)) return 0;
     _accumulator += frameSeconds.clamp(0, maxFrameSeconds);
     var steps = 0;
     while (_accumulator + 1e-10 >= stepSeconds && steps < maxSubSteps) {
@@ -40,7 +43,10 @@ class FixedStepClock {
     return steps;
   }
 
-  void reset() => _accumulator = 0;
+  void reset() {
+    _accumulator = 0;
+    ArcadeHitstop.cancel();
+  }
 }
 
 /// Owns a Flutter [Ticker] and feeds a [FixedStepClock].

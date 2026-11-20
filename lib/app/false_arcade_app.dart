@@ -5,7 +5,11 @@ import 'arcade_game_art.dart';
 import 'arcade_hall_of_fame_page.dart';
 import 'game_level_select_page.dart';
 import '../core/arcade_achievements.dart';
+import '../core/arcade_ads.dart';
+import '../core/arcade_daily_shift.dart';
+import '../core/arcade_leaderboard.dart';
 import '../core/game_feedback.dart';
+import '../core/level_campaign.dart';
 import '../ui/arcade_screen_filter.dart';
 import '../ui/game_controls.dart';
 import '../ui/screen_shake.dart';
@@ -77,13 +81,18 @@ class ArcadeHomePage extends StatefulWidget {
 }
 
 class _ArcadeHomePageState extends State<ArcadeHomePage> {
-  var _selectedIndex = 0;
+  late int _selectedIndex;
 
   ArcadeGameDefinition get _selected => arcadeCatalog[_selectedIndex];
 
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    final day = DateTime.utc(now.year, now.month, now.day)
+        .difference(DateTime.utc(1970))
+        .inDays;
+    _selectedIndex = day % arcadeCatalog.length;
     ArcadeFlash.reset();
     GameFeedback.playMusic('arcade_theme');
   }
@@ -117,6 +126,53 @@ class _ArcadeHomePageState extends State<ArcadeHomePage> {
     GameFeedback.selection();
     final next = (_selectedIndex + direction) % arcadeCatalog.length;
     setState(() => _selectedIndex = next < 0 ? arcadeCatalog.length - 1 : next);
+  }
+
+  Future<void> _launchDailyContract(DailyShiftContract contract) async {
+    GameFeedback.selection();
+    final gameDef = arcadeCatalog.firstWhere(
+      (g) => g.id == contract.gameId,
+      orElse: () => arcadeCatalog.first,
+    );
+    final level = GeneratedGameLevel(
+      gameId: contract.gameId,
+      number: 1,
+      seed: contract.seed,
+      difficulty: 1.35,
+      enemyPressure: 1.35,
+      rewardRate: 1.15,
+      targetScore: contract.targetScore,
+      parSeconds: contract.parSeconds,
+      mutator: contract.mutators.map((m) => m.name).join(' + '),
+      briefing: 'DAILY CONTRACT: ${contract.mutators.first.description}',
+      chapterTitle: 'DAILY SHIFT // ${contract.dateKey}',
+      storyBeat:
+          'Universal seeded daily shift. Complete to extend streak and earn shields.',
+      objective: 'SURVIVE AND SETTLE',
+      gameplayFocus:
+          'Active Mutators: ${contract.mutators.map((m) => m.name).join(' · ')}',
+      lengthMultiplier: 1.0,
+    );
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => gameDef.levelPageBuilder(
+          level,
+          (result) {
+            DailyShiftManager.recordCompletion(contract.dateKey);
+            ArcadeLeaderboard.submitScore(
+              gameId: contract.gameId,
+              initials: 'PLY',
+              score: result.score,
+              level: 1,
+            );
+          },
+          () => Navigator.of(context).pop(),
+        ),
+      ),
+    );
+    ArcadeFlash.reset();
+    GameFeedback.playMusic('arcade_theme');
   }
 
   @override
@@ -162,13 +218,27 @@ class _ArcadeHomePageState extends State<ArcadeHomePage> {
                           onFeedbackSettings: () =>
                               showGameFeedbackSettings(context),
                         ),
-
                       ),
                     ),
                     SliverPadding(
                       padding: EdgeInsets.fromLTRB(
                         horizontalPadding,
-                        18,
+                        14,
+                        horizontalPadding,
+                        0,
+                      ),
+                      sliver: SliverToBoxAdapter(
+                        child: _DailyShiftBanner(
+                          onPlay: () => _launchDailyContract(
+                            DailyShiftManager.getContract(),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(
+                        horizontalPadding,
+                        16,
                         horizontalPadding,
                         0,
                       ),
@@ -194,16 +264,20 @@ class _ArcadeHomePageState extends State<ArcadeHomePage> {
                       sliver: SliverToBoxAdapter(
                         child: Row(
                           children: [
-                            const Text(
-                              'CHOOSE A SIGNAL',
-                              style: TextStyle(
-                                color: Color(0xFF90A7B8),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 2.1,
+                            const Flexible(
+                              child: Text(
+                                'CHOOSE A SIGNAL',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Color(0xFF90A7B8),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.5,
+                                ),
                               ),
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: Container(
                                 height: 1,
@@ -212,14 +286,14 @@ class _ArcadeHomePageState extends State<ArcadeHomePage> {
                                 ).withValues(alpha: .65),
                               ),
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 8),
                             const Text(
                               'TAP TO PLAY',
                               style: TextStyle(
                                 color: Color(0xFF48F2C1),
                                 fontSize: 9,
                                 fontWeight: FontWeight.w900,
-                                letterSpacing: 1.25,
+                                letterSpacing: 1.0,
                               ),
                             ),
                           ],
@@ -243,10 +317,24 @@ class _ArcadeHomePageState extends State<ArcadeHomePage> {
                             index: index,
                             selected: index == _selectedIndex,
                             onHover: () => _select(index),
-                            onPlay: () => _launch(arcadeCatalog[index]),
+                            onPlay: () {
+                              _select(index);
+                              _launch(arcadeCatalog[index]);
+                            },
                           ),
                           childCount: arcadeCatalog.length,
                         ),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(
+                        horizontalPadding,
+                        16,
+                        horizontalPadding,
+                        0,
+                      ),
+                      sliver: const SliverToBoxAdapter(
+                        child: ArcadeNativeAdCard(),
                       ),
                     ),
                     SliverPadding(
@@ -285,165 +373,641 @@ class _ArcadeHeader extends StatelessWidget {
   final VoidCallback onFeedbackSettings;
 
   @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.end,
-    children: [
-      Container(
-        width: 31,
-        height: 31,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: const Color(0xFF48F2C1),
-          borderRadius: BorderRadius.circular(5),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF48F2C1).withValues(alpha: .35),
-              blurRadius: 16,
-            ),
-          ],
-        ),
-        child: const Icon(
-          Icons.videogame_asset_rounded,
-          color: Color(0xFF031016),
-          size: 19,
-        ),
-      ),
-      const SizedBox(width: 10),
-      const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'FALSE ARCADE',
-            style: TextStyle(
-              color: Color(0xFFF0FAFF),
-              fontSize: 16,
-              height: 1.0,
-              fontWeight: FontWeight.w900,
-              fontFamily: 'PressStart2P',
-              letterSpacing: 1.8,
-              shadows: [
-                Shadow(
-                  color: Color(0xFF48F2C1),
-                  blurRadius: 16,
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 5),
-          Text(
-            'SYSTEM SELECT // SIX IMPOSSIBLE GAMES',
-            style: TextStyle(
-              color: Color(0xFF89A3B5),
-              fontSize: 8,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.16,
-            ),
-          ),
-        ],
-      ),
-      const Spacer(),
-      IconButton(
-        visualDensity: VisualDensity.compact,
-        padding: const EdgeInsets.all(4),
-        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-        onPressed: onHallOfFame,
-        tooltip: 'Hall of Fame (High Scores)',
-        icon: const Icon(Icons.leaderboard_rounded, color: Color(0xFFFFD36A), size: 20),
-      ),
-      IconButton(
-        visualDensity: VisualDensity.compact,
-        padding: const EdgeInsets.all(4),
-        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-        onPressed: onTrophies,
-        tooltip: 'Trophies & Achievements',
-        icon: const Icon(Icons.military_tech_rounded, color: Color(0xFF48F2C1), size: 20),
-      ),
-      IconButton(
-        visualDensity: VisualDensity.compact,
-        padding: const EdgeInsets.all(4),
-        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-        onPressed: onFeedbackSettings,
-        tooltip: 'Feedback settings',
-        icon: const Icon(Icons.tune_rounded, color: Color(0xFF8FEAFF), size: 20),
-      ),
-      const SizedBox(width: 4),
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            'SIGNAL ${active.toString().padLeft(2, '0')} / ${total.toString().padLeft(2, '0')}',
-            style: const TextStyle(
-              color: Color(0xFF48F2C1),
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.1,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisSize: MainAxisSize.min,
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 620;
+        final isUltraCompact = constraints.maxWidth < 360;
+
+        if (isCompact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ValueListenableBuilder<Set<String>>(
-                valueListenable: ArcadeAchievements.unlockedNotifier,
-                builder: (context, unlocked, _) => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F1E2C),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: const Color(0xFFFFD36A).withValues(alpha: 0.5),
+              Row(
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF48F2C1),
+                      borderRadius: BorderRadius.circular(5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF48F2C1).withValues(alpha: .35),
+                          blurRadius: 16,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.videogame_asset_rounded,
+                      color: Color(0xFF031016),
+                      size: 18,
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.military_tech_rounded,
-                        color: Color(0xFFFFD36A),
-                        size: 11,
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        '${unlocked.length}/${ArcadeAchievements.totalCount}',
-                        style: const TextStyle(
-                          color: Color(0xFFFFD36A),
-                          fontSize: 8,
-                          fontWeight: FontWeight.w900,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'FALSE ARCADE',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: const Color(0xFFF0FAFF),
+                            fontSize: isUltraCompact ? 13 : 15,
+                            height: 1.0,
+                            fontWeight: FontWeight.w900,
+                            fontFamily: 'PressStart2P',
+                            letterSpacing: isUltraCompact ? 1.0 : 1.5,
+                            shadows: const [
+                              Shadow(
+                                color: Color(0xFF48F2C1),
+                                blurRadius: 16,
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(height: 3),
+                        Text(
+                          isUltraCompact
+                              ? 'SYSTEM SELECT'
+                              : 'SYSTEM SELECT // SIX IMPOSSIBLE GAMES',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF89A3B5),
+                            fontSize: 7.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.all(4),
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    onPressed: onHallOfFame,
+                    tooltip: 'Hall of Fame (High Scores)',
+                    icon: const Icon(Icons.leaderboard_rounded, color: Color(0xFFFFD36A), size: 19),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.all(4),
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    onPressed: onTrophies,
+                    tooltip: 'Trophies & Achievements',
+                    icon: const Icon(Icons.military_tech_rounded, color: Color(0xFF48F2C1), size: 19),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.all(4),
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    onPressed: onFeedbackSettings,
+                    tooltip: 'Feedback settings',
+                    icon: const Icon(Icons.tune_rounded, color: Color(0xFF8FEAFF), size: 19),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Text(
+                    'SIGNAL ${active.toString().padLeft(2, '0')} / ${total.toString().padLeft(2, '0')}',
+                    style: const TextStyle(
+                      color: Color(0xFF48F2C1),
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                  const Spacer(),
+                  ValueListenableBuilder<Set<String>>(
+                    valueListenable: ArcadeAchievements.unlockedNotifier,
+                    builder: (context, unlocked, _) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F1E2C),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: const Color(0xFFFFD36A).withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.military_tech_rounded,
+                            color: Color(0xFFFFD36A),
+                            size: 11,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            '${unlocked.length}/${ArcadeAchievements.totalCount}',
+                            style: const TextStyle(
+                              color: Color(0xFFFFD36A),
+                              fontSize: 8,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (!isUltraCompact) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      width: 5,
+                      height: 5,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF48F2C1),
+                        boxShadow: [
+                          BoxShadow(color: Color(0xFF48F2C1), blurRadius: 6),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'READY',
+                      style: TextStyle(
+                        color: Color(0xFF7591A8),
+                        fontSize: 8,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: .8,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Container(
+              width: 31,
+              height: 31,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: const Color(0xFF48F2C1),
+                borderRadius: BorderRadius.circular(5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF48F2C1).withValues(alpha: .35),
+                    blurRadius: 16,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.videogame_asset_rounded,
+                color: Color(0xFF031016),
+                size: 19,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'FALSE ARCADE',
+                  style: TextStyle(
+                    color: Color(0xFFF0FAFF),
+                    fontSize: 16,
+                    height: 1.0,
+                    fontWeight: FontWeight.w900,
+                    fontFamily: 'PressStart2P',
+                    letterSpacing: 1.8,
+                    shadows: [
+                      Shadow(
+                        color: Color(0xFF48F2C1),
+                        blurRadius: 16,
                       ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Container(
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFF48F2C1),
-                  boxShadow: [
-                    BoxShadow(color: Color(0xFF48F2C1), blurRadius: 6),
+                SizedBox(height: 5),
+                Text(
+                  'SYSTEM SELECT // SIX IMPOSSIBLE GAMES',
+                  style: TextStyle(
+                    color: Color(0xFF89A3B5),
+                    fontSize: 8,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.16,
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.all(4),
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              onPressed: onHallOfFame,
+              tooltip: 'Hall of Fame (High Scores)',
+              icon: const Icon(Icons.leaderboard_rounded, color: Color(0xFFFFD36A), size: 20),
+            ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.all(4),
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              onPressed: onTrophies,
+              tooltip: 'Trophies & Achievements',
+              icon: const Icon(Icons.military_tech_rounded, color: Color(0xFF48F2C1), size: 20),
+            ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.all(4),
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              onPressed: onFeedbackSettings,
+              tooltip: 'Feedback settings',
+              icon: const Icon(Icons.tune_rounded, color: Color(0xFF8FEAFF), size: 20),
+            ),
+            const SizedBox(width: 4),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  'SIGNAL ${active.toString().padLeft(2, '0')} / ${total.toString().padLeft(2, '0')}',
+                  style: const TextStyle(
+                    color: Color(0xFF48F2C1),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ValueListenableBuilder<Set<String>>(
+                      valueListenable: ArcadeAchievements.unlockedNotifier,
+                      builder: (context, unlocked, _) => Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F1E2C),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: const Color(0xFFFFD36A).withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.military_tech_rounded,
+                              color: Color(0xFFFFD36A),
+                              size: 11,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              '${unlocked.length}/${ArcadeAchievements.totalCount}',
+                              style: const TextStyle(
+                                color: Color(0xFFFFD36A),
+                                fontSize: 8,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF48F2C1),
+                        boxShadow: [
+                          BoxShadow(color: Color(0xFF48F2C1), blurRadius: 6),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    const Text(
+                      'PLAYER ONE READY',
+                      style: TextStyle(
+                        color: Color(0xFF7591A8),
+                        fontSize: 8,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: .85,
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 5),
-              const Text(
-                'PLAYER ONE READY',
-                style: TextStyle(
-                  color: Color(0xFF7591A8),
-                  fontSize: 8,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: .85,
-                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DailyShiftBanner extends StatelessWidget {
+  const _DailyShiftBanner({required this.onPlay});
+
+  final VoidCallback onPlay;
+
+  @override
+  Widget build(BuildContext context) {
+    final contract = DailyShiftManager.getContract();
+    final gameDef = arcadeCatalog.firstWhere(
+      (g) => g.id == contract.gameId,
+      orElse: () => arcadeCatalog.first,
+    );
+    final accent = gameDef.colors.first;
+
+    return ValueListenableBuilder<DailyStreakLedger>(
+      valueListenable: DailyShiftManager.streakNotifier,
+      builder: (context, ledger, _) {
+        final isDone = ledger.isCompletedOn(contract.dateKey);
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                accent.withValues(alpha: 0.18),
+                const Color(0xFF091422),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: accent.withValues(alpha: 0.5),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: 0.15),
+                blurRadius: 18,
+                spreadRadius: 1,
               ),
             ],
           ),
-        ],
-      ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 480;
+              final isCompact = constraints.maxWidth < 580;
 
-    ],
-  );
+              final streakWidget = Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF9E40).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: const Color(0xFFFF9E40),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.local_fire_department_rounded,
+                      color: Color(0xFFFF9E40),
+                      size: 13,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      '${ledger.currentStreak} DAYS',
+                      style: const TextStyle(
+                        color: Color(0xFFFF9E40),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    if (ledger.shieldTokens > 0) ...[
+                      const SizedBox(width: 6),
+                      const Icon(
+                        Icons.shield_rounded,
+                        color: Color(0xFF72D6FF),
+                        size: 12,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${ledger.shieldTokens}',
+                        style: const TextStyle(
+                          color: Color(0xFF72D6FF),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+
+              final playButton = ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDone
+                      ? const Color(0xFF23364A)
+                      : accent,
+                  foregroundColor: isDone
+                      ? const Color(0xFF8BA8C2)
+                      : const Color(0xFF030A10),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isCompact ? 10 : 14,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: onPlay,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isDone
+                          ? Icons.check_circle_rounded
+                          : Icons.play_arrow_rounded,
+                      size: 16,
+                      color: isDone ? const Color(0xFF48F2C1) : null,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isDone ? 'REPLAY' : 'PLAY SHIFT',
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+
+              final mutatorsWrap = Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: contract.mutators.map((m) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF162536),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      m.name,
+                      style: const TextStyle(
+                        color: Color(0xFFBDD2E4),
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: accent.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: accent, width: 1.5),
+                          ),
+                          child: Icon(gameDef.icon, color: accent, size: 18),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'DAILY CONTRACT // ${contract.dateKey}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: accent,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w900,
+                                        fontFamily: 'PressStart2P',
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  streakWidget,
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                gameDef.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    mutatorsWrap,
+                    const SizedBox(height: 10),
+                    playButton,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: accent, width: 1.5),
+                    ),
+                    child: Icon(gameDef.icon, color: accent, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                'DAILY CONTRACT // ${contract.dateKey}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: accent,
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w900,
+                                  fontFamily: 'PressStart2P',
+                                  letterSpacing: 1.1,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            streakWidget,
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          gameDef.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        mutatorsWrap,
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  playButton,
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _FeaturedGamePanel extends StatelessWidget {

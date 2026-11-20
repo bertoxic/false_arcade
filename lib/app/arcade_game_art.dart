@@ -2,11 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../games/fall_due/fall_due_game.dart';
+import '../games/future_debt/future_debt_game.dart';
+
 /// Compact, game-specific cover illustrations used by the arcade selector.
-///
-/// These stay in code on purpose: the art can share each game's neon language,
-/// scales cleanly on every screen, and does not turn the launcher into a web
-/// catalogue of stock images.
 class ArcadeGameArtwork extends StatelessWidget {
   const ArcadeGameArtwork({
     super.key,
@@ -20,16 +19,20 @@ class ArcadeGameArtwork extends StatelessWidget {
   final bool muted;
 
   @override
-  Widget build(BuildContext context) => RepaintBoundary(
-    child: CustomPaint(
-      painter: _ArcadeGameArtworkPainter(
-        gameId: gameId,
-        colors: colors,
-        muted: muted,
+  Widget build(BuildContext context) {
+    if (gameId == 'fall_due') return FallDueCover(muted: muted);
+    if (gameId == 'future_debt') return FutureDebtCover(muted: muted);
+    return RepaintBoundary(
+      child: CustomPaint(
+        painter: _ArcadeGameArtworkPainter(
+          gameId: gameId,
+          colors: colors,
+          muted: muted,
+        ),
+        child: const SizedBox.expand(),
       ),
-      child: const SizedBox.expand(),
-    ),
-  );
+    );
+  }
 }
 
 class ArcadeGridField extends StatelessWidget {
@@ -143,14 +146,6 @@ class _ArcadeGameArtworkPainter extends CustomPainter {
       case 'numberfall':
         _drawNumberfall(canvas, size);
         break;
-      case 'fall_due':
-        _drawFallDue(canvas, size);
-        break;
-      case 'future_debt':
-        _drawFutureDebt(canvas, size);
-        break;
-      default:
-        _drawFutureDebt(canvas, size);
     }
     final vignette = Paint()
       ..shader = RadialGradient(
@@ -463,268 +458,6 @@ class _ArcadeGameArtworkPainter extends CustomPainter {
       Offset(size.width * .52, size.height * .67),
       math.max(6, size.shortestSide * .025),
       const Color(0xFFFFE66D),
-    );
-  }
-
-  void _drawFallDue(Canvas canvas, Size size) {
-    // 1. Distant skyscraper silhouettes
-    final cityPaint = Paint()..color = const Color(0xFF0C1728).withValues(alpha: 0.6 * _alpha);
-    for (var i = 0; i < 6; i++) {
-      final bx = size.width * (0.05 + i * 0.17);
-      final bh = size.height * (0.28 + (i * 3 % 4) * 0.08);
-      canvas.drawRect(Rect.fromLTWH(bx, size.height * 0.82 - bh, size.width * 0.12, bh), cityPaint);
-    }
-
-    // 2. Glowing gravitational field distortion rings
-    final center = Offset(size.width * .55, size.height * .48);
-    final arcPaint = Paint()
-      ..color = const Color(0xFFFFD36A).withValues(alpha: .75 * _alpha)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: size.shortestSide * .28),
-      math.pi * 0.9,
-      math.pi * 1.25,
-      false,
-      arcPaint,
-    );
-    final cyanArc = Paint()
-      ..color = _primary.withValues(alpha: .65 * _alpha)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: size.shortestSide * .36),
-      math.pi * 1.3,
-      math.pi * 0.9,
-      false,
-      cyanArc,
-    );
-
-    // 3. Floating high-tech modular platforms
-    final platformPaint = Paint()..color = const Color(0xFF19283E).withValues(alpha: 0.9 * _alpha);
-    final railPaint = Paint()
-      ..color = _primary.withValues(alpha: .95 * _alpha)
-      ..strokeWidth = 2.5;
-    for (var index = 0; index < 4; index++) {
-      final width = size.width * (.18 + (index % 2) * .05);
-      final left = size.width * (.08 + index * .23);
-      final top = size.height * (.76 - (index % 3) * .13);
-      final pRect = Rect.fromLTWH(left, top, width, 10);
-      canvas.drawRRect(RRect.fromRectAndRadius(pRect, const Radius.circular(3)), platformPaint);
-      canvas.drawLine(pRect.topLeft, pRect.topRight, railPaint);
-    }
-
-    // 4. Heavy Gravity Cargo Crate on lower platform
-    final cratePos = Offset(size.width * 0.22, size.height * 0.70);
-    final crateRect = Rect.fromCenter(center: cratePos, width: 22, height: 22);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(crateRect, const Radius.circular(4)),
-      Paint()..color = const Color(0xFF2A1C0E),
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(crateRect, const Radius.circular(4)),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.6
-        ..color = const Color(0xFFFFD36A).withValues(alpha: 0.9 * _alpha),
-    );
-    canvas.drawCircle(cratePos, 4, Paint()..color = const Color(0xFFFFD36A).withValues(alpha: 0.9 * _alpha));
-
-    // 5. Cyber-Astronaut Hero leaping in mid-air
-    final heroPos = Offset(size.width * 0.58, size.height * 0.36);
-    // Thruster exhaust plumes
-    canvas.drawLine(
-      heroPos + const Offset(-4, 12),
-      heroPos + const Offset(-6, 24),
-      Paint()
-        ..color = _primary.withValues(alpha: 0.85 * _alpha)
-        ..strokeWidth = 3.5
-        ..strokeCap = StrokeCap.round,
-    );
-    canvas.drawLine(
-      heroPos + const Offset(4, 12),
-      heroPos + const Offset(2, 24),
-      Paint()
-        ..color = _primary.withValues(alpha: 0.85 * _alpha)
-        ..strokeWidth = 3.5
-        ..strokeCap = StrokeCap.round,
-    );
-    // Torso & backpack
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: heroPos + const Offset(0, 3), width: 14, height: 16),
-        const Radius.circular(4),
-      ),
-      Paint()..color = const Color(0xFF1E2D44),
-    );
-    // Helmet
-    canvas.drawCircle(heroPos - const Offset(0, 7), 8, Paint()..color = const Color(0xFFE5F3FF));
-    // Glowing visor glint
-    canvas.drawOval(
-      Rect.fromCenter(center: heroPos - const Offset(-2, 7), width: 7, height: 5),
-      Paint()..color = _primary.withValues(alpha: _alpha),
-    );
-
-    // 6. Quantum Siphon Lightning Tether connecting Hero to Crate
-    final tetherPaint = Paint()
-      ..color = const Color(0xFFFFD36A).withValues(alpha: 0.85 * _alpha)
-      ..strokeWidth = 1.8;
-    canvas.drawLine(heroPos + const Offset(0, 8), cratePos, tetherPaint);
-    canvas.drawCircle(
-      cratePos,
-      18,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4
-        ..color = const Color(0xFFFFD36A).withValues(alpha: 0.65 * _alpha),
-    );
-
-    // 7. Floating Holographic Chronal Seal in upper-right
-    final sealPos = Offset(size.width * 0.84, size.height * 0.28);
-    _glowCircle(canvas, sealPos, math.max(6, size.shortestSide * 0.026), const Color(0xFF52FFB8));
-  }
-
-  void _drawFutureDebt(Canvas canvas, Size size) {
-    final arena = Rect.fromCenter(
-      center: Offset(size.width * .58, size.height * .50),
-      width: size.width * .72,
-      height: size.height * .74,
-    );
-
-    // 1. High-Tech Cyber-Floor Grid with glowing intersection crosses
-    final gridPaint = Paint()
-      ..color = _primary.withValues(alpha: .20 * _alpha)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-    canvas.drawRect(arena, gridPaint);
-
-    final spacing = math.max(18.0, arena.height / 7);
-    for (double x = arena.left; x <= arena.right; x += spacing) {
-      canvas.drawLine(Offset(x, arena.top), Offset(x, arena.bottom), gridPaint);
-    }
-    for (double y = arena.top; y <= arena.bottom; y += spacing) {
-      canvas.drawLine(Offset(arena.left, y), Offset(arena.right, y), gridPaint);
-    }
-
-    // 2. Tactical Flashlight Illumination Cone
-    final player = Offset(
-      arena.center.dx - size.width * 0.06,
-      arena.center.dy + arena.height * .14,
-    );
-    final aimTarget = Offset(arena.right - size.width * 0.08, arena.top + arena.height * 0.16);
-    final aimDiff = aimTarget - player;
-    final aimLength = math.sqrt(aimDiff.dx * aimDiff.dx + aimDiff.dy * aimDiff.dy);
-    final aimDir = aimLength > 0.001 ? aimDiff / aimLength : const Offset(1, 0);
-
-    final beamPath = Path()
-      ..moveTo(player.dx, player.dy)
-      ..lineTo(aimTarget.dx - 30, aimTarget.dy - 35)
-      ..lineTo(aimTarget.dx + 35, aimTarget.dy + 30)
-      ..close();
-    canvas.drawPath(
-      beamPath,
-      Paint()
-        ..shader = RadialGradient(
-          center: Alignment(
-            (player.dx / size.width) * 2 - 1,
-            (player.dy / size.height) * 2 - 1,
-          ),
-          radius: 0.8,
-          colors: [
-            _primary.withValues(alpha: 0.25 * _alpha),
-            Colors.transparent,
-          ],
-        ).createShader(arena),
-    );
-
-    // 3. Directional Targeting Laser Sight Beam
-    final laserPaint = Paint()
-      ..color = const Color(0xFFFF3355).withValues(alpha: 0.8 * _alpha)
-      ..strokeWidth = 1.4;
-    canvas.drawLine(player, aimTarget, laserPaint);
-    canvas.drawCircle(aimTarget, 3.5, Paint()..color = const Color(0xFFFF3355).withValues(alpha: 0.9 * _alpha));
-
-    // 4. Spec-Ops Operative (Player)
-    canvas.drawCircle(player, 11, Paint()..color = const Color(0xFF162338));
-    canvas.drawCircle(
-      player,
-      11,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.8
-        ..color = _primary.withValues(alpha: 0.9 * _alpha),
-    );
-    // Weapon barrel
-    canvas.drawLine(
-      player,
-      player + aimDir * 18,
-      Paint()
-        ..color = const Color(0xFFE2F8FF)
-        ..strokeWidth = 3.5
-        ..strokeCap = StrokeCap.square,
-    );
-    // Muzzle flash
-    canvas.drawCircle(player + aimDir * 19, 4.5, Paint()..color = const Color(0xFFFFF0A0));
-
-    // 5. Orbiting Holographic Debt Contract Slips
-    for (var i = 0; i < 3; i++) {
-      final angle = i * math.pi * 2 / 3 + 0.4;
-      final slipPos = player + Offset(math.cos(angle) * 24, math.sin(angle) * 24);
-      final slipRect = Rect.fromCenter(center: slipPos, width: 8, height: 5);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(slipRect, const Radius.circular(1.5)),
-        Paint()..color = const Color(0xFFFF4F7F).withValues(alpha: 0.8 * _alpha),
-      );
-    }
-
-    // 6. Menacing Eldritch Creditor Entities lurking in darkness
-    for (final pos in [
-      aimTarget,
-      Offset(arena.left + arena.width * .16, arena.top + arena.height * .24),
-      Offset(arena.right - arena.width * .14, arena.bottom - arena.height * .26),
-    ]) {
-      // Dark matter aura
-      canvas.drawCircle(
-        pos,
-        14,
-        Paint()..color = const Color(0xFFFF3355).withValues(alpha: .22 * _alpha),
-      );
-      // Entity core
-      canvas.drawCircle(
-        pos,
-        8,
-        Paint()..color = const Color(0xFF381022),
-      );
-      canvas.drawCircle(
-        pos,
-        8,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5
-          ..color = const Color(0xFFFF5277).withValues(alpha: 0.9 * _alpha),
-      );
-      // Glowing evil eye
-      canvas.drawCircle(
-        pos,
-        2.5,
-        Paint()..color = const Color(0xFFFFF0A0),
-      );
-    }
-
-    // 7. Swirling Quantum Extraction Rift
-    final portalPos = Offset(arena.left + arena.width * 0.14, arena.bottom - arena.height * 0.18);
-    canvas.drawCircle(
-      portalPos,
-      12,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0
-        ..color = const Color(0xFFC995FF).withValues(alpha: 0.85 * _alpha),
-    );
-    canvas.drawCircle(
-      portalPos,
-      6,
-      Paint()..color = const Color(0xFFC995FF).withValues(alpha: 0.45 * _alpha),
     );
   }
 

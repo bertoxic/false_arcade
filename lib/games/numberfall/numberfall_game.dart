@@ -12,7 +12,6 @@ import '../../core/game_presentation.dart';
 import '../../core/logical_viewport.dart';
 import '../../core/arcade_achievements.dart';
 import '../../core/arcade_fever.dart';
-import '../../ui/arcade_screen_filter.dart';
 import '../../ui/game_controls.dart';
 import '../../ui/screen_shake.dart';
 

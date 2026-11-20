@@ -210,8 +210,7 @@ class _NumberfallPageState extends State<NumberfallPage>
                                     color: const Color(0xFF376A78),
                                   ),
                                 ),
-                                child: ArcadeScreenFilter(
-                                  child: Stack(
+                                child: Stack(
                                     children: [
                                     Positioned.fill(
                                       child: CustomPaint(
@@ -263,14 +262,14 @@ class _NumberfallPageState extends State<NumberfallPage>
                                       ),
                                     Positioned(
                                       left: 15,
-                                      bottom: 15,
+                                      bottom: constraints.maxWidth < 400 ? 130 : 15,
                                       child: Row(
                                         children: [
                                           HoldGameButton(
                                             label: 'LEFT',
                                             icon: Icons.chevron_left_rounded,
                                             color: const Color(0xFF67D9ED),
-                                            size: compact ? 78 : 92,
+                                            size: compact ? 94 : 110,
                                             onChanged: (value) => setState(
                                               () => game.left = value,
                                             ),
@@ -280,7 +279,7 @@ class _NumberfallPageState extends State<NumberfallPage>
                                             label: 'RIGHT',
                                             icon: Icons.chevron_right_rounded,
                                             color: const Color(0xFF67D9ED),
-                                            size: compact ? 78 : 92,
+                                            size: compact ? 94 : 110,
                                             onChanged: (value) => setState(
                                               () => game.right = value,
                                             ),
@@ -295,7 +294,7 @@ class _NumberfallPageState extends State<NumberfallPage>
                                         label: 'JUMP',
                                         icon: Icons.arrow_upward_rounded,
                                         color: const Color(0xFFFFE66D),
-                                        size: compact ? 80 : 94,
+                                        size: compact ? 96 : 112,
                                         onChanged: (value) =>
                                             setState(() => game.setJump(value)),
                                       ),
@@ -368,7 +367,6 @@ class _NumberfallPageState extends State<NumberfallPage>
                                       ),
                                   ],
                                 ),
-                              ),
                               ),
                             ),
                           ),
@@ -525,10 +523,11 @@ class _NumberOverlay extends StatelessWidget {
     child: ColoredBox(
       color: const Color(0xC9061118),
       child: Center(
-        child: Container(
-          width: 410,
-          margin: const EdgeInsets.all(20),
-          padding: const EdgeInsets.all(23),
+        child: SingleChildScrollView(
+          child: Container(
+            width: 410,
+            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.all(23),
           decoration: BoxDecoration(
             color: const Color(0xFF0B1A23),
             borderRadius: BorderRadius.circular(18),
@@ -590,6 +589,7 @@ class _NumberOverlay extends StatelessWidget {
               ),
             ],
           ),
+        ),
         ),
       ),
     ),

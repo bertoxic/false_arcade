@@ -472,17 +472,21 @@ class _TrophiesTab extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              'TROPHIES UNLOCKED: $unlocked / $total ($pct%)',
-                              style: const TextStyle(
-                                color: Color(0xFFE2EEF8),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1,
+                            Expanded(
+                              child: Text(
+                                'TROPHIES UNLOCKED: $unlocked / $total ($pct%)',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFFE2EEF8),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.8,
+                                ),
                               ),
                             ),
+                            const SizedBox(width: 8),
                             Text(
                               unlocked == total ? '★ 100% COMPLETE' : 'KEEP PLAYING',
                               style: const TextStyle(
@@ -681,9 +685,10 @@ class _InitialsDialogState extends State<_InitialsDialog> {
             ),
           ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             const Icon(Icons.emoji_events_rounded, color: Color(0xFFFFD36A), size: 36),
             const SizedBox(height: 8),
             const Text(
@@ -791,6 +796,7 @@ class _InitialsDialogState extends State<_InitialsDialog> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

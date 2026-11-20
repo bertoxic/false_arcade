@@ -186,15 +186,9 @@ class _RealityGamePageState extends State<RealityGamePage>
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final compact = constraints.maxHeight < 520;
-                return Column(
-                  children: [
-                    Offstage(
-                      offstage: true,
-                      child: _TopHud(game: game, compact: compact),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(4, 3, 4, 4),
+                final isNarrow = constraints.maxWidth < 560;
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 3, 4, 4),
                         child: Center(
                           child: SizedBox.expand(
                             child: ClipRRect(
@@ -224,11 +218,14 @@ class _RealityGamePageState extends State<RealityGamePage>
                                       ),
                                     ),
                                     Positioned(
-                                      top: 60,
-                                      left: 12,
-                                      right: 170,
+                                      top: isNarrow ? 12 : 60,
+                                      left: isNarrow ? 54 : 12,
+                                      right: isNarrow ? 54 : 170,
                                       child: IgnorePointer(
-                                        child: _RealityArenaHud(game: game),
+                                        child: _RealityArenaHud(
+                                          game: game,
+                                          compact: isNarrow,
+                                        ),
                                       ),
                                     ),
                                     Positioned(
@@ -251,7 +248,7 @@ class _RealityGamePageState extends State<RealityGamePage>
                                       ),
                                     Positioned(
                                       left: compact ? 12 : 18,
-                                      bottom: compact ? 10 : 18,
+                                      bottom: constraints.maxWidth < 400 ? 130 : (compact ? 10 : 18),
                                       child: _Joystick(onChanged: _setMove),
                                     ),
                                     Positioned(
@@ -266,7 +263,7 @@ class _RealityGamePageState extends State<RealityGamePage>
                                             icon: Icons.hourglass_top_rounded,
                                             color: const Color(0xFFE94D79),
                                             active: game.holding,
-                                            diameter: compact ? 74 : 84,
+                                            diameter: compact ? 90 : 102,
                                             onChanged: _setNotYet,
                                           ),
                                           SizedBox(width: compact ? 10 : 14),
@@ -274,14 +271,14 @@ class _RealityGamePageState extends State<RealityGamePage>
                                             label: 'FIRE',
                                             icon: Icons.gps_fixed_rounded,
                                             color: const Color(0xFF4ADCF2),
-                                            diameter: compact ? 68 : 78,
+                                            diameter: compact ? 84 : 96,
                                             onChanged: _setFire,
                                           ),
                                         ],
                                       ),
                                     ),
                                     Positioned(
-                                      top: 57,
+                                      top: isNarrow ? 52 : 57,
                                       right: 15,
                                       child: _DebtChip(game: game),
                                     ),
@@ -346,25 +343,18 @@ class _RealityGamePageState extends State<RealityGamePage>
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                    Offstage(
-                      offstage: true,
-                      child: _BottomHud(game: game, compact: compact),
-                    ),
-                  ],
-                );
-              },
+                      );
+                    },
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-      ),
-    );
+          );
   }
 }
 
-class _TopHud extends StatelessWidget {
-  const _TopHud({required this.game, required this.compact});
+class _RealityArenaHud extends StatelessWidget {
+  const _RealityArenaHud({required this.game, this.compact = false});
 
   final RealityGame game;
   final bool compact;
@@ -372,146 +362,95 @@ class _TopHud extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hpFraction = game.hitPoints / RealityGame.maxHitPoints;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, compact ? 7 : 12, 16, 0),
-      child: Row(
-        children: [
-          if (!compact) ...[
-            const Icon(Icons.bolt_rounded, color: Color(0xFFFFD166), size: 25),
-            const SizedBox(width: 6),
-            const Text(
-              'NOT YET',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 3,
-              ),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const NeverScrollableScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _StatChip(
+              icon: Icons.favorite_rounded,
+              label: compact
+                  ? '${game.hitPoints.clamp(0, RealityGame.maxHitPoints)} HP'
+                  : '${game.hitPoints.clamp(0, RealityGame.maxHitPoints)} / ${RealityGame.maxHitPoints}',
+              valueColor: hpFraction > .4
+                  ? const Color(0xFF79F2BE)
+                  : const Color(0xFFFF6386),
             ),
-            const SizedBox(width: 16),
-          ],
-          _StatChip(
-            icon: Icons.favorite_rounded,
-            label:
-                '${game.hitPoints.clamp(0, RealityGame.maxHitPoints)} / ${RealityGame.maxHitPoints}',
-            valueColor: hpFraction > .4
-                ? const Color(0xFF79F2BE)
-                : const Color(0xFFFF6386),
-          ),
-          const SizedBox(width: 8),
-          _StatChip(
-            icon: Icons.stars_rounded,
-            label: game.score.toString().padLeft(5, '0'),
-            valueColor: const Color(0xFFFFD166),
-          ),
-          const Spacer(),
-          Text(
-            'SECTOR ${game.levelIndex + 1}  •  ${game.level.title.toUpperCase()}',
-            textAlign: TextAlign.end,
-            style: TextStyle(
-              color: const Color(0xFFC9D5F3),
-              fontWeight: FontWeight.w800,
-              fontSize: compact ? 10 : 12,
-              letterSpacing: compact ? .5 : 1.1,
+            const SizedBox(width: 4),
+            _StatChip(
+              icon: Icons.stars_rounded,
+              label: game.score.toString().padLeft(5, '0'),
+              valueColor: const Color(0xFFFFD166),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RealityArenaHud extends StatelessWidget {
-  const _RealityArenaHud({required this.game});
-
-  final RealityGame game;
-
-  @override
-  Widget build(BuildContext context) {
-    final hpFraction = game.hitPoints / RealityGame.maxHitPoints;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
-      child: Row(
-        children: [
-          _StatChip(
-            icon: Icons.favorite_rounded,
-            label:
-                '${game.hitPoints.clamp(0, RealityGame.maxHitPoints)} / ${RealityGame.maxHitPoints}',
-            valueColor: hpFraction > .4
-                ? const Color(0xFF79F2BE)
-                : const Color(0xFFFF6386),
-          ),
-          const SizedBox(width: 6),
-          _StatChip(
-            icon: Icons.stars_rounded,
-            label: game.score.toString().padLeft(5, '0'),
-            valueColor: const Color(0xFFFFD166),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'PURGE ${game.defeated}/${game.level.goal}   ·   CHAIN ×${game.chain.toStringAsFixed(1)}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFFC9D5F3),
-                fontSize: 9,
-                fontWeight: FontWeight.w900,
-                letterSpacing: .5,
-              ),
-            ),
-          ),
-          ValueListenableBuilder<double>(
-            valueListenable: ArcadeFever.energyNotifier,
-            builder: (context, energy, _) {
-              if (energy <= 0) return const SizedBox.shrink();
-              final isFever = ArcadeFever.isActive;
-              return Container(
-                margin: const EdgeInsets.only(left: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(
-                  color: isFever
-                      ? const Color(0xFFFFD36A).withValues(alpha: 0.25)
-                      : const Color(0xFF111829),
-                  borderRadius: BorderRadius.circular(11),
-                  border: Border.all(
-                    color: isFever
-                        ? const Color(0xFFFFD36A)
-                        : const Color(0xFF48F2C1),
-                    width: isFever ? 1.8 : 1.0,
-                  ),
+            if (!compact) ...[
+              const SizedBox(width: 8),
+              Text(
+                'PURGE ${game.defeated}/${game.level.goal}   ·   CHAIN ×${game.chain.toStringAsFixed(1)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFFC9D5F3),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: .5,
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isFever ? Icons.auto_awesome_rounded : Icons.bolt_rounded,
-                      size: 13,
+              ),
+            ],
+            ValueListenableBuilder<double>(
+              valueListenable: ArcadeFever.energyNotifier,
+              builder: (context, energy, _) {
+                if (energy <= 0) return const SizedBox.shrink();
+                final isFever = ArcadeFever.isActive;
+                return Container(
+                  margin: const EdgeInsets.only(left: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: isFever
+                        ? const Color(0xFFFFD36A).withValues(alpha: 0.25)
+                        : const Color(0xFF111829),
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(
                       color: isFever
                           ? const Color(0xFFFFD36A)
                           : const Color(0xFF48F2C1),
+                      width: isFever ? 1.8 : 1.0,
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      isFever ? 'FEVER 2X!' : 'FEVER ${(energy * 100).toInt()}%',
-                      style: TextStyle(
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isFever ? Icons.auto_awesome_rounded : Icons.bolt_rounded,
+                        size: 13,
                         color: isFever
                             ? const Color(0xFFFFD36A)
                             : const Color(0xFF48F2C1),
-                        fontSize: 8,
-                        fontWeight: FontWeight.w900,
-                        fontFamily: 'PressStart2P',
                       ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ],
+                      const SizedBox(width: 4),
+                      Text(
+                        isFever ? 'FEVER 2X!' : 'FEVER ${(energy * 100).toInt()}%',
+                        style: TextStyle(
+                          color: isFever
+                              ? const Color(0xFFFFD36A)
+                              : const Color(0xFF48F2C1),
+                          fontSize: 8,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'PressStart2P',
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
-
 }
 
 class _StatChip extends StatelessWidget {
@@ -528,105 +467,23 @@ class _StatChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
         color: const Color(0xFF111829),
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(9),
         border: Border.all(color: const Color(0xFF2E3C5B)),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: valueColor),
-          const SizedBox(width: 5),
+          Icon(icon, size: 13, color: valueColor),
+          const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
               color: valueColor,
               fontWeight: FontWeight.w900,
-              fontSize: 13,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BottomHud extends StatelessWidget {
-  const _BottomHud({required this.game, required this.compact});
-
-  final RealityGame game;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = game.level.goal == 0
-        ? 0.0
-        : game.defeated / game.level.goal;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, 0, 16, compact ? 7 : 11),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'PURGE ${game.defeated}/${game.level.goal}',
-                      style: TextStyle(
-                        color: const Color(0xFFBAC7E2),
-                        fontSize: compact ? 9 : 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'CHAIN ×${game.chain.toStringAsFixed(1)}',
-                      style: TextStyle(
-                        color: const Color(0xFFB993FF),
-                        fontSize: compact ? 9 : 11,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    if (game.powerupLabel.isNotEmpty) ...[
-                      const SizedBox(width: 12),
-                      Text(
-                        game.powerupLabel,
-                        style: TextStyle(
-                          color: const Color(0xFF8DDCFF),
-                          fontSize: compact ? 8 : 10,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 5),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: LinearProgressIndicator(
-                    minHeight: compact ? 5 : 7,
-                    value: progress.clamp(0.0, 1.0),
-                    color: const Color(0xFF8D73FF),
-                    backgroundColor: const Color(0xFF182033),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(width: compact ? 11 : 17),
-          Text(
-            game.statusText,
-            style: TextStyle(
-              color: game.holding
-                  ? const Color(0xFFFF80A0)
-                  : const Color(0xFF91A1C0),
-              fontWeight: FontWeight.w700,
-              fontSize: compact ? 9 : 11,
+              fontSize: 12,
             ),
           ),
         ],
@@ -718,15 +575,18 @@ class _Joystick extends StatefulWidget {
 class _JoystickState extends State<_Joystick> {
   int? _pointer;
   Offset _knob = Offset.zero;
-  static const _size = 104.0;
+  static const _size = 128.0;
 
   void _update(PointerEvent event) {
     final box = context.findRenderObject()! as RenderBox;
     final local = box.globalToLocal(event.position);
     final raw = local - const Offset(_size / 2, _size / 2);
-    final capped = raw.distance > 37 ? raw / raw.distance * 37 : raw;
+    final maxOffset = _size * .355;
+    final capped = raw.distance > maxOffset
+        ? raw / raw.distance * maxOffset
+        : raw;
     setState(() => _knob = capped);
-    widget.onChanged(capped / 37);
+    widget.onChanged(capped / maxOffset);
   }
 
   void _release(PointerEvent event) {
@@ -762,8 +622,8 @@ class _JoystickState extends State<_Joystick> {
             child: Transform.translate(
               offset: _knob,
               child: Container(
-                height: 43,
-                width: 43,
+                height: _size * .42,
+                width: _size * .42,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const RadialGradient(
@@ -1015,10 +875,11 @@ class _OverlayCard extends StatelessWidget {
       child: ColoredBox(
         color: const Color(0xC9080C15),
         child: Center(
-          child: Container(
-            width: 480,
-            margin: const EdgeInsets.symmetric(horizontal: 22),
-            padding: const EdgeInsets.fromLTRB(24, 23, 24, 20),
+          child: SingleChildScrollView(
+            child: Container(
+              width: 480,
+              margin: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+              padding: const EdgeInsets.fromLTRB(24, 23, 24, 20),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 begin: Alignment.topCenter,
@@ -1053,14 +914,18 @@ class _OverlayCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: dangerous ? const Color(0xFFFF8FA7) : Colors.white,
-                    fontSize: 39,
-                    height: 1,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2.5,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: dangerous ? const Color(0xFFFF8FA7) : Colors.white,
+                      fontSize: 39,
+                      height: 1,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2.5,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -1097,20 +962,28 @@ class _OverlayCard extends StatelessWidget {
                                 size: 14,
                               ),
                               const SizedBox(width: 5),
-                              Text(
-                                '${fact.title}: ',
-                                style: const TextStyle(
-                                  color: Color(0xFF90A1C1),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              Text(
-                                fact.value,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
+                              Flexible(
+                                child: Text.rich(
+                                  TextSpan(
+                                    text: '${fact.title}: ',
+                                    style: const TextStyle(
+                                      color: Color(0xFF90A1C1),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    children: [
+                                      TextSpan(
+                                        text: fact.value,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
@@ -1134,11 +1007,14 @@ class _OverlayCard extends StatelessWidget {
                       ),
                     ),
                     onPressed: onTap,
-                    child: Text(
-                      buttonLabel,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        buttonLabel,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1,
+                        ),
                       ),
                     ),
                   ),
@@ -1146,6 +1022,7 @@ class _OverlayCard extends StatelessWidget {
               ],
             ),
           ),
+        ),
         ),
       ),
     );

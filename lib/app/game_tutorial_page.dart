@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../core/level_campaign.dart';
@@ -47,125 +49,147 @@ class _GameTutorialPageState extends State<GameTutorialPage> {
           ),
         ),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'TRAINING SIMULATION',
-                  style: TextStyle(
-                    color: accent,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.7,
-                  ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxHeight < 560;
+              final iconSize = isCompact ? 54.0 : 84.0;
+              final iconSpacing = isCompact ? 14.0 : 28.0;
+
+              return SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: constraints.maxWidth < 400 ? 16 : 24,
+                  vertical: isCompact ? 14 : 24,
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  widget.game.title,
-                  style: const TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w900,
-                    height: .9,
-                    letterSpacing: 1,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'LEVEL ${widget.level.number.toString().padLeft(2, '0')} · ${widget.level.chapterTitle}',
-                  style: const TextStyle(
-                    color: Color(0xFFA9B7CA),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: .8,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'OBJECTIVE · ${widget.level.objective}',
-                  style: TextStyle(
-                    color: accent,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: .35,
-                  ),
-                ),
-                const Spacer(),
-                Center(child: Icon(step.icon, size: 84, color: accent)),
-                const SizedBox(height: 28),
-                Center(
-                  child: Text(
-                    step.title,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: .6,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: math.max(
+                      0.0,
+                      constraints.maxHeight - (isCompact ? 28 : 48),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 480),
-                    child: Text(
-                      step.body,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Color(0xFFCFD9E8),
-                        fontSize: 15,
-                        height: 1.45,
-                      ),
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                Row(
-                  children: [
-                    for (var index = 0; index < _steps.length; index++)
-                      Expanded(
-                        child: Container(
-                          height: 4,
-                          margin: EdgeInsets.only(
-                            right: index == _steps.length - 1 ? 0 : 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: index <= _step
-                                ? accent
-                                : const Color(0xFF344154),
-                            borderRadius: BorderRadius.circular(99),
+                  child: IntrinsicHeight(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'TRAINING SIMULATION',
+                          style: TextStyle(
+                            color: accent,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.7,
                           ),
                         ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: FilledButton.icon(
-                    onPressed: _advance,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: accent,
-                      foregroundColor: const Color(0xFF031018),
-                    ),
-                    icon: Icon(
-                      _step == _steps.length - 1
-                          ? Icons.play_arrow_rounded
-                          : Icons.arrow_forward_rounded,
-                    ),
-                    label: Text(
-                      _step == _steps.length - 1 ? 'BEGIN LEVEL' : 'NEXT',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: .7,
-                      ),
+                        const SizedBox(height: 10),
+                        Text(
+                          widget.game.title,
+                          style: TextStyle(
+                            fontSize: isCompact ? 24 : 30,
+                            fontWeight: FontWeight.w900,
+                            height: .9,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'LEVEL ${widget.level.number.toString().padLeft(2, '0')} · ${widget.level.chapterTitle}',
+                          style: const TextStyle(
+                            color: Color(0xFFA9B7CA),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: .8,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'OBJECTIVE · ${widget.level.objective}',
+                          style: TextStyle(
+                            color: accent,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: .35,
+                          ),
+                        ),
+                        const Spacer(),
+                        Center(child: Icon(step.icon, size: iconSize, color: accent)),
+                        SizedBox(height: iconSpacing),
+                        Center(
+                          child: Text(
+                            step.title,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: isCompact ? 20 : 24,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: .6,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 480),
+                            child: Text(
+                              step.body,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: const Color(0xFFCFD9E8),
+                                fontSize: isCompact ? 13 : 15,
+                                height: 1.45,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            for (var index = 0; index < _steps.length; index++)
+                              Expanded(
+                                child: Container(
+                                  height: 4,
+                                  margin: EdgeInsets.only(
+                                    right: index == _steps.length - 1 ? 0 : 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: index <= _step
+                                        ? accent
+                                        : const Color(0xFF344154),
+                                    borderRadius: BorderRadius.circular(99),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          height: isCompact ? 46 : 52,
+                          child: FilledButton.icon(
+                            onPressed: _advance,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: accent,
+                              foregroundColor: const Color(0xFF031018),
+                            ),
+                            icon: Icon(
+                              _step == _steps.length - 1
+                                  ? Icons.play_arrow_rounded
+                                  : Icons.arrow_forward_rounded,
+                            ),
+                            label: Text(
+                              _step == _steps.length - 1 ? 'BEGIN LEVEL' : 'NEXT',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: .7,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -264,7 +288,7 @@ const _tutorials = <String, List<_TutorialStep>>{
     ),
     _TutorialStep(
       'TRANSFER THE DEBT',
-      'Give (Q) makes crates heavy enough to build bridges; Take (E) makes them rise into locks or launches collectors. Pick the target with F.',
+      'Tap a crate, enemy, or turret to select it. Give (Q) adds weight and Take (E) removes it. Tap open ground to return to automatic targeting. F also selects a nearby target on keyboard.',
       Icons.swap_horiz_rounded,
     ),
     _TutorialStep(
@@ -286,7 +310,7 @@ const _tutorials = <String, List<_TutorialStep>>{
     ),
     _TutorialStep(
       'POWER NOW, CONSEQUENCES LATER',
-      'Borrowed powers are strong, but their future bills change the fight. Ghost Wage phases through walls; Reverse Payment turns danger back on enemies.',
+      'Tap the controls above Fire to phase through walls with Ghost Wage or reflect enemy fire with Reverse Payment. Defeated enemies can drop Compound Fire or Cash Out.',
       Icons.currency_exchange_rounded,
     ),
   ],

@@ -215,7 +215,7 @@ class _EchoHeistPageState extends State<EchoHeistPage>
                         bottom: compact ? 12 : 18,
                         child: TouchStick(
                           key: ValueKey(_inputEpoch),
-                          size: compact ? 90 : 108,
+                          size: compact ? 112 : 132,
                           onChanged: (value) =>
                               setState(() => _movement.setAnalog(value)),
                         ),
