@@ -48,7 +48,17 @@ enum _DueLandscape {
   final Color rim;
 
   String get path => 'assets/images/fall_due/$asset.jpg';
+
+  String get music => switch (this) {
+    grove => 'sunset_steps',
+    canyon => 'ember_current',
+    ridge => 'settlement',
+  };
 }
+
+_DueLandscape _landscapeForStage(int index) => index < _chapters.length
+    ? _chapters[index].landscape
+    : _DueLandscape.values[index % _DueLandscape.values.length];
 
 /// The selector uses the opening stretch of the actual game scene.
 class FallDueCover extends StatelessWidget {

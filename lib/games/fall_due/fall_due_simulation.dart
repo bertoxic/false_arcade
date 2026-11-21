@@ -3,7 +3,6 @@ part of 'fall_due_game.dart';
 enum _DuePhase { intro, playing, stageClear, dead, won }
 
 class _FallDueGame {
-  static const musicTheme = 'sunset_steps';
   static const viewWidth = FallDueTuning.viewWidth;
   static const viewHeight = FallDueTuning.viewHeight;
   static const interactionRange = FallDueTuning.interactionRange;
@@ -14,111 +13,148 @@ class _FallDueGame {
   );
   static final stages = <_DueStage>[
     _DueStage(
-      title: 'FIRST INSTALMENT',
+      title: 'WEIGHT & VELOCITY',
       briefing:
-          'Learn the rhythm across a full route: jump, feather Borrow, and land with control.',
+          'Feather Borrow to glide and Slam to land. Push crates onto weight plates to open route blast gates.',
       platforms: const [
         Rect.fromLTWH(-40, 430, 400, 110),
         Rect.fromLTWH(470, 430, 360, 110),
-        Rect.fromLTWH(960, 430, 410, 110),
-        Rect.fromLTWH(1480, 430, 480, 110),
-        Rect.fromLTWH(500, 335, 150, 18),
-        Rect.fromLTWH(1005, 315, 155, 18),
+        Rect.fromLTWH(960, 430, 420, 110),
+        Rect.fromLTWH(1460, 430, 500, 110),
+        Rect.fromLTWH(500, 335, 140, 18),
+        Rect.fromLTWH(960, 250, 150, 18),
         Rect.fromLTWH(1330, 260, 135, 18),
       ],
       spikes: const [
         Rect.fromLTWH(360, 465, 110, 55),
-        Rect.fromLTWH(830, 465, 130, 55),
-        Rect.fromLTWH(1370, 465, 110, 55),
+        Rect.fromLTWH(890, 465, 70, 55),
+        Rect.fromLTWH(1380, 465, 80, 55),
       ],
-      targets: const [],
+      targets: const [
+        _DueTargetSpec(560, 390, _TargetKind.crate),
+      ],
+      weightPlates: const [
+        _DueWeightPlateSpec(1, 700, 423, 85, 8),
+      ],
+      gravityPuzzles: const [
+        _GravityPuzzleSpec(
+          id: 1,
+          boxPosition: Offset(560, 390),
+          leverPosition: Offset(700, 270),
+          gate: Rect.fromLTWH(850, 175, 30, 255),
+        ),
+      ],
+      vents: const [
+        _DueKineticVentSpec(1000, 423, 70, 16, isUpdraft: true),
+      ],
+      spikeTraps: const [
+        _DueSpikeTrapSpec(1380, 465, 80, 55, cycleOffset: 0.0),
+      ],
+      weakPanels: const [
+        Rect.fromLTWH(1510, 335, 130, 16),
+      ],
       seals: const [
         Offset(300, 390),
-        Offset(560, 300),
-        Offset(1060, 280),
-        Offset(1395, 225),
+        Offset(700, 230),
+        Offset(1035, 195),
+        Offset(1395, 220),
         Offset(1740, 390),
       ],
-      safeDebtPads: const [Rect.fromLTWH(1530, 423, 92, 7)],
+      safeDebtPads: const [Rect.fromLTWH(1560, 423, 92, 7)],
       exit: const Rect.fromLTWH(1840, 350, 56, 80),
       route: const _DueRoute(
         sections: [
           _DueSectionSpec(
             1900,
-            'LOAN LAB',
-            'Use Take on the yellow audit crate to float it through the lift shaft and hold the first lock.',
+            'LASER OCCLUSION',
+            'Push the crate down to block the laser beam, or phase shift safely across.',
           ),
           _DueSectionSpec(
-            3500,
-            'NARROW MARGIN',
-            'A tight sequence rewards controlled short hops; the second crate opens the only clean exit.',
+            3350,
+            'CRUMBLING SPAN',
+            'Traverse crumbling ledges with feather Borrow hops; open the upper route gate.',
           ),
           _DueSectionSpec(
             4650,
-            'SETTLEMENT RUN',
-            'Finish on staggered ledges, then use the safe pad before the final landing.',
+            'SETTLEMENT VAULT',
+            'Invert the gravity well to clear the final chasm, then settle debt at the safe pad.',
           ),
         ],
         platforms: [
-          Rect.fromLTWH(1900, 430, 270, 110),
-          Rect.fromLTWH(2180, 430, 230, 110),
-          Rect.fromLTWH(2525, 430, 260, 110),
-          Rect.fromLTWH(2790, 360, 135, 18),
-          Rect.fromLTWH(2960, 300, 130, 18),
-          Rect.fromLTWH(3130, 235, 145, 18),
+          Rect.fromLTWH(1900, 430, 320, 110),
+          Rect.fromLTWH(2300, 430, 240, 110),
+          Rect.fromLTWH(2600, 430, 280, 110),
+          Rect.fromLTWH(2180, 320, 130, 18),
+          Rect.fromLTWH(2420, 270, 140, 18),
+          Rect.fromLTWH(2980, 430, 260, 110),
           Rect.fromLTWH(3350, 430, 270, 110),
-          Rect.fromLTWH(3680, 430, 125, 110),
-          Rect.fromLTWH(3910, 430, 105, 110),
-          Rect.fromLTWH(4140, 430, 115, 110),
-          Rect.fromLTWH(4315, 430, 280, 110),
-          Rect.fromLTWH(4635, 335, 125, 18),
-          Rect.fromLTWH(4795, 275, 140, 18),
-          Rect.fromLTWH(4965, 335, 120, 18),
-          Rect.fromLTWH(4820, 430, 210, 110),
-          Rect.fromLTWH(5110, 430, 540, 110),
+          Rect.fromLTWH(3680, 430, 130, 110),
+          Rect.fromLTWH(3910, 430, 120, 110),
+          Rect.fromLTWH(4140, 430, 130, 110),
+          Rect.fromLTWH(4360, 430, 280, 110),
+          Rect.fromLTWH(4700, 430, 220, 110),
+          Rect.fromLTWH(5060, 430, 580, 110),
         ],
         spikes: [
-          Rect.fromLTWH(2410, 465, 115, 55),
-          Rect.fromLTWH(3620, 465, 60, 55),
-          Rect.fromLTWH(3805, 465, 105, 55),
-          Rect.fromLTWH(4015, 465, 125, 55),
-          Rect.fromLTWH(4255, 465, 60, 55),
-          Rect.fromLTWH(4595, 465, 225, 55),
-          Rect.fromLTWH(5030, 465, 80, 55),
+          Rect.fromLTWH(2220, 465, 80, 55),
+          Rect.fromLTWH(2540, 465, 60, 55),
+          Rect.fromLTWH(2880, 465, 100, 55),
+          Rect.fromLTWH(3240, 465, 110, 55),
+          Rect.fromLTWH(3810, 465, 100, 55),
+          Rect.fromLTWH(4270, 465, 90, 55),
+          Rect.fromLTWH(4640, 465, 60, 55),
+          Rect.fromLTWH(4920, 465, 140, 55),
+        ],
+        targets: [
+          _DueTargetSpec(2220, 275, _TargetKind.crate),
+          _DueTargetSpec(3450, 390, _TargetKind.crate),
+        ],
+        laserGates: [
+          _DueLaserGateSpec(2480, 215, 20, 215, cycleOffset: 0.0),
+        ],
+        crumblingLedges: [
+          Rect.fromLTWH(3700, 340, 130, 18),
+          Rect.fromLTWH(3920, 280, 130, 18),
+        ],
+        vents: [
+          _DueKineticVentSpec(3380, 423, 60, 16, isUpdraft: true),
+        ],
+        spikeTraps: [
+          _DueSpikeTrapSpec(4030, 465, 110, 55, cycleOffset: 0.5),
+        ],
+        gravityWells: [
+          _DueGravityWellSpec(4800, 340, radius: 180),
+        ],
+        weightPlates: [
+          _DueWeightPlateSpec(11, 3500, 423, 80, 8),
         ],
         gravityPuzzles: [
           _GravityPuzzleSpec(
             id: 11,
-            boxPosition: Offset(2300, 390),
-            leverPosition: Offset(2318, 218),
-            gate: Rect.fromLTWH(2470, 145, 32, 285),
-          ),
-          _GravityPuzzleSpec(
-            id: 12,
-            boxPosition: Offset(3980, 390),
-            leverPosition: Offset(3980, 205),
-            gate: Rect.fromLTWH(4270, 145, 32, 285),
+            boxPosition: Offset(3450, 390),
+            leverPosition: Offset(3500, 220),
+            gate: Rect.fromLTWH(4300, 145, 32, 285),
           ),
         ],
         seals: [
           Offset(2050, 390),
-          Offset(2320, 180),
-          Offset(3025, 265),
-          Offset(3970, 350),
-          Offset(4795, 240),
+          Offset(2240, 220),
+          Offset(2750, 380),
+          Offset(3765, 290),
+          Offset(4190, 380),
           Offset(5370, 390),
         ],
         safeDebtPads: [
-          Rect.fromLTWH(3370, 423, 92, 7),
-          Rect.fromLTWH(4870, 423, 92, 7),
+          Rect.fromLTWH(3020, 423, 92, 7),
+          Rect.fromLTWH(5150, 423, 92, 7),
         ],
         exit: Rect.fromLTWH(5600, 350, 56, 80),
       ),
     ),
     _DueStage(
-      title: 'TRANSFER BRIDGE',
+      title: 'KINETIC BREACH',
       briefing:
-          'Give weight to build a bridge, then Take from the marked crate to latch the route gate.',
+          'Slam down to shatter weak floor panels. Block laser barriers with heavy freight to advance.',
       platforms: const [
         Rect.fromLTWH(-40, 430, 330, 110),
         Rect.fromLTWH(470, 430, 340, 110),
@@ -130,12 +166,27 @@ class _FallDueGame {
       ],
       spikes: const [
         Rect.fromLTWH(290, 465, 180, 55),
-        Rect.fromLTWH(810, 465, 130, 55),
         Rect.fromLTWH(1280, 465, 150, 55),
       ],
       targets: const [
         _DueTargetSpec(220, 390, _TargetKind.crate),
+        _DueTargetSpec(620, 390, _TargetKind.crate),
         _DueTargetSpec(1030, 258, _TargetKind.crate),
+      ],
+      weakPanels: const [
+        Rect.fromLTWH(290, 370, 170, 16),
+      ],
+      weightPlates: const [
+        _DueWeightPlateSpec(20, 680, 423, 85, 8),
+      ],
+      laserGates: const [
+        _DueLaserGateSpec(1180, 215, 20, 215, cycleOffset: 0.0),
+      ],
+      vents: const [
+        _DueKineticVentSpec(1250, 423, 60, 16, isUpdraft: true),
+      ],
+      spikeTraps: const [
+        _DueSpikeTrapSpec(810, 465, 130, 55, cycleOffset: 0.3),
       ],
       gravityPuzzles: const [
         _GravityPuzzleSpec(
@@ -158,7 +209,7 @@ class _FallDueGame {
           _DueSectionSpec(
             1900,
             'ANCHOR BAY',
-            'Give the loose crate weight and shove it into the long spike bed to make your first bridge.',
+            'Give the loose crate weight and shove it into the spike bed to bridge the crossing.',
           ),
           _DueSectionSpec(
             3400,
@@ -173,6 +224,7 @@ class _FallDueGame {
         ],
         platforms: [
           Rect.fromLTWH(1900, 430, 300, 110),
+          Rect.fromLTWH(2360, 360, 120, 18),
           Rect.fromLTWH(2590, 430, 240, 110),
           Rect.fromLTWH(2860, 365, 130, 18),
           Rect.fromLTWH(3025, 300, 135, 18),
@@ -200,6 +252,18 @@ class _FallDueGame {
           _DueTargetSpec(2110, 390, _TargetKind.crate),
           _DueTargetSpec(3760, 390, _TargetKind.crate),
           _DueTargetSpec(4750, 388, _TargetKind.enemy),
+        ],
+        weightPlates: [
+          _DueWeightPlateSpec(21, 2680, 423, 80, 8),
+        ],
+        laserGates: [
+          _DueLaserGateSpec(3600, 215, 20, 215, cycleOffset: 0.4),
+        ],
+        vents: [
+          _DueKineticVentSpec(4200, 423, 60, 16, isUpdraft: true),
+        ],
+        crumblingLedges: [
+          Rect.fromLTWH(4750, 340, 130, 18),
         ],
         gravityPuzzles: [
           _GravityPuzzleSpec(
@@ -241,13 +305,11 @@ class _FallDueGame {
         Rect.fromLTWH(1360, 430, 600, 110),
         Rect.fromLTWH(275, 345, 135, 18),
         Rect.fromLTWH(500, 285, 145, 18),
-        Rect.fromLTWH(915, 330, 135, 18),
         Rect.fromLTWH(1120, 260, 150, 18),
         Rect.fromLTWH(1440, 315, 145, 18),
       ],
       spikes: const [
         Rect.fromLTWH(260, 465, 140, 55),
-        Rect.fromLTWH(730, 465, 140, 55),
         Rect.fromLTWH(1220, 465, 140, 55),
       ],
       targets: const [
@@ -256,6 +318,21 @@ class _FallDueGame {
         _DueTargetSpec(965, 288, _TargetKind.enemy),
         _DueTargetSpec(1490, 273, _TargetKind.enemy),
         _DueTargetSpec(1160, 390, _TargetKind.crate),
+      ],
+      weightPlates: const [
+        _DueWeightPlateSpec(30, 1140, 423, 85, 8),
+      ],
+      weakPanels: const [
+        Rect.fromLTWH(915, 330, 135, 16),
+      ],
+      vents: const [
+        _DueKineticVentSpec(650, 423, 60, 16, isUpdraft: true),
+      ],
+      spikeTraps: const [
+        _DueSpikeTrapSpec(730, 465, 140, 55, cycleOffset: 0.2),
+      ],
+      laserGates: const [
+        _DueLaserGateSpec(1260, 215, 20, 215, cycleOffset: 0.0),
       ],
       gravityPuzzles: const [
         _GravityPuzzleSpec(
@@ -303,9 +380,7 @@ class _FallDueGame {
           Rect.fromLTWH(2720, 280, 145, 18),
           Rect.fromLTWH(2910, 430, 270, 110),
           Rect.fromLTWH(3360, 430, 190, 110),
-          Rect.fromLTWH(3590, 350, 120, 18),
           Rect.fromLTWH(3760, 275, 140, 18),
-          Rect.fromLTWH(3950, 340, 120, 18),
           Rect.fromLTWH(4140, 430, 300, 110),
           Rect.fromLTWH(4480, 430, 180, 110),
           Rect.fromLTWH(4850, 430, 260, 110),
@@ -329,6 +404,19 @@ class _FallDueGame {
           _DueTargetSpec(3040, 388, _TargetKind.enemy),
           _DueTargetSpec(4210, 388, _TargetKind.enemy),
           _DueTargetSpec(4560, 388, _TargetKind.enemy),
+        ],
+        weightPlates: [
+          _DueWeightPlateSpec(31, 2370, 423, 80, 8),
+        ],
+        gravityWells: [
+          _DueGravityWellSpec(3180, 350, radius: 170),
+        ],
+        vents: [
+          _DueKineticVentSpec(4400, 423, 60, 16, isUpdraft: true),
+        ],
+        crumblingLedges: [
+          Rect.fromLTWH(3590, 350, 120, 18),
+          Rect.fromLTWH(3950, 340, 120, 18),
         ],
         gravityPuzzles: [
           _GravityPuzzleSpec(
@@ -381,7 +469,6 @@ class _FallDueGame {
       ],
       spikes: const [
         Rect.fromLTWH(260, 465, 180, 55),
-        Rect.fromLTWH(700, 465, 180, 55),
         Rect.fromLTWH(1160, 465, 180, 55),
       ],
       targets: const [
@@ -394,6 +481,18 @@ class _FallDueGame {
         Rect.fromLTWH(260, 390, 180, 16),
         Rect.fromLTWH(700, 390, 180, 16),
         Rect.fromLTWH(1160, 390, 180, 16),
+      ],
+      weightPlates: const [
+        _DueWeightPlateSpec(40, 920, 423, 85, 8),
+      ],
+      vents: const [
+        _DueKineticVentSpec(1350, 423, 60, 16, isUpdraft: true),
+      ],
+      spikeTraps: const [
+        _DueSpikeTrapSpec(700, 465, 180, 55, cycleOffset: 0.1),
+      ],
+      laserGates: const [
+        _DueLaserGateSpec(860, 215, 20, 215, cycleOffset: 0.0),
       ],
       safeDebtPads: const [
         Rect.fromLTWH(470, 423, 92, 7),
@@ -514,6 +613,22 @@ class _FallDueGame {
         _DueTargetSpec(1015, 218, _TargetKind.enemy),
         _DueTargetSpec(1310, 390, _TargetKind.crate),
         _DueTargetSpec(1510, 228, _TargetKind.enemy),
+      ],
+      weightPlates: const [
+        _DueWeightPlateSpec(50, 680, 423, 85, 8),
+        _DueWeightPlateSpec(51, 1150, 423, 85, 8),
+      ],
+      vents: const [
+        _DueKineticVentSpec(880, 423, 60, 16, isUpdraft: true),
+      ],
+      spikeTraps: const [
+        _DueSpikeTrapSpec(750, 465, 170, 55, cycleOffset: 0.25),
+      ],
+      laserGates: const [
+        _DueLaserGateSpec(1200, 215, 20, 215, cycleOffset: 0.3),
+      ],
+      weakPanels: const [
+        Rect.fromLTWH(780, 335, 120, 16),
       ],
       gravityPuzzles: const [
         _GravityPuzzleSpec(
@@ -673,6 +788,27 @@ class _FallDueGame {
         _DueTargetSpec(1850, 390, _TargetKind.crate),
         _DueTargetSpec(2040, 208, _TargetKind.enemy),
       ],
+      weightPlates: const [
+        _DueWeightPlateSpec(60, 710, 423, 85, 8),
+        _DueWeightPlateSpec(61, 1680, 423, 85, 8),
+      ],
+      vents: const [
+        _DueKineticVentSpec(940, 423, 60, 16, isUpdraft: true),
+        _DueKineticVentSpec(1420, 423, 60, 16, isUpdraft: true),
+      ],
+      spikeTraps: const [
+        _DueSpikeTrapSpec(790, 465, 180, 55, cycleOffset: 0.2),
+        _DueSpikeTrapSpec(1750, 465, 180, 55, cycleOffset: 0.4),
+      ],
+      weakPanels: const [
+        Rect.fromLTWH(820, 335, 125, 16),
+        Rect.fromLTWH(1270, 390, 180, 16),
+        Rect.fromLTWH(1750, 390, 180, 16),
+        Rect.fromLTWH(1780, 330, 125, 16),
+      ],
+      laserGates: const [
+        _DueLaserGateSpec(1240, 215, 20, 215, cycleOffset: 0.35),
+      ],
       gravityPuzzles: const [
         _GravityPuzzleSpec(
           id: 60,
@@ -686,10 +822,6 @@ class _FallDueGame {
           leverPosition: Offset(1650, 225),
           gate: Rect.fromLTWH(1900, 165, 30, 265),
         ),
-      ],
-      weakPanels: const [
-        Rect.fromLTWH(1270, 390, 180, 16),
-        Rect.fromLTWH(1750, 390, 180, 16),
       ],
       safeDebtPads: const [
         Rect.fromLTWH(1000, 423, 92, 7),
@@ -846,9 +978,21 @@ class _FallDueGame {
   final List<_DueCheckpoint> checkpoints = [];
   final List<_DueWeakPanel> weakPanels = [];
   final List<_DueSafeDebtPad> safeDebtPads = [];
+  final List<_DueCrumblingLedge> crumblingLedges = [];
+  final List<_DueSpikeTrap> spikeTraps = [];
+  final List<_DueGravityWell> gravityWells = [];
+  final List<_DueLaserGate> laserGates = [];
+  final List<_DueKineticVent> vents = [];
+  final List<_DueConduit> conduits = [];
+  final List<_DueWeightPlate> weightPlates = [];
   final List<_DueParticle> particles = [];
   final List<_FallDueShockwave> shockwaves = [];
   final List<_DueTransferArc> transferArcs = [];
+  final List<_DueWorkshop> workshops = [];
+  _DueWorkshop? _openingRelay;
+  _DueBoss? activeBoss;
+  List<_DueSectionSpec> _worldSections = const [];
+  List<_GravityPuzzleSpec> _worldPuzzles = const [];
   final Set<int> disabledSpikes = {};
   final Set<int> rewardedSpikes = {};
   Rect? _activeExit;
@@ -865,6 +1009,20 @@ class _FallDueGame {
   bool _slamHeld = false;
   bool _hasAirDashed = false;
   double _airDashRemaining = 0;
+  double _dashDirX = 1.0;
+  double _dashDirY = 0.0;
+  double get dashDirX => _dashDirX;
+  double get dashDirY => _dashDirY;
+  double _phaseShiftRemaining = 0.0;
+  double _phaseShiftCooldown = 0.0;
+  bool get isPhaseShiftActive => _phaseShiftRemaining > 0;
+  bool _isWallSliding = false;
+  double _wallSlideDirection = 0.0;
+  bool get isWallSliding => _isWallSliding;
+  _DueGravityTarget? _tetherTarget;
+  bool get isTetherActive => _tetherTarget != null;
+  double _invulnerableTimer = 0.0;
+  bool get isInvulnerable => _invulnerableTimer > 0 || isPhaseShiftActive;
   double _landedAt = double.negativeInfinity;
   double _landingForce = 0;
   bool _antiGravityActive = false;
@@ -904,7 +1062,9 @@ class _FallDueGame {
   );
   int get collectedSeals => seals.where((seal) => seal.collected).length;
   int get activeLevers => levers.where((lever) => lever.active).length;
-  int get lockedGates => gates.where((gate) => !gate.open).length;
+  int get lockedGates => gates.where((gate) => !gate.open).length +
+      workshops.where((workshop) => !workshop.cleared).length +
+      ((activeBoss?.defeated ?? true) ? 0 : 1);
   String get objectiveReadout {
     final sealsDue = seals.length - collectedSeals;
     if (sealsDue > 0 && lockedGates > 0) {
@@ -916,7 +1076,7 @@ class _FallDueGame {
   }
 
   int get activatedCheckpoints => _checkpointIndex + 1;
-  List<_DueSectionSpec> get routeSections => level.route?.sections ?? const [];
+  List<_DueSectionSpec> get routeSections => _worldSections;
   int get visibleCollectors => targets
       .where(
         (target) =>
@@ -926,6 +1086,12 @@ class _FallDueGame {
             target.center.dx <= camera + viewWidth + 40,
       )
       .length;
+
+  void preparePreview() {
+    levelIndex = _initialLevelIndex;
+    _buildStageWorld(level);
+    _resetPlayerAtFieldStart();
+  }
 
   void start() {
     score = 0;
@@ -1017,13 +1183,74 @@ class _FallDueGame {
     safeDebtPads
       ..clear()
       ..addAll(stage.allSafeDebtPads.map(_DueSafeDebtPad.new));
+    crumblingLedges
+      ..clear()
+      ..addAll(stage.allCrumblingLedges.map(_DueCrumblingLedge.new));
+    spikeTraps
+      ..clear()
+      ..addAll(
+        stage.allSpikeTraps.map(
+          (s) => _DueSpikeTrap(s.rect, cycleOffset: s.cycleOffset),
+        ),
+      );
+    gravityWells
+      ..clear()
+      ..addAll(
+        stage.allGravityWells.map(
+          (w) => _DueGravityWell(
+            w.center,
+            radius: w.radius,
+          ),
+        ),
+      );
+    laserGates
+      ..clear()
+      ..addAll(
+        stage.allLaserGates.map(
+          (l) => _DueLaserGate(
+            l.rect,
+            switchId: l.switchId,
+            cycleOffset: l.cycleOffset,
+          ),
+        ),
+      );
+    vents
+      ..clear()
+      ..addAll(
+        stage.allVents.map(
+          (v) => _DueKineticVent(
+            v.rect,
+            isUpdraft: v.isUpdraft,
+            cycleOffset: v.cycleOffset,
+          ),
+        ),
+      );
+    conduits
+      ..clear()
+      ..addAll(
+        stage.allConduits.map(
+          (c) => _DueConduit(c.id, c.emitterPos, c.receptorPos, c.alignment),
+        ),
+      );
+    weightPlates
+      ..clear()
+      ..addAll(stage.allWeightPlates.map((w) => _DueWeightPlate(w.id, w.rect)));
     bullets.clear();
     particles.clear();
     shockwaves.clear();
     transferArcs.clear();
     disabledSpikes.clear();
     rewardedSpikes.clear();
+    _phaseShiftRemaining = 0.0;
+    _phaseShiftCooldown = 0.0;
+    _isWallSliding = false;
+    _wallSlideDirection = 0.0;
+    _tetherTarget = null;
+    _invulnerableTimer = 0.0;
     _appendCampaignAnnex();
+    _installRouteSystems(stage);
+    _installWorkshops(stage);
+    _installBossHall();
     _addExitBase();
   }
 
@@ -1050,6 +1277,43 @@ class _FallDueGame {
     seals.addAll(annex.seals.map(_DueSeal.new));
     weakPanels.addAll(annex.weakPanels.map(_DueWeakPanel.new));
     safeDebtPads.addAll(annex.safeDebtPads.map(_DueSafeDebtPad.new));
+    crumblingLedges.addAll(annex.crumblingLedges.map(_DueCrumblingLedge.new));
+    spikeTraps.addAll(
+      annex.spikeTraps.map(
+        (s) => _DueSpikeTrap(s.rect, cycleOffset: s.cycleOffset),
+      ),
+    );
+    gravityWells.addAll(
+      annex.gravityWells.map(
+        (w) => _DueGravityWell(w.center, radius: w.radius),
+      ),
+    );
+    laserGates.addAll(
+      annex.laserGates.map(
+        (l) => _DueLaserGate(
+          l.rect,
+          switchId: l.switchId,
+          cycleOffset: l.cycleOffset,
+        ),
+      ),
+    );
+    vents.addAll(
+      annex.vents.map(
+        (v) => _DueKineticVent(
+          v.rect,
+          isUpdraft: v.isUpdraft,
+          cycleOffset: v.cycleOffset,
+        ),
+      ),
+    );
+    conduits.addAll(
+      annex.conduits.map(
+        (c) => _DueConduit(c.id, c.emitterPos, c.receptorPos, c.alignment),
+      ),
+    );
+    weightPlates.addAll(
+      annex.weightPlates.map((w) => _DueWeightPlate(w.id, w.rect)),
+    );
     _activeExit = annex.exit;
   }
 
@@ -1058,7 +1322,7 @@ class _FallDueGame {
       _TargetKind.heavy => (40.0, 46.0),
       _TargetKind.drone => (34.0, 30.0),
       _TargetKind.leecher => (28.0, 32.0),
-      _TargetKind.enemy => (32.0, 42.0),
+      _TargetKind.enemy || _TargetKind.swordsman || _TargetKind.archer => (32.0, 42.0),
       _TargetKind.crate => (35.0, 40.0),
     };
     return _DueTarget(target.x, target.y, w, h, target.kind);
@@ -1093,25 +1357,25 @@ class _FallDueGame {
       }
       checkpoints.add(_DueCheckpoint(Offset(x, platform.top - player.h)));
     }
+    checkpoints.addAll(workshops.map((workshop) => _DueCheckpoint(workshop.checkpoint)));
+    if (activeBoss case final boss?) {
+      checkpoints.add(_DueCheckpoint(boss.checkpoint));
+    }
+    checkpoints.sort((a, b) => a.position.dx.compareTo(b.position.dx));
   }
+
+  double _lastBorrowTapTime = double.negativeInfinity;
 
   void setBorrow(bool value) {
     if (value && !_borrowHeld && !_slamming && phase == _DuePhase.playing) {
+      if (time - _lastBorrowTapTime < 0.35) {
+        performPhaseShift();
+      }
+      _lastBorrowTapTime = time;
+
       final direction = (right ? 1.0 : 0.0) - (left ? 1.0 : 0.0);
       if (!player.grounded && direction != 0 && !_hasAirDashed) {
-        // GRAVITY DASH: Directional horizontal aerial impulse (once per jump)
-        _hasAirDashed = true;
-        _airDashRemaining = FallDueTuning.airDashDuration;
-        player.vx = direction * FallDueTuning.dashImpulse;
-        player.vy = math.min(player.vy, -130.0);
-        debt = math.min(
-          FallDueTuning.maxDebt,
-          debt + FallDueTuning.dashDebtCost,
-        );
-        _burst(player.center, const Color(0xFF8DE1FF), 14);
-        ArcadeShake.shake(0.18);
-        GameFeedback.jump();
-        message = 'GRAVITY DASH: directional air burst borrowed!';
+        performDash(dirX: direction, dirY: 0.0);
       }
       _antiGravityActive = true;
       _settleGrace = 0;
@@ -1130,6 +1394,120 @@ class _FallDueGame {
       _openSettlementWindow();
     }
     _borrowHeld = value;
+  }
+
+  void performDash({double? dirX, double? dirY}) {
+    if (player.grounded || _hasAirDashed || phase != _DuePhase.playing) return;
+    var dx = dirX ?? ((right ? 1.0 : 0.0) - (left ? 1.0 : 0.0));
+    var dy = dirY ?? ((_slamHeld ? 1.0 : 0.0) - (_jumpHeld ? 1.0 : 0.0));
+    if (dx == 0 && dy == 0) {
+      dx = player.vx < -12 || (player.vx.abs() <= 12 && left) ? -1.0 : 1.0;
+    }
+    final len = math.sqrt(dx * dx + dy * dy);
+    dx /= len;
+    dy /= len;
+
+    _hasAirDashed = true;
+    _airDashRemaining = FallDueTuning.airDashDuration;
+    _dashDirX = dx;
+    _dashDirY = dy;
+    player.vx = dx * FallDueTuning.dashImpulse;
+    player.vy = dy * FallDueTuning.dashImpulse;
+    debt = math.min(FallDueTuning.maxDebt, debt + FallDueTuning.dashDebtCost);
+    _invulnerableTimer = 0.12;
+    _burst(player.center, const Color(0xFF8DE1FF), 16);
+    ArcadeShake.shake(0.18);
+    GameFeedback.jump();
+    message = 'OMNI-DIRECTIONAL AIR DASH: burst impulse borrowed!';
+  }
+
+  void performRepulsorBurst() {
+    if (phase != _DuePhase.playing) return;
+    if (_payback <= 0 && debt < 15) {
+      debt = math.min(FallDueTuning.maxDebt, debt + 15.0);
+    }
+    final discharged = _payback > 0 ? _payback * 0.30 : math.min(debt, 15.0);
+    if (_payback > 0) {
+      _payback = math.max(0, _payback - discharged);
+    } else {
+      debt = math.max(0, debt - discharged);
+    }
+    final pushForce = FallDueRules.repulsorBurstPushForce(debt);
+
+    shockwaves.add(
+      _FallDueShockwave(
+        position: player.center,
+        color: const Color(0xFF6DE8FF),
+        maxRadius: FallDueTuning.repulsorRadius,
+      ),
+    );
+
+    for (final enemy in targets.where((t) => t.alive && t.kind!.isEnemy)) {
+      final dist = (enemy.center - player.center).distance;
+      if (dist <= FallDueTuning.repulsorRadius) {
+        final dir = enemy.center - player.center;
+        final norm =
+            dir.distance > 0 ? dir / dir.distance : const Offset(1, 0);
+        enemy.vx += norm.dx * pushForce;
+        enemy.vy += norm.dy * pushForce * 0.5;
+        enemy.stunTimer = FallDueTuning.repulsorStunDuration;
+        _burst(enemy.center, const Color(0xFF6DE8FF), 12);
+      }
+    }
+
+    for (final bullet in bullets.where((b) => b.alive)) {
+      final dist = (bullet.rect.center - player.center).distance;
+      if (dist <= FallDueTuning.repulsorRadius) {
+        bullet.alive = false;
+        score += 100;
+        _burst(bullet.rect.center, const Color(0xFF6DE8FF), 8);
+      }
+    }
+
+    ArcadeShake.shake(0.24);
+    GameFeedback.heavyImpact();
+    message =
+        'KINETIC REPULSOR SHIELD BURST! Discharged ${discharged.round()}% into kinetic blast.';
+  }
+
+  void performPhaseShift() {
+    if (phase != _DuePhase.playing) return;
+    if (debt > 75.0) {
+      message = 'LEDGER OVERBURDENED: Debt too high to initiate phase shift.';
+      return;
+    }
+    if (_phaseShiftCooldown > 0) {
+      message = 'PHASE SHIFT RECHARGING: Stabilizing quantum coherence.';
+      return;
+    }
+    _phaseShiftRemaining = FallDueRules.phaseShiftDuration();
+    _phaseShiftCooldown = 0.80;
+    debt = math.min(FallDueTuning.maxDebt, debt + 25.0);
+    _burst(player.center, const Color(0xFF00E5FF), 20);
+    ArcadeShake.shake(0.18);
+    GameFeedback.selection();
+    message = 'PHASE SHIFT ENGAGED: 0.40s intangibility active (+25 debt).';
+  }
+
+  void performTether() {
+    if (phase != _DuePhase.playing) return;
+    if (_tetherTarget != null) {
+      _tetherTarget = null;
+      message = 'GRAVITATIONAL TETHER DISCONNECTED.';
+      GameFeedback.selection();
+      return;
+    }
+    final anchor = _gravityRecipient;
+    if (anchor != null &&
+        (anchor.center - player.center).distance <=
+            FallDueTuning.tetherMaxDistance) {
+      _tetherTarget = anchor;
+      _burst(anchor.center, const Color(0xFF8CFFB1), 14);
+      GameFeedback.selection();
+      message = 'GRAVITATIONAL TETHER LINKED to ${anchor.label}!';
+    } else {
+      message = 'NO ANCHOR IN RANGE: Move closer to crate or target.';
+    }
   }
 
   void setSlam(bool value) {
@@ -1231,7 +1609,7 @@ class _FallDueGame {
             _TargetKind.heavy => 950,
             _TargetKind.drone => 750,
             _TargetKind.leecher => 600,
-            _TargetKind.enemy => 650,
+            _TargetKind.enemy || _TargetKind.swordsman || _TargetKind.archer => 650,
             _TargetKind.crate || null => 0,
           };
           score += killScore;
@@ -1301,6 +1679,17 @@ class _FallDueGame {
 
   void jump() {
     if (phase != _DuePhase.playing) return;
+    if (_isWallSliding) {
+      player.vx = -_wallSlideDirection * 280.0;
+      player.vy = -520.0;
+      _hasAirDashed = false;
+      _isWallSliding = false;
+      _jumpBuffer = 0;
+      _burst(player.center, const Color(0xFF8DE1FF), 12);
+      GameFeedback.jump();
+      message = 'WALL KICK-OFF!';
+      return;
+    }
     _jumpBuffer = .14;
   }
 
@@ -1333,11 +1722,18 @@ class _FallDueGame {
       pad.cooldown = math.max(0, pad.cooldown - dt);
     }
     _ridingLightBox = _isPlayerRidingLightBox();
+    _moveWorkshopWorld(dt);
     _updatePlayer(dt);
     if (phase != _DuePhase.playing) return;
     _updateTargets(dt);
     _updateLevers();
     _updateBullets(dt);
+    _updateTrapsAndPuzzles(dt);
+    _updateTether(dt);
+    if (phase != _DuePhase.playing) return;
+    _updateWorkshops(dt);
+    if (phase != _DuePhase.playing) return;
+    _updateBoss(dt);
     if (phase != _DuePhase.playing) return;
     _collectSeals();
     _updateCheckpoints();
@@ -1363,6 +1759,13 @@ class _FallDueGame {
   }
 
   void _updatePlayer(double dt) {
+    _invulnerableTimer = math.max(0, _invulnerableTimer - dt);
+    if (_phaseShiftRemaining > 0) {
+      _phaseShiftRemaining = math.max(0, _phaseShiftRemaining - dt);
+    }
+    if (_phaseShiftCooldown > 0) {
+      _phaseShiftCooldown = math.max(0, _phaseShiftCooldown - dt);
+    }
     final direction = (right ? 1 : 0) - (left ? 1 : 0);
     final acceleration = player.grounded
         ? FallDueTuning.groundAcceleration
@@ -1380,6 +1783,44 @@ class _FallDueGame {
     final speedLimit = FallDueTuning.airDashSpeedLimit(_airDashRemaining);
     player.vx = player.vx.clamp(-speedLimit, speedLimit);
     _airDashRemaining = math.max(0, _airDashRemaining - dt);
+
+    _isWallSliding = false;
+    _wallSlideDirection = 0.0;
+    if (!player.grounded && player.vy > 0) {
+      final leftRect =
+          Rect.fromLTWH(player.x - 4, player.y + 4, 4, player.h - 8);
+      final rightRect =
+          Rect.fromLTWH(player.right, player.y + 4, 4, player.h - 8);
+      final activeWeak =
+          weakPanels.where((p) => !p.broken).map((p) => p.rect);
+      final activeCrum =
+          crumblingLedges.where((l) => !l.collapsed).map((l) => l.rect);
+      final checkSurfaces = [...platforms, ...activeWeak, ...activeCrum];
+      final hasLeft = checkSurfaces.any((s) => s.overlaps(leftRect));
+      final hasRight = checkSurfaces.any((s) => s.overlaps(rightRect));
+      if (hasLeft && left) {
+        _isWallSliding = true;
+        _wallSlideDirection = -1.0;
+      } else if (hasRight && right) {
+        _isWallSliding = true;
+        _wallSlideDirection = 1.0;
+      }
+      if (_isWallSliding) {
+        final maxSlide =
+            _payback >= 50.0 ? 240.0 : FallDueTuning.wallSlideSpeed;
+        if (player.vy > maxSlide) player.vy = maxSlide;
+        _hasAirDashed = false;
+        if (_random.nextDouble() < 0.25) {
+          final sparkX = _wallSlideDirection < 0 ? player.x : player.right;
+          _burst(
+            Offset(sparkX, player.y + player.h * 0.7),
+            const Color(0xFFFFD56F),
+            2,
+          );
+        }
+      }
+    }
+
     player.coyote = player.grounded ? .12 : math.max(0, player.coyote - dt);
     if (_jumpBuffer > 0 && player.coyote > 0) {
       final onCrate = targets.any(
@@ -1440,8 +1881,10 @@ class _FallDueGame {
     final slamPower = _slamBorrowPower;
     Set<_DueTarget> shockwaveHitTargets = const {};
     final wasGrounded = player.grounded;
+    final previousFeet = player.rect.bottom;
     final landed = _resolve(player, dt, gravity);
-    if (landed) {
+    final stompedBoss = _stompBoss(previousFeet, impactSpeed, wasSlamming);
+    if (landed && !stompedBoss) {
       _hasAirDashed = false;
       _airDashRemaining = 0;
       if (!wasGrounded && impactSpeed > 105) {
@@ -1460,6 +1903,13 @@ class _FallDueGame {
         }
       }
       if (wasSlamming) {
+        for (final workshop in _workshopsAt(player.center.dx)) {
+          for (final panel in workshop.room.service.where((panel) => panel.height <= 12)) {
+            if (player.rect.inflate(4).overlaps(panel.shift(workshop.origin))) {
+              workshop.run.broken.add(panel);
+            }
+          }
+        }
         _slamming = false;
         if (FallDueRules.slamCausesShockwave(slamPower)) {
           // Highest borrow causes shockwaves!
@@ -1531,7 +1981,7 @@ class _FallDueGame {
               _TargetKind.heavy => 950,
               _TargetKind.drone => 750,
               _TargetKind.leecher => 600,
-              _TargetKind.enemy => 550,
+              _TargetKind.enemy || _TargetKind.swordsman || _TargetKind.archer => 550,
               _TargetKind.crate || null => 0,
             };
             score += killScore;
@@ -1539,7 +1989,7 @@ class _FallDueGame {
               _TargetKind.heavy => 'ENFORCER',
               _TargetKind.drone => 'DRONE',
               _TargetKind.leecher => 'LEECHER',
-              _TargetKind.enemy => 'LIABILITY',
+              _TargetKind.enemy || _TargetKind.swordsman || _TargetKind.archer => 'LIABILITY',
               _TargetKind.crate || null => 'CRATE',
             };
             message = wasSlamming
@@ -1564,14 +2014,8 @@ class _FallDueGame {
           ArcadeShake.shake(0.35);
           GameFeedback.heavyImpact();
         } else if (target.kind == _TargetKind.leecher) {
-          // Siphon Leecher latches on and drains balance into Payback!
-          target.alive = false;
-          _payback = math.min(FallDueTuning.maxDebt, _payback + 28.0);
-          _burst(player.center, const Color(0xFFC77DFF), 18);
-          GameFeedback.heavyImpact();
-          ArcadeShake.shake(0.24);
-          message =
-              'LEDGER LEECHED! Siphon leech attached +28% Payback to your balance!';
+          player.vx = player.center.dx < target.center.dx ? -150 : 150;
+          _spawnGrace = .18;
         } else {
           _die('Crushed by liability.');
           return;
@@ -1622,6 +2066,7 @@ class _FallDueGame {
     for (var index = 0; index < spikes.length; index++) {
       if (_spawnGrace <= 0 &&
           !disabledSpikes.contains(index) &&
+          !spikeTraps.any((trap) => trap.rect.overlaps(spikes[index])) &&
           player.rect.overlaps(spikes[index])) {
         _die('Gravity collected its due.');
         return;
@@ -1717,6 +2162,17 @@ class _FallDueGame {
     weakPanels: weakPanels.map((panel) => panel.copy()).toList(),
     disabledSpikes: Set<int>.of(disabledSpikes),
     rewardedSpikes: Set<int>.of(rewardedSpikes),
+    crumblingLedges: crumblingLedges.map((l) => l.copy()).toList(),
+    spikeTraps: spikeTraps.map((s) => s.copy()).toList(),
+    gravityWells: gravityWells.map((w) => w.copy()).toList(),
+    laserGates: laserGates.map((l) => l.copy()).toList(),
+    vents: vents.map((v) => v.copy()).toList(),
+    conduits: conduits.map((c) => c.copy()).toList(),
+    weightPlates: weightPlates.map((w) => w.copy()).toList(),
+    safeDebtPads: safeDebtPads.map((pad) => pad.rect).toList(),
+    workshops: workshops.map((workshop) => workshop.save()).toList(),
+    openingRelay: _openingRelay?.save(),
+    bossHealth: activeBoss?.health,
   );
 
   void _restoreCheckpointWorld() {
@@ -1752,16 +2208,42 @@ class _FallDueGame {
         ..addAll(snapshot.weakPanels.map((panel) => panel.copy()));
       safeDebtPads
         ..clear()
-        ..addAll(level.allSafeDebtPads.map(_DueSafeDebtPad.new));
+        ..addAll(snapshot.safeDebtPads.map(_DueSafeDebtPad.new));
+      for (var i = 0; i < workshops.length; i++) {
+        workshops[i].restore(i < snapshot.workshops.length ? snapshot.workshops[i] : null);
+      }
+      _openingRelay?.restore(snapshot.openingRelay);
+      activeBoss?.restore(snapshot.bossHealth);
       disabledSpikes
         ..clear()
         ..addAll(snapshot.disabledSpikes);
       rewardedSpikes
         ..clear()
         ..addAll(snapshot.rewardedSpikes);
+      crumblingLedges
+        ..clear()
+        ..addAll(snapshot.crumblingLedges.map((l) => l.copy()));
+      spikeTraps
+        ..clear()
+        ..addAll(snapshot.spikeTraps.map((s) => s.copy()));
+      gravityWells
+        ..clear()
+        ..addAll(snapshot.gravityWells.map((w) => w.copy()));
+      laserGates
+        ..clear()
+        ..addAll(snapshot.laserGates.map((l) => l.copy()));
+      vents
+        ..clear()
+        ..addAll(snapshot.vents.map((v) => v.copy()));
+      conduits
+        ..clear()
+        ..addAll(snapshot.conduits.map((c) => c.copy()));
+      weightPlates
+        ..clear()
+        ..addAll(snapshot.weightPlates.map((w) => w.copy()));
       for (final target in targets) {
         if (target.anchored) {
-          if (target.bridgeSurface case final bridge?) {
+          if (target.bridgeSurface case final bridge? when !platforms.contains(bridge)) {
             platforms.add(bridge);
           }
         }
@@ -1772,7 +2254,7 @@ class _FallDueGame {
       shockwaves.clear();
       _selectedTarget = null;
     }
-    for (final puzzle in level.allGravityPuzzles) {
+    for (final puzzle in _worldPuzzles) {
       if (targets.any((target) => target.puzzleId == puzzle.id)) continue;
       targets.add(_puzzleTarget(puzzle));
       final checkpointX = _checkpointIndex >= 0
@@ -1800,6 +2282,10 @@ class _FallDueGame {
       return;
     }
     if (lockedGates > 0) {
+      if (activeBoss case final boss? when !boss.defeated) {
+        message = 'EXIT SEALED · Defeat ${boss.spec.name}.';
+        return;
+      }
       message = 'GATE LOCKED: latch $lockedGates remaining gravity lock(s).';
       return;
     }
@@ -1881,20 +2367,23 @@ class _FallDueGame {
           player.rect.bottom >= target.y - 4 &&
           player.rect.bottom <= target.y + 6;
 
-      if (target.kind == _TargetKind.enemy) {
+      if (target.kind == _TargetKind.enemy ||
+          target.kind == _TargetKind.swordsman ||
+          target.kind == _TargetKind.archer) {
         if (target.stunTimer > 0) {
           target.stunTimer = math.max(0, target.stunTimer - dt);
           target.vx = damp(target.vx, 0.28, dt);
         } else {
           final weight = (target.debt / 35).clamp(0.0, .78).toDouble();
-          final patrolSpeed = 58 * (1 - weight);
+          final patrolSpeed = (target.kind == _TargetKind.swordsman
+              ? 83 : target.kind == _TargetKind.archer ? 30 : 58) * (1 - weight);
           target.vx = target.vx == 0 ? patrolSpeed : target.vx;
           final desiredSpeed = target.vx.sign * patrolSpeed;
           if (target.debt > 0 || target.vx.abs() > patrolSpeed) {
             target.vx += (desiredSpeed - target.vx) * math.min(1, dt * 8);
           }
           if (target.grounded &&
-              target.vx.abs() <= 70 &&
+              target.vx.abs() <= patrolSpeed + 12 &&
               !_hasPatrolLedgeAhead(target, dt)) {
             target.vx = -target.vx;
           }
@@ -1928,29 +2417,6 @@ class _FallDueGame {
             target.vy = -160.0;
           }
         }
-        // Drone Repulsor Pulse
-        if (target.droneRecoveryTimer <= 0 && target.abilityCooldown <= 0) {
-          final dist = (target.center - player.center).distance;
-          if (dist < 220) {
-            target.abilityCooldown = 2.4;
-            final pushDir = player.center - target.center;
-            if (pushDir.distance > 0) {
-              player.vx += (pushDir.dx / pushDir.distance) * 260.0;
-              player.vy = math.min(player.vy, -160.0);
-            }
-            shockwaves.add(
-              _FallDueShockwave(
-                position: target.center,
-                color: const Color(0xFF6DE8FF),
-                maxRadius: 70,
-              ),
-            );
-            debt = math.min(FallDueTuning.maxDebt, debt + 10.0);
-            message = 'REPULSOR PULSE! Drone blast pushed you with +10% debt.';
-            GameFeedback.lightImpact();
-            ArcadeShake.shake(0.18);
-          }
-        }
       } else if (target.kind == _TargetKind.heavy) {
         if (target.stunTimer > 0) {
           target.stunTimer = math.max(0, target.stunTimer - dt);
@@ -1967,30 +2433,6 @@ class _FallDueGame {
               target.vx.abs() <= 50 &&
               !_hasPatrolLedgeAhead(target, dt)) {
             target.vx = -target.vx;
-          }
-        }
-        // Heavy Quake Stomp
-        if (target.stunTimer <= 0 &&
-            target.grounded &&
-            target.abilityCooldown <= 0) {
-          final dist = (target.center - player.center).distance;
-          if (dist < 240 && player.grounded) {
-            target.abilityCooldown = 3.2;
-            shockwaves.add(
-              _FallDueShockwave(
-                position: target.rect.bottomCenter,
-                color: const Color(0xFFFF5277),
-                maxRadius: 90,
-              ),
-            );
-            ArcadeShake.shake(0.28);
-            GameFeedback.heavyImpact();
-            if (dist < 180 && player.grounded) {
-              player.vy = -260.0;
-              player.grounded = false;
-              message =
-                  'QUAKE STOMP! Enforcer ground tremor popped you into the air!';
-            }
           }
         }
       } else if (target.kind == _TargetKind.leecher) {
@@ -2024,6 +2466,7 @@ class _FallDueGame {
         }
       }
 
+      if (target.kind.isEnemy) _stepEnemyAbility(target, dt);
       double gravity = (1 + target.debt * .035).clamp(.22, 2.4).toDouble();
       if (target.kind == _TargetKind.drone) {
         gravity = 0;
@@ -2038,6 +2481,17 @@ class _FallDueGame {
         _crushEnemiesWithCrate(target);
         _breakWeakPanels(target.rect, fallImpact, source: 'CRATE DROP');
       }
+      if (target.kind.isCrate && !target.anchored) {
+        if (player.rect.inflate(4).overlaps(target.rect) &&
+            player.rect.bottom > target.y + 6) {
+          if (player.center.dx < target.center.dx && player.vx > 10) {
+            target.vx = math.max(target.vx, player.vx * 0.9);
+          } else if (player.center.dx > target.center.dx && player.vx < -10) {
+            target.vx = math.min(target.vx, player.vx * 0.9);
+          }
+        }
+      }
+      if (target.kind.isCrate) _pushEnemiesWithCrate(target, dt);
       if (target.kind == _TargetKind.crate && target.grounded) {
         target.vx = damp(
           target.vx,
@@ -2067,7 +2521,7 @@ class _FallDueGame {
       }
       if (target.y > 610) {
         if (target.puzzleId case final puzzleId?) {
-          final puzzle = level.allGravityPuzzles.firstWhere(
+          final puzzle = _worldPuzzles.firstWhere(
             (candidate) => candidate.id == puzzleId,
           );
           target
@@ -2122,7 +2576,7 @@ class _FallDueGame {
         _TargetKind.heavy => 950,
         _TargetKind.drone => 750,
         _TargetKind.leecher => 600,
-        _TargetKind.enemy => 700,
+        _TargetKind.enemy || _TargetKind.swordsman || _TargetKind.archer => 700,
         _TargetKind.crate || null => 0,
       };
       score += killScore;
@@ -2130,6 +2584,49 @@ class _FallDueGame {
       _burst(enemy.center, const Color(0xFFFFD86E), 20);
       GameFeedback.mediumImpact();
     }
+  }
+
+  void _pushEnemiesWithCrate(_DueTarget crate, double dt) {
+    if (!crate.alive) return;
+    for (final enemy in targets) {
+      if (!enemy.alive || enemy == crate || !enemy.kind!.isEnemy) continue;
+      if (!crate.rect.inflate(3).overlaps(enemy.rect)) continue;
+      final pushDir = crate.vx.abs() > 4
+          ? crate.vx.sign
+          : (enemy.center.dx >= crate.center.dx ? 1.0 : -1.0);
+      final pushSpeed = math.max(crate.vx.abs(), 145.0);
+      enemy.vx = pushDir * pushSpeed;
+      if (pushDir > 0 && enemy.rect.left < crate.rect.right) {
+        enemy.x = crate.rect.right;
+      } else if (pushDir < 0 && enemy.rect.right > crate.rect.left) {
+        enemy.x = crate.rect.left - enemy.w;
+      }
+      enemy.stunTimer = math.max(enemy.stunTimer, 0.45);
+      if (crate.vx.abs() > 210) {
+        enemy.health -= 1;
+        if (enemy.health <= 0) {
+          enemy.alive = false;
+          score += 650;
+          message = 'KINETIC CRATE IMPACT: enemy crushed +650!';
+          _burst(enemy.center, const Color(0xFFFFD86E), 16);
+          GameFeedback.heavyImpact();
+        }
+      }
+    }
+  }
+
+  _DueTarget? _closestEnemy(Offset from) {
+    _DueTarget? closest;
+    var bestDist = double.infinity;
+    for (final t in targets) {
+      if (!t.alive || !t.kind!.isEnemy) continue;
+      final d = (t.center - from).distance;
+      if (d < bestDist) {
+        bestDist = d;
+        closest = t;
+      }
+    }
+    return closest;
   }
 
   void _launchEnemyIntoTargets(_DueTarget launched) {
@@ -2177,6 +2674,28 @@ class _FallDueGame {
       GameFeedback.mediumImpact();
       return;
     }
+    for (final trap in spikeTraps) {
+      if (trap.crushedToBridge) continue;
+      if (crate.rect.overlaps(trap.rect.inflate(4))) {
+        trap.crushedToBridge = true;
+        final bridge =
+            Rect.fromLTWH(trap.rect.left, trap.rect.top, trap.rect.width, 14);
+        platforms.add(bridge);
+        crate
+          ..anchored = true
+          ..bridgeSurface = bridge
+          ..x = crate.x.clamp(trap.rect.left - crate.w + 8, trap.rect.right - 8)
+          ..y = trap.rect.top - crate.h
+          ..vx = 0
+          ..vy = 0;
+        score += 350;
+        message =
+            'WEIGHT ANCHORED: crate crushed retractable spike field into bridge dais +350.';
+        _burst(crate.center, const Color(0xFF8CFFB1), 16);
+        GameFeedback.mediumImpact();
+        return;
+      }
+    }
   }
 
   void _updateLevers() {
@@ -2186,9 +2705,10 @@ class _FallDueGame {
       var launchedEnemyHit = false;
       for (final target in targets) {
         if (!target.alive || !target.rect.overlaps(trigger)) continue;
-        boxTouching |= target.puzzleId == lever.id;
-        launchedEnemyHit |=
-            target.kind == _TargetKind.enemy && target.debt < -1;
+        boxTouching |= target.kind.isCrate &&
+            (target.puzzleId == lever.id || target.debt < -1 && target.vy <= 0);
+        launchedEnemyHit |= target.kind.isEnemy &&
+            (target.debt < -1 || target.stunTimer > 0 && target.vx.abs() > 190);
       }
       if (launchedEnemyHit || boxTouching) lever.latched = true;
       final wasActive = lever.active;
@@ -2199,10 +2719,310 @@ class _FallDueGame {
       if (!wasActive && lever.active) {
         score += launchedEnemyHit ? 700 : 500;
         message = launchedEnemyHit
-            ? 'LAUNCHED COLLECTOR HIT THE LEVER: gate latched open +700.'
-            : 'CRATE LATCHED THE LEVER: route gate stays open +500.';
+            ? 'LAUNCHED ENEMY HIT THE RECEIVER · Route open +700.'
+            : 'LIFTED FREIGHT HIT THE RECEIVER · Route open +500.';
         _burst(lever.position, const Color(0xFF8CFFB1), 22);
         GameFeedback.mediumImpact();
+      }
+    }
+  }
+
+  void _updateTether(double dt) {
+    final target = _tetherTarget;
+    if (target == null) return;
+    if (!target.alive) {
+      _tetherTarget = null;
+      return;
+    }
+    final r = target.center - player.center;
+    final dist = r.distance;
+    if (dist > FallDueTuning.tetherMaxDistance + 80) {
+      _tetherTarget = null;
+      message = 'TETHER SNAPPED: target exceeded range.';
+      return;
+    }
+    if (dist > 40) {
+      final pull = (dist - 40) * 12.0;
+      final norm = r / dist;
+      player.vx += norm.dx * pull * dt;
+      player.vy += norm.dy * pull * dt;
+      if (target is _DueTarget &&
+          target.kind == _TargetKind.crate &&
+          !target.anchored) {
+        target.vx -= norm.dx * pull * 0.5 * dt;
+        target.vy -= norm.dy * pull * 0.5 * dt;
+      }
+    }
+  }
+
+  void _updateTrapsAndPuzzles(double dt) {
+    // 1. Crumbling Ledges
+    for (final ledge in crumblingLedges) {
+      if (ledge.collapsed) {
+        ledge.respawnTimer += dt;
+        if (ledge.respawnTimer >= ledge.maxRespawnTime) {
+          ledge.collapsed = false;
+          ledge.collapsing = false;
+          ledge.collapseTimer = 0.0;
+          ledge.respawnTimer = 0.0;
+          _burst(ledge.rect.center, const Color(0xFF8DE1FF), 10);
+        }
+      } else if (ledge.collapsing) {
+        ledge.collapseTimer += dt;
+        if (ledge.collapseTimer >= ledge.maxCollapseTime) {
+          ledge.collapsed = true;
+          _burst(ledge.rect.center, const Color(0xFFC5ABD8), 18);
+          GameFeedback.mediumImpact();
+        }
+      } else {
+        final onLedge = player.grounded &&
+            player.rect.bottom <= ledge.rect.top + 6 &&
+            player.rect.bottom >= ledge.rect.top - 4 &&
+            player.rect.right > ledge.rect.left + 4 &&
+            player.rect.left < ledge.rect.right - 4;
+        if (onLedge) {
+          ledge.collapsing = true;
+          ledge.maxCollapseTime =
+              FallDueRules.crumblingLedgeCollapseDuration(_payback);
+          ledge.collapseTimer = 0.0;
+        }
+      }
+    }
+
+    // 2. Retractable Spike Fields
+    for (final trap in spikeTraps) {
+      if (trap.disarmed) {
+        trap.disarmedTimer -= dt;
+        if (trap.disarmedTimer <= 0) trap.disarmed = false;
+      }
+      if (_spawnGrace <= 0 && trap.isActive(time) && !isInvulnerable) {
+        if (player.rect.overlaps(trap.rect)) {
+          _die('Pierced by pneumatic spike bed.');
+          return;
+        }
+      }
+    }
+
+    // 3. Gravity Wells
+    for (final well in gravityWells) {
+      if (well.rig != null) {
+        _applyRig(well, dt);
+        continue;
+      }
+      if (well.inverted) {
+        well.invertedTimer -= dt;
+        if (well.invertedTimer <= 0) well.inverted = false;
+      }
+      final pDist = (well.center - player.center).distance;
+      if (pDist < well.radius) {
+        final dir = well.center - player.center;
+        final norm =
+            dir.distance > 0 ? dir / dir.distance : const Offset(0, -1);
+        final factor = (1.0 - pDist / well.radius);
+        if (well.inverted) {
+          player.vx -= norm.dx * well.pullForce * 1.4 * factor * dt;
+          player.vy = math.min(player.vy, -620.0);
+          player.grounded = false;
+        } else {
+          player.vx +=
+              norm.dx * well.pullForce * (1.0 + 0.01 * debt) * factor * dt;
+          player.vy +=
+              norm.dy * well.pullForce * (1.0 + 0.01 * debt) * factor * dt;
+        }
+      }
+      for (final crate in targets.where(
+        (t) => t.alive && t.kind == _TargetKind.crate && !t.anchored,
+      )) {
+        final cDist = (well.center - crate.center).distance;
+        if (cDist < well.radius) {
+          final dir = well.center - crate.center;
+          final norm =
+              dir.distance > 0 ? dir / dir.distance : const Offset(0, -1);
+          final factor = (1.0 - cDist / well.radius);
+          crate.vx += norm.dx *
+              (well.inverted ? -1 : 1) *
+              well.pullForce *
+              0.7 *
+              factor *
+              dt;
+          crate.vy += norm.dy *
+              (well.inverted ? -1 : 1) *
+              well.pullForce *
+              0.7 *
+              factor *
+              dt;
+        }
+      }
+      // Gravity well affects enemies
+      for (final enemy in targets.where((t) => t.alive && t.kind!.isEnemy)) {
+        final eDist = (well.center - enemy.center).distance;
+        if (eDist < well.radius) {
+          final dir = well.center - enemy.center;
+          final norm =
+              dir.distance > 0 ? dir / dir.distance : const Offset(0, -1);
+          final factor = (1.0 - eDist / well.radius);
+          if (well.inverted) {
+            enemy.vx -= norm.dx * well.pullForce * 1.35 * factor * dt;
+            enemy.vy = math.min(enemy.vy, -420.0);
+            enemy.grounded = false;
+            enemy.stunTimer = math.max(enemy.stunTimer, 0.6);
+          } else {
+            enemy.vx += norm.dx * well.pullForce * 0.9 * factor * dt;
+            enemy.vy += norm.dy * well.pullForce * 0.9 * factor * dt;
+            enemy.grounded = false;
+            if (eDist < 32) {
+              enemy.stunTimer = math.max(enemy.stunTimer, 0.4);
+            }
+          }
+        }
+      }
+      // Gravity well affects turret bullets
+      for (final bullet in bullets.where((b) => b.alive)) {
+        final bDist = (well.center - bullet.rect.center).distance;
+        if (bDist < well.radius) {
+          final dir = well.center - bullet.rect.center;
+          final norm =
+              dir.distance > 0 ? dir / dir.distance : const Offset(1, 0);
+          final factor = (1.0 - bDist / well.radius);
+          if (well.inverted) {
+            bullet.vx -= norm.dx * well.pullForce * 1.8 * factor * dt;
+            bullet.vy -= norm.dy * well.pullForce * 1.8 * factor * dt;
+          } else {
+            bullet.vx += norm.dx * well.pullForce * 1.5 * factor * dt;
+            bullet.vy += norm.dy * well.pullForce * 1.5 * factor * dt;
+            if (bDist < 28 && !bullet.reflected) {
+              bullet.reflected = true;
+              bullet.debt = 25.0;
+              final targetEnemy = _closestEnemy(well.center);
+              if (targetEnemy != null) {
+                final toEnemy = targetEnemy.center - well.center;
+                final ed = toEnemy.distance;
+                bullet.vx = (toEnemy.dx / ed) * 460;
+                bullet.vy = (toEnemy.dy / ed) * 460;
+              } else {
+                bullet.vx = -bullet.vx * 1.3;
+              }
+              _burst(bullet.rect.center, const Color(0xFF6DE8FF), 10);
+            }
+          }
+        }
+      }
+    }
+
+    // 4. Laser Gates
+    for (final gate in laserGates) {
+      final switchEngaged = gate.switchId != null &&
+          (levers.any((l) => l.id == gate.switchId && l.active) ||
+              conduits.any((c) => c.id == gate.switchId && c.connected) ||
+              weightPlates.any((w) => w.id == gate.switchId && w.satisfied));
+      if (gate.isActive(time, switchEngaged)) {
+        final occludingCrate = targets.where((t) =>
+            t.alive &&
+            t.kind == _TargetKind.crate &&
+            t.rect.right > gate.rect.left + 2 &&
+            t.rect.left < gate.rect.right - 2 &&
+            (t.rect.overlaps(gate.rect) ||
+                (t.rect.bottom >= gate.rect.top - 8 &&
+                    t.rect.top <= gate.rect.top + 20)),
+        ).firstOrNull;
+
+        final blockedAtTop = occludingCrate != null &&
+            (occludingCrate.rect.bottom <= gate.rect.top + 10 ||
+                occludingCrate.rect.top <= gate.rect.top + 6);
+
+        final lethalZone = blockedAtTop
+            ? Rect.zero
+            : (occludingCrate != null
+                ? Rect.fromLTRB(
+                    gate.rect.left,
+                    gate.rect.top,
+                    gate.rect.right,
+                    math.max(gate.rect.top, occludingCrate.rect.top),
+                  )
+                : gate.rect);
+
+        final warpingWell = gravityWells.where((w) =>
+            (w.center.dx - gate.rect.center.dx).abs() < w.radius &&
+            w.center.dy >= gate.rect.top - 30 &&
+            w.center.dy <= gate.rect.bottom + 30).firstOrNull;
+
+        final isDeflectedFromPlayer = warpingWell != null &&
+            (player.center - warpingWell.center).distance < warpingWell.radius * 0.72;
+
+        if (!lethalZone.isEmpty &&
+            !isDeflectedFromPlayer &&
+            _spawnGrace <= 0 &&
+            !isInvulnerable) {
+          if (player.rect.overlaps(lethalZone)) {
+            _die('Vaporized by laser flux barrier.');
+            return;
+          }
+        }
+      }
+    }
+
+    // 5. Kinetic Vents
+    for (final vent in vents) {
+      if (vent.isActive(time)) {
+        if (player.rect.overlaps(vent.rect)) {
+          if (vent.isUpdraft) {
+            player.vy = math.min(player.vy, -720.0);
+            player.grounded = false;
+          } else {
+            player.vy += 2800.0 * dt;
+          }
+        }
+        for (final crate in targets.where(
+          (t) => t.alive && t.kind == _TargetKind.crate && !t.anchored,
+        )) {
+          if (crate.rect.overlaps(vent.rect)) {
+            if (vent.isUpdraft) {
+              crate.vy = math.min(crate.vy, -600.0);
+              crate.grounded = false;
+            } else {
+              crate.vy += 2400.0 * dt;
+            }
+          }
+        }
+      }
+    }
+
+    // 6. Conduits
+    for (final conduit in conduits) {
+      conduit.connected = conduit.checkConnected();
+      if (conduit.connected) {
+        for (final gate in gates.where((g) => g.id == conduit.id)) {
+          gate.open = true;
+        }
+      }
+    }
+
+    // 7. Weight Plates
+    for (final plate in weightPlates) {
+      var weight = 0.0;
+      for (final crate in targets.where(
+        (t) => t.alive && t.kind == _TargetKind.crate,
+      )) {
+        if (crate.rect.overlaps(plate.rect.inflate(4))) {
+          weight += 10.0 + math.max(0, crate.debt);
+        }
+      }
+      if (player.rect.overlaps(plate.rect.inflate(4))) {
+        weight += 10.0 + _payback;
+      }
+      plate.currentWeight = weight;
+      final wasSatisfied = plate.satisfied;
+      plate.satisfied = plate.checkSatisfied();
+      if (plate.satisfied) {
+        for (final gate in gates.where((g) => g.id == plate.id)) {
+          gate.open = true;
+        }
+        if (!wasSatisfied) {
+          score += 450;
+          message = 'WEIGHT PLATE SATISFIED: route gate unlocked +450.';
+          _burst(plate.rect.center, const Color(0xFF8CFFB1), 16);
+          GameFeedback.mediumImpact();
+        }
       }
     }
   }
@@ -2258,7 +3078,8 @@ class _FallDueGame {
               emitter.speed / (1 + shotDebt * .012),
             )
             ..vy = -210
-            ..debt = shotDebt,
+            ..debt = shotDebt
+            ..reflected = emitter.reprogrammed,
         );
         emitter.cooldown = emitter.interval * (1 + emitter.debt * .014);
       }
@@ -2271,7 +3092,7 @@ class _FallDueGame {
       if (!bullet.reflected &&
           _spawnGrace <= 0 &&
           player.rect.overlaps(bullet.rect)) {
-        _die('Projectile due.');
+        _die(bullet.arrow ? 'Pierced by an archer arrow.' : 'Projectile due.');
         return;
       }
       if ((bullet.reflected || bullet.debt > 3) && bullet.alive) {
@@ -2289,7 +3110,7 @@ class _FallDueGame {
               _TargetKind.heavy => 950,
               _TargetKind.drone => 750,
               _TargetKind.leecher => 600,
-              _TargetKind.enemy => 500,
+              _TargetKind.enemy || _TargetKind.swordsman || _TargetKind.archer => 500,
               _TargetKind.crate || null => 0,
             };
             score += killScore;
@@ -2326,6 +3147,10 @@ class _FallDueGame {
       }
       final hitsWorld =
           platforms.any(bullet.rect.overlaps) ||
+          _workshopsAt(bullet.rect.center.dx).any(
+            (workshop) => workshop.surfaces.any(bullet.rect.overlaps) ||
+                workshop.cargo.any(bullet.rect.overlaps),
+          ) ||
           weakPanels.any(
             (panel) => !panel.broken && bullet.rect.overlaps(panel.rect),
           ) ||
@@ -2367,9 +3192,26 @@ class _FallDueGame {
     final activeWeakPanels = weakPanels
         .where((panel) => !panel.broken)
         .map((panel) => panel.rect);
-    final stableSurfaces = <Rect>[...platforms, ...activeWeakPanels];
+    final activeCrumbling = crumblingLedges
+        .where((l) => !l.collapsed)
+        .map((l) => l.rect);
+    final bridgeSpikes = spikeTraps
+        .where((s) => s.crushedToBridge)
+        .map((s) => Rect.fromLTWH(s.rect.left, s.rect.top, s.rect.width, 14));
+    final nonDynamicPlatforms = platforms.where((p) =>
+        !weakPanels.any((w) => w.rect == p) &&
+        !crumblingLedges.any((c) => c.rect == p));
+    final stableSurfaces = <Rect>[
+      ...nonDynamicPlatforms,
+      ...activeWeakPanels,
+      ...activeCrumbling,
+      ...bridgeSpikes,
+    ];
+    final nearbyWorkshops = _workshopsAt(body.center.dx);
     final surfaces = <Rect>[
       ...stableSurfaces,
+      ...nearbyWorkshops.expand((workshop) => workshop.surfaces),
+      ...nearbyWorkshops.expand((workshop) => workshop.cargo),
       ...gates.where((gate) => !gate.open).map((gate) => gate.rect),
       if (body == player || bodyIsEnemy || body is _DueTarget) ...solidCrates,
       if (body == player) ...heavyEnemies,
@@ -2430,6 +3272,14 @@ class _FallDueGame {
   Iterable<_DueGravityTarget> get _gravityTargets sync* {
     yield* targets.where((target) => target.alive);
     yield* emitters;
+    yield* gravityWells;
+    if (activeBoss case final boss? when boss.engaged && !boss.defeated) {
+      yield boss.armor;
+      yield boss.core;
+    }
+    for (final workshop in _workshopsAt(player.center.dx)) {
+      yield* workshop.targets;
+    }
   }
 
   double _distanceToTarget(_DueGravityTarget target) =>
@@ -2463,7 +3313,7 @@ class _FallDueGame {
     var closestDistance = double.infinity;
     var hitBody = false;
     for (final target in _gravityTargets) {
-      if (!target.rect.inflate(padding).contains(point)) continue;
+      if (!target.alive || !target.rect.inflate(padding).contains(point)) continue;
       final onBody = target.rect.contains(point);
       final distance = (point - target.center).distanceSquared;
       if (closest == null ||
@@ -2488,7 +3338,7 @@ class _FallDueGame {
   // Keep the existing shortcut available when playing without a pointer.
   void cycleTarget() {
     if (phase != _DuePhase.playing) return;
-    final candidates = _gravityTargets.where(_targetInRange).toList()
+    final candidates = _gravityTargets.where((target) => target.alive && _targetInRange(target)).toList()
       ..sort((a, b) => _distanceToTarget(a).compareTo(_distanceToTarget(b)));
     if (candidates.isEmpty) {
       message = 'NO TARGETS IN RANGE — move closer.';
@@ -2536,25 +3386,47 @@ class _FallDueGame {
       message = 'GRAVITY CHANNEL RECHARGING.';
       return;
     }
-    // Instant micro-loan if debt is low, so player is never locked out of using Give
-    if (debt < 10) {
+    final selected = _gravityRecipient;
+    if (selected is _DueBossTarget) {
+      _castBoss(selected, _Gravity.give);
+      return;
+    }
+    if (selected is _DueGravityWell && selected.rig != null) {
+      _activateRig(selected, _Gravity.give);
+      return;
+    }
+    if (selected is _DueWorkshopTarget) {
+      _castWorkshop(selected, _Gravity.give);
+      return;
+    }
+    final bullet = selected == null ? _nearestBullet() : null;
+    if (debt < 10 && (selected != null || bullet != null)) {
       debt = math.min(FallDueTuning.maxDebt, debt + 15.0);
       _burst(player.center, const Color(0xFFFFD86E), 6);
     }
-    final selected = _gravityRecipient;
-    final bullet = selected == null ? _nearestBullet() : null;
 
-    // Bullet gravity slam if bullet is nearby and no other closer target
-    if (bullet != null && (bullet.rect.center - player.center).distance < 160) {
-      bullet.vy = 850.0;
+    // Bullet gravity redirect if bullet is nearby and no other closer target
+    if (bullet != null && (bullet.rect.center - player.center).distance < 200) {
+      final targetEnemy = _closestEnemy(bullet.rect.center);
+      if (targetEnemy != null) {
+        final toEnemy = targetEnemy.center - bullet.rect.center;
+        final dist = toEnemy.distance;
+        final speed = 480.0;
+        bullet.vx = (toEnemy.dx / dist) * speed;
+        bullet.vy = (toEnemy.dy / dist) * speed;
+      } else {
+        bullet.vx = -bullet.vx * 1.3;
+        bullet.vy = -180.0;
+      }
+      bullet.reflected = true;
       bullet.debt = 35.0;
       debt = math.max(0, debt - 10.0);
-      score += 200;
+      score += 250;
       _transferCooldown.tryTrigger(.35);
-      _burst(bullet.rect.center, const Color(0xFFFFD86E), 14);
+      _burst(bullet.rect.center, const Color(0xFFFFD86E), 16);
       _showTransfer(bullet.rect.center);
       GameFeedback.mediumImpact();
-      message = 'GRAVITY OVERLOAD: bullet grounded into the floor +200.';
+      message = 'GRAVITY REDIRECT: bullet turned toward enemies +250.';
       return;
     }
 
@@ -2565,19 +3437,36 @@ class _FallDueGame {
     final requested = math
         .min(debt, math.min(30.0, math.max(10.0, debt * .65)))
         .toDouble();
+    if (selected is _DueGravityWell) {
+      final well = selected;
+      well.inverted = true;
+      well.invertedTimer = 4.0;
+      debt = math.max(0, debt - 25.0);
+      _transferCooldown.tryTrigger(.35);
+      _burst(well.center, const Color(0xFF8CFFB1), 22);
+      _showTransfer(well.center);
+      ArcadeShake.shake(0.24);
+      GameFeedback.heavyImpact();
+      message =
+          'VORTEX INVERSION! Gravity well converted to upward kinetic slingshot for 4.0s!';
+      return;
+    }
     if (selected is _DueEmitter) {
       final amount = math.min(requested, 60 - selected.debt).toDouble();
-      if (amount < 1) {
-        message = 'TURRET LEDGER FULL: Take weight back before giving more.';
-        return;
-      }
       debt -= amount;
       selected.debt += amount;
-      selected.cooldown += .3 + amount * .02;
+      final targetEnemy = _closestEnemy(selected.position);
+      if (targetEnemy != null) {
+        final dir = (targetEnemy.center.dx - selected.position.dx).sign;
+        selected.speed = selected.speed.abs() * (dir == 0 ? 1 : dir);
+      } else {
+        selected.speed = -selected.speed;
+      }
+      selected.reprogrammed = true;
+      selected.cooldown = 0;
       _transferCooldown.tryTrigger(.35);
-      message =
-          'GAVE ${amount.round()}% TO TURRET: its shots slow and fall sooner.';
-      _burst(selected.position, const Color(0xFFFFD86E), 10);
+      message = 'GAVE GRAVITY: Turret re-aimed toward enemies!';
+      _burst(selected.position, const Color(0xFFFFD86E), 14);
       _showTransfer(selected.position);
       GameFeedback.selection();
       return;
@@ -2642,13 +3531,34 @@ class _FallDueGame {
       return;
     }
 
+    var selected = _gravityRecipient;
+    if (selected is _DueBossTarget) {
+      _castBoss(selected, _Gravity.take);
+      return;
+    }
+    if (selected is _DueGravityWell && selected.rig != null) {
+      _activateRig(selected, _Gravity.take);
+      return;
+    }
+    if (selected is _DueWorkshopTarget) {
+      _castWorkshop(selected, _Gravity.take);
+      return;
+    }
     final bullet = _manualTarget == null ? _nearestBullet() : null;
     if (bullet != null &&
         (bullet.rect.center - player.center).distance <
             FallDueTuning.parryRange) {
-      // PLASMA PARRY: Invert and accelerate bullet back with heavy debt
-      bullet.vx = -bullet.vx * 1.5;
-      bullet.vy = -140.0;
+      final targetEnemy = _closestEnemy(bullet.rect.center);
+      if (targetEnemy != null) {
+        final toEnemy = targetEnemy.center - bullet.rect.center;
+        final dist = toEnemy.distance;
+        final speed = 520.0;
+        bullet.vx = (toEnemy.dx / dist) * speed;
+        bullet.vy = (toEnemy.dy / dist) * speed;
+      } else {
+        bullet.vx = -bullet.vx * 1.5;
+        bullet.vy = -140.0;
+      }
       bullet.debt = 25.0;
       bullet.reflected = true;
       debt = math.min(FallDueTuning.maxDebt, debt + 12.0);
@@ -2660,45 +3570,45 @@ class _FallDueGame {
       _burst(bullet.rect.center, const Color(0xFF8DE1FF), 18);
       _showTransfer(bullet.rect.center, taking: true);
       message =
-          'PLASMA PARRY! Shot reversed with +25 debt +${FallDueTuning.parryBonusScore}.';
+          'PLASMA PARRY! Shot reversed and directed at enemies +${FallDueTuning.parryBonusScore}.';
       return;
     }
 
-    var selected = _gravityRecipient;
     if (selected == null) {
-      message = 'Move closer to an enemy, crate, or turret to take gravity.';
+      performRepulsorBurst();
+      return;
+    }
+    if (selected is _DueGravityWell) {
+      final well = selected;
+      well.inverted = false;
+      well.debt = 0;
+      debt = math.min(FallDueTuning.maxDebt, debt + 20.0);
+      _settleGrace = math.max(_settleGrace, FallDueTuning.settlementWindow);
+      _transferCooldown.tryTrigger(.35);
+      _burst(well.center, const Color(0xFF8DE1FF), 14);
+      _showTransfer(well.center, taking: true);
+      message = 'GRAVITY RECLAIMED: well restored to standard attraction.';
       return;
     }
     if (selected is _DueEmitter) {
       final emitter = selected;
-      if (emitter.debt >= 2) {
-        final amount = math.min(
-          math.min(emitter.debt, 18),
-          FallDueTuning.maxDebt - debt,
-        );
-        if (amount < 1) {
-          message = 'YOUR LEDGER IS FULL: release or give gravity first.';
-          return;
-        }
-        emitter.debt -= amount;
-        debt += amount;
-        _settleGrace = math.max(_settleGrace, FallDueTuning.settlementWindow);
-        _transferCooldown.tryTrigger(.45);
-        message =
-            'TOOK ${amount.round()}% BACK: credit is ready for your next lift.';
-        _burst(emitter.position, const Color(0xFF8DE1FF), 10);
-        _showTransfer(emitter.position, taking: true);
-        GameFeedback.selection();
-        return;
+      final targetEnemy = _closestEnemy(emitter.position);
+      if (targetEnemy != null) {
+        final dir = (targetEnemy.center.dx - emitter.position.dx).sign;
+        emitter.speed = emitter.speed.abs() * (dir == 0 ? 1 : dir);
+      } else {
+        emitter.speed = -emitter.speed;
       }
-      final fallback = _manualTarget == null
-          ? _closestGravityTarget(targets)
-          : null;
-      if (fallback == null) {
-        message = 'That turret has no borrowed gravity to take.';
-        return;
-      }
-      selected = fallback;
+      emitter.reprogrammed = true;
+      emitter.cooldown = 0;
+      debt = math.min(FallDueTuning.maxDebt, debt + 15.0);
+      _settleGrace = math.max(_settleGrace, FallDueTuning.settlementWindow);
+      _transferCooldown.tryTrigger(.45);
+      message = 'TOOK GRAVITY: Turret reversed and directed at enemies!';
+      _burst(emitter.position, const Color(0xFF8DE1FF), 14);
+      _showTransfer(emitter.position, taking: true);
+      GameFeedback.selection();
+      return;
     }
     final recipient = selected as _DueTarget;
     final isLiftableBox = recipient.kind == _TargetKind.crate;
@@ -2714,7 +3624,7 @@ class _FallDueGame {
             math.min(isLiftableBox ? 30.0 : 14.0, naturalGravity),
             maxTransfer,
           );
-    if (!isEnemy && amount < 1) {
+    if (isLiftableBox && naturalGravity < 1) {
       message = reclaimingLoan
           ? 'YOUR LEDGER IS FULL: release or give some gravity first.'
           : 'THAT TARGET IS ALREADY WEIGHTLESS.';
@@ -2736,7 +3646,7 @@ class _FallDueGame {
           ..bridgeSpikeIndex = null;
         message = 'BRIDGE RECALLED: the spike bed is exposed again.';
       }
-      recipient.debt = math.max(-32, recipient.debt - amount - 8);
+      recipient.debt = math.max(-32, recipient.debt - math.min(30, naturalGravity) - 8);
     } else if (reclaimingLoan) {
       recipient.debt -= amount;
     } else if (amount > 0) {
@@ -2790,10 +3700,26 @@ class _FallDueGame {
     GameFeedback.selection();
   }
 
-  void _die(String reason) {
-    if (phase != _DuePhase.playing) return;
+  void _die(String reason, {bool settleDebt = true}) {
+    if (phase != _DuePhase.playing || _spawnGrace > 0) return;
     final impact = player.center;
-    _payback = FallDueRules.paybackAfterDeath(
+    lives--;
+    if (lives > 0) {
+      _spawnGrace = 1.2;
+      if (player.y > 570) {
+        _resetPlayerAtCheckpoint();
+      } else {
+        player.vy = -180;
+        player.vx = player.vx >= 0 ? -120 : 120;
+      }
+      message = '$reason  $lives heart${lives == 1 ? '' : 's'} left.';
+      _burst(impact, const Color(0xFFFF7186), 14);
+      GameFeedback.heavyImpact();
+      ArcadeShake.shake(0.35);
+      ArcadeFlash.flash(const Color(0x44FF7186));
+      return;
+    }
+    _payback = !settleDebt ? 0 : FallDueRules.paybackAfterDeath(
       carriedDebt: debt,
       payback: _payback,
     );
@@ -2801,7 +3727,6 @@ class _FallDueGame {
     _settleGrace = 0;
     _antiGravityActive = false;
     _borrowHeld = false;
-    lives--;
     _restoreCheckpointWorld();
     _resetPlayerAtCheckpoint();
     if (lives > 0) {
@@ -2882,7 +3807,7 @@ class _DueTransferArc {
   double time = 0;
 }
 
-enum _TargetKind { crate, enemy, drone, heavy, leecher }
+enum _TargetKind { crate, enemy, drone, heavy, leecher, swordsman, archer }
 
 extension _TargetKindX on _TargetKind? {
   bool get isEnemy => this != null && this != _TargetKind.crate;
@@ -2902,6 +3827,13 @@ class _DueStage {
     this.gravityPuzzles = const [],
     this.weakPanels = const [],
     this.safeDebtPads = const [],
+    this.crumblingLedges = const [],
+    this.spikeTraps = const [],
+    this.gravityWells = const [],
+    this.laserGates = const [],
+    this.vents = const [],
+    this.conduits = const [],
+    this.weightPlates = const [],
     this.route,
   });
 
@@ -2915,6 +3847,13 @@ class _DueStage {
   final List<_GravityPuzzleSpec> gravityPuzzles;
   final List<Rect> weakPanels;
   final List<Rect> safeDebtPads;
+  final List<Rect> crumblingLedges;
+  final List<_DueSpikeTrapSpec> spikeTraps;
+  final List<_DueGravityWellSpec> gravityWells;
+  final List<_DueLaserGateSpec> laserGates;
+  final List<_DueKineticVentSpec> vents;
+  final List<_DueConduitSpec> conduits;
+  final List<_DueWeightPlateSpec> weightPlates;
   final Rect exit;
   final _DueRoute? route;
 
@@ -2929,6 +3868,28 @@ class _DueStage {
   ];
   List<Rect> get allWeakPanels => [...weakPanels, ...?route?.weakPanels];
   List<Rect> get allSafeDebtPads => [...safeDebtPads, ...?route?.safeDebtPads];
+  List<Rect> get allCrumblingLedges => [
+    ...crumblingLedges,
+    ...?route?.crumblingLedges,
+  ];
+  List<_DueSpikeTrapSpec> get allSpikeTraps => [
+    ...spikeTraps,
+    ...?route?.spikeTraps,
+  ];
+  List<_DueGravityWellSpec> get allGravityWells => [
+    ...gravityWells,
+    ...?route?.gravityWells,
+  ];
+  List<_DueLaserGateSpec> get allLaserGates => [
+    ...laserGates,
+    ...?route?.laserGates,
+  ];
+  List<_DueKineticVentSpec> get allVents => [...vents, ...?route?.vents];
+  List<_DueConduitSpec> get allConduits => [...conduits, ...?route?.conduits];
+  List<_DueWeightPlateSpec> get allWeightPlates => [
+    ...weightPlates,
+    ...?route?.weightPlates,
+  ];
   Rect get finalExit => route?.exit ?? exit;
 }
 
@@ -2948,6 +3909,13 @@ class _DueRoute {
     this.gravityPuzzles = const [],
     this.weakPanels = const [],
     this.safeDebtPads = const [],
+    this.crumblingLedges = const [],
+    this.spikeTraps = const [],
+    this.gravityWells = const [],
+    this.laserGates = const [],
+    this.vents = const [],
+    this.conduits = const [],
+    this.weightPlates = const [],
   });
 
   final List<_DueSectionSpec> sections;
@@ -2959,6 +3927,13 @@ class _DueRoute {
   final List<_GravityPuzzleSpec> gravityPuzzles;
   final List<Rect> weakPanels;
   final List<Rect> safeDebtPads;
+  final List<Rect> crumblingLedges;
+  final List<_DueSpikeTrapSpec> spikeTraps;
+  final List<_DueGravityWellSpec> gravityWells;
+  final List<_DueLaserGateSpec> laserGates;
+  final List<_DueKineticVentSpec> vents;
+  final List<_DueConduitSpec> conduits;
+  final List<_DueWeightPlateSpec> weightPlates;
   final Rect exit;
 }
 
@@ -3010,6 +3985,10 @@ class _DueBody {
   double coyote = 0;
   bool grounded = false;
   _TargetKind? kind;
+  double get left => x;
+  double get right => x + w;
+  double get top => y;
+  double get bottom => y + h;
   Rect get rect => Rect.fromLTWH(x, y, w, h);
   Offset get center => Offset(x + w / 2, y + h / 2);
 }
@@ -3032,7 +4011,7 @@ class _DueTarget extends _DueBody implements _DueGravityTarget {
   }) : super(kind: kind) {
     health = switch (kind) {
       _TargetKind.heavy => 5,
-      _TargetKind.enemy => 3,
+      _TargetKind.enemy || _TargetKind.swordsman || _TargetKind.archer => 3,
       _TargetKind.drone => 2,
       _TargetKind.leecher => 2,
       _TargetKind.crate => 2,
@@ -3049,6 +4028,10 @@ class _DueTarget extends _DueBody implements _DueGravityTarget {
   double droneRecoveryTimer = 0;
   double stunTimer = 0;
   double abilityCooldown = 0;
+  double attackTell = 0;
+  Rect? preparedAttack;
+  double attackDirection = 1;
+  Offset attackAim = Offset.zero;
   @override
   bool alive = true;
   bool anchored = false;
@@ -3062,6 +4045,8 @@ class _DueTarget extends _DueBody implements _DueGravityTarget {
     _TargetKind.drone => 'DRONE',
     _TargetKind.leecher => 'LEECHER',
     _TargetKind.enemy => 'COLLECTOR',
+    _TargetKind.swordsman => 'SWORD GUARD',
+    _TargetKind.archer => 'ARCHER',
     _TargetKind.crate => 'CRATE',
     null => 'TARGET',
   };
@@ -3079,6 +4064,10 @@ class _DueTarget extends _DueBody implements _DueGravityTarget {
     ..droneRecoveryTimer = droneRecoveryTimer
     ..stunTimer = stunTimer
     ..abilityCooldown = abilityCooldown
+    ..attackTell = attackTell
+    ..preparedAttack = preparedAttack
+    ..attackDirection = attackDirection
+    ..attackAim = attackAim
     ..alive = alive
     ..anchored = anchored
     ..bridgeSpikeIndex = bridgeSpikeIndex
@@ -3094,6 +4083,7 @@ class _DueBullet {
   double debt = 0;
   bool alive = true;
   bool reflected = false;
+  bool arrow = false;
   Rect get rect => Rect.fromLTWH(x, y, 14, 14);
 }
 
@@ -3111,10 +4101,11 @@ class _DueEmitter implements _DueGravityTarget {
   _DueEmitter.fromSpec(_DueEmitterSpec spec)
     : this(Offset(spec.x, spec.y), spec.speed, spec.interval);
   final Offset position;
-  final double speed;
+  double speed;
   final double interval;
   double cooldown;
   double debt = 0;
+  bool reprogrammed = false;
 
   @override
   Offset get center => position;
@@ -3130,7 +4121,8 @@ class _DueEmitter implements _DueGravityTarget {
 
   _DueEmitter copy() => _DueEmitter(position, speed, interval)
     ..cooldown = cooldown
-    ..debt = debt;
+    ..debt = debt
+    ..reprogrammed = reprogrammed;
 }
 
 class _DueLever {
@@ -3196,6 +4188,17 @@ class _DueCheckpointSnapshot {
     required this.weakPanels,
     required this.disabledSpikes,
     required this.rewardedSpikes,
+    this.crumblingLedges = const [],
+    this.spikeTraps = const [],
+    this.gravityWells = const [],
+    this.laserGates = const [],
+    this.vents = const [],
+    this.conduits = const [],
+    this.weightPlates = const [],
+    this.safeDebtPads = const [],
+    this.workshops = const [],
+    this.openingRelay,
+    this.bossHealth,
   });
 
   final int score;
@@ -3210,6 +4213,17 @@ class _DueCheckpointSnapshot {
   final List<_DueWeakPanel> weakPanels;
   final Set<int> disabledSpikes;
   final Set<int> rewardedSpikes;
+  final List<_DueCrumblingLedge> crumblingLedges;
+  final List<_DueSpikeTrap> spikeTraps;
+  final List<_DueGravityWell> gravityWells;
+  final List<_DueLaserGate> laserGates;
+  final List<_DueKineticVent> vents;
+  final List<_DueConduit> conduits;
+  final List<_DueWeightPlate> weightPlates;
+  final List<Rect> safeDebtPads;
+  final List<_WorkshopSave> workshops;
+  final _WorkshopSave? openingRelay;
+  final int? bossHealth;
 }
 
 class _DueParticle {
@@ -3218,4 +4232,241 @@ class _DueParticle {
   Offset velocity;
   final Color color;
   double life;
+}
+
+class _DueCrumblingLedge {
+  _DueCrumblingLedge(this.rect);
+  final Rect rect;
+  double collapseTimer = 0.0;
+  double maxCollapseTime = 1.20;
+  bool collapsing = false;
+  bool collapsed = false;
+  double respawnTimer = 0.0;
+  double maxRespawnTime = 3.50;
+
+  _DueCrumblingLedge copy() => _DueCrumblingLedge(rect)
+    ..collapseTimer = collapseTimer
+    ..maxCollapseTime = maxCollapseTime
+    ..collapsing = collapsing
+    ..collapsed = collapsed
+    ..respawnTimer = respawnTimer
+    ..maxRespawnTime = maxRespawnTime;
+}
+
+class _DueSpikeTrap {
+  _DueSpikeTrap(this.rect, {this.cycleOffset = 0.0});
+  final Rect rect;
+  final double cycleOffset;
+  bool disarmed = false;
+  double disarmedTimer = 0.0;
+  bool crushedToBridge = false;
+
+  bool isActive(double time) =>
+      !disarmed &&
+      !crushedToBridge &&
+      FallDueRules.retractableSpikeActive(time + cycleOffset);
+
+  bool isTelegraphing(double time) {
+    if (disarmed || crushedToBridge) return false;
+    final t = (time + cycleOffset) % 3.20;
+    return t >= 2.80; // 0.40s prior to extension
+  }
+
+  _DueSpikeTrap copy() => _DueSpikeTrap(rect, cycleOffset: cycleOffset)
+    ..disarmed = disarmed
+    ..disarmedTimer = disarmedTimer
+    ..crushedToBridge = crushedToBridge;
+}
+
+class _DueGravityWell implements _DueGravityTarget {
+  _DueGravityWell(
+    this.center, {
+    this.radius = 180.0,
+    this.rig,
+  });
+  @override
+  final Offset center;
+  final double radius;
+  final _WellRig? rig;
+  double get pullForce => FallDueTuning.gravityWellPull;
+  bool inverted = false;
+  bool drawing = false;
+  double invertedTimer = 0.0;
+  double debt = 0.0;
+
+  @override
+  Rect get rect => Rect.fromCircle(center: center, radius: 24.0);
+
+  @override
+  String get label => rig?.title ?? (inverted ? 'KINETIC UPDRAFT' : 'GRAVITY WELL');
+
+  @override
+  bool get alive => true;
+
+  _DueGravityWell copy() =>
+      _DueGravityWell(center, radius: radius, rig: rig)
+        ..inverted = inverted
+        ..drawing = drawing
+        ..invertedTimer = invertedTimer
+        ..debt = debt;
+}
+
+class _DueLaserGate {
+  _DueLaserGate(
+    this.rect, {
+    this.switchId,
+    this.cycleOffset = 0.0,
+  });
+  final Rect rect;
+  final int? switchId;
+  final double cycleOffset;
+
+  bool isActive(double time, bool switchEngaged) {
+    if (switchEngaged) return false;
+    return FallDueRules.laserGateActive(time + cycleOffset, switchEngaged);
+  }
+
+  _DueLaserGate copy() => _DueLaserGate(
+    rect,
+    switchId: switchId,
+    cycleOffset: cycleOffset,
+  );
+}
+
+class _DueKineticVent {
+  _DueKineticVent(
+    this.rect, {
+    this.isUpdraft = true,
+    this.cycleOffset = 0.0,
+  });
+  final Rect rect;
+  final bool isUpdraft;
+  final double cycleOffset;
+  static const double cyclePeriod = 2.40;
+  static const double activeDuration = 1.40;
+
+  bool isActive(double time) =>
+      ((time + cycleOffset) % cyclePeriod) < activeDuration;
+
+  _DueKineticVent copy() =>
+      _DueKineticVent(rect, isUpdraft: isUpdraft, cycleOffset: cycleOffset);
+}
+
+class _DueConduit {
+  _DueConduit(this.id, this.emitterPos, this.receptorPos, this.alignment);
+  final int id;
+  final Offset emitterPos;
+  final Offset receptorPos;
+  final List<int> alignment;
+  bool connected = false;
+
+  bool checkConnected() => FallDueRules.conduitPowerConnected(alignment);
+
+  _DueConduit copy() => _DueConduit(
+    id,
+    emitterPos,
+    receptorPos,
+    List<int>.from(alignment),
+  )..connected = connected;
+}
+
+class _DueWeightPlate {
+  _DueWeightPlate(this.id, this.rect);
+  final int id;
+  final Rect rect;
+  double currentWeight = 0.0;
+  bool satisfied = false;
+
+  bool checkSatisfied() => FallDueRules.weightAnchorSatisfied(currentWeight);
+
+  _DueWeightPlate copy() => _DueWeightPlate(id, rect)
+    ..currentWeight = currentWeight
+    ..satisfied = satisfied;
+}
+
+class _DueSpikeTrapSpec {
+  const _DueSpikeTrapSpec(
+    this.x,
+    this.y,
+    this.w,
+    this.h, {
+    this.cycleOffset = 0.0,
+  });
+  final double x;
+  final double y;
+  final double w;
+  final double h;
+  final double cycleOffset;
+  Rect get rect => Rect.fromLTWH(x, y, w, h);
+}
+
+class _DueGravityWellSpec {
+  const _DueGravityWellSpec(
+    this.x,
+    this.y, {
+    this.radius = 180.0,
+  });
+  final double x;
+  final double y;
+  final double radius;
+  Offset get center => Offset(x, y);
+}
+
+class _DueLaserGateSpec {
+  const _DueLaserGateSpec(
+    this.x,
+    this.y,
+    this.w,
+    this.h, {
+    this.switchId,
+    this.cycleOffset = 0.0,
+  });
+  final double x;
+  final double y;
+  final double w;
+  final double h;
+  final int? switchId;
+  final double cycleOffset;
+  Rect get rect => Rect.fromLTWH(x, y, w, h);
+}
+
+class _DueKineticVentSpec {
+  const _DueKineticVentSpec(
+    this.x,
+    this.y,
+    this.w,
+    this.h, {
+    this.isUpdraft = true,
+    this.cycleOffset = 0.0,
+  });
+  final double x;
+  final double y;
+  final double w;
+  final double h;
+  final double cycleOffset;
+  final bool isUpdraft;
+  Rect get rect => Rect.fromLTWH(x, y, w, h);
+}
+
+class _DueConduitSpec {
+  const _DueConduitSpec(
+    this.id,
+    this.emitterPos,
+    this.receptorPos,
+    this.alignment,
+  );
+  final int id;
+  final Offset emitterPos;
+  final Offset receptorPos;
+  final List<int> alignment;
+}
+
+class _DueWeightPlateSpec {
+  const _DueWeightPlateSpec(this.id, this.x, this.y, this.w, this.h);
+  final int id;
+  final double x;
+  final double y;
+  final double w;
+  final double h;
+  Rect get rect => Rect.fromLTWH(x, y, w, h);
 }

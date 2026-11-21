@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/level_campaign.dart';
+import '../games/fall_due/fall_due_game.dart';
 import '../games/future_debt/future_debt_game.dart';
 import '../ui/screen_shake.dart';
 import 'arcade_catalog.dart';
@@ -17,15 +18,9 @@ class GameLevelSelectPage extends StatefulWidget {
 
 class _GameLevelSelectPageState extends State<GameLevelSelectPage> {
   final _store = LevelCampaignStore();
-  late Future<LevelCampaignProgress> _progressFuture;
+  late final Future<LevelCampaignProgress> _progressFuture = _store.load();
   LevelCampaignProgress? _progress;
   int _selectedLevel = 1;
-
-  @override
-  void initState() {
-    super.initState();
-    _progressFuture = _store.load();
-  }
 
   void _setProgress(LevelCampaignProgress progress) {
     _progress = progress;
@@ -49,7 +44,7 @@ class _GameLevelSelectPageState extends State<GameLevelSelectPage> {
       widget.game.id,
     );
     if (!mounted) return;
-    if (!hasCompletedTutorial) {
+    if (!hasCompletedTutorial && widget.game.id != 'fall_due') {
       final completed = await Navigator.of(context).push<bool>(
         MaterialPageRoute<bool>(
           builder: (_) => GameTutorialPage(game: widget.game, level: blueprint),
@@ -143,7 +138,7 @@ class _GameLevelSelectPageState extends State<GameLevelSelectPage> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'GENERATED CAMPAIGN · $gameCampaignLevelCount LEVELS · ${progress.totalStars} STARS SAVED',
+                                  '${widget.game.id == 'fall_due' ? '2.5D CAMPAIGN' : 'GENERATED CAMPAIGN'} · $gameCampaignLevelCount LEVELS · ${progress.totalStars} STARS SAVED',
                                   style: TextStyle(
                                     color: accent,
                                     fontSize: 8,
@@ -154,6 +149,16 @@ class _GameLevelSelectPageState extends State<GameLevelSelectPage> {
                               ],
                             ),
                           ),
+                          if (widget.game.id == 'fall_due')
+                            IconButton(
+                              tooltip: '2D gravity tutorial',
+                              icon: const Icon(Icons.school_outlined),
+                              onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const FallDueTrainingPage(),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -263,7 +268,9 @@ class _LevelNode extends StatelessWidget {
                         fontSize: 19,
                         fontWeight: FontWeight.w900,
                         letterSpacing: .8,
-                        color: selected ? Colors.white : const Color(0xFFE2EDFC),
+                        color: selected
+                            ? Colors.white
+                            : const Color(0xFFE2EDFC),
                         shadows: selected
                             ? [
                                 Shadow(
@@ -288,7 +295,9 @@ class _LevelNode extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 1.5),
                         child: Icon(
-                          i <= stars ? Icons.star_rounded : Icons.star_outline_rounded,
+                          i <= stars
+                              ? Icons.star_rounded
+                              : Icons.star_outline_rounded,
                           size: 11,
                           color: i <= stars
                               ? const Color(0xFFFFD700)
@@ -323,6 +332,39 @@ class _ChallengeCard extends StatelessWidget {
     final targetScore = level.gameId == 'future_debt'
         ? FutureDebtRules.campaignTargetScore(level.targetScore)
         : level.targetScore;
+    final details = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'LEVEL ${level.number.toString().padLeft(2, '0')} · ${level.chapterTitle}',
+          style: TextStyle(
+            color: accent,
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+            letterSpacing: .8,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '${level.storyBeat}\nObjective: ${level.objective}\nFocus: ${level.gameplayFocus}\nTarget $targetScore · Par ${level.parSeconds.round()}s · $existingStars/3 stars',
+          style: const TextStyle(
+            color: Color(0xFFC0CDDF),
+            fontSize: 11,
+            height: 1.35,
+          ),
+        ),
+      ],
+    );
+    final action = FilledButton.icon(
+      onPressed: onPlay,
+      style: FilledButton.styleFrom(
+        backgroundColor: accent,
+        foregroundColor: const Color(0xFF031018),
+      ),
+      icon: const Icon(Icons.play_arrow_rounded),
+      label: const Text('PLAY', style: TextStyle(fontWeight: FontWeight.w900)),
+    );
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -338,47 +380,24 @@ class _ChallengeCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'LEVEL ${level.number.toString().padLeft(2, '0')} · ${level.chapterTitle}',
-                  style: TextStyle(
-                    color: accent,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: .8,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${level.storyBeat}\nObjective: ${level.objective}\nFocus: ${level.gameplayFocus}\nTarget $targetScore · Par ${level.parSeconds.round()}s · $existingStars/3 stars',
-                  style: const TextStyle(
-                    color: Color(0xFFC0CDDF),
-                    fontSize: 11,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 14),
-          FilledButton.icon(
-            onPressed: onPlay,
-            style: FilledButton.styleFrom(
-              backgroundColor: accent,
-              foregroundColor: const Color(0xFF031018),
-            ),
-            icon: const Icon(Icons.play_arrow_rounded),
-            label: const Text(
-              'PLAY',
-              style: TextStyle(fontWeight: FontWeight.w900),
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, bounds) => bounds.maxWidth < 275
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  details,
+                  const SizedBox(height: 8),
+                  Align(alignment: Alignment.centerRight, child: action),
+                ],
+              )
+            : Row(
+                children: [
+                  Expanded(child: details),
+                  const SizedBox(width: 14),
+                  action,
+                ],
+              ),
       ),
     );
   }

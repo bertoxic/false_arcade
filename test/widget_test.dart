@@ -5,9 +5,11 @@ import 'package:fluga/core/level_campaign.dart';
 import 'package:fluga/ui/arcade_crash_recovery_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   testWidgets('launches the arcade game picker', (tester) async {
+    SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const FalseArcadeApp());
 
     expect(find.text('FALSE ARCADE'), findsOneWidget);

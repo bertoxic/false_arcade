@@ -89,7 +89,7 @@ final arcadeCatalog = <ArcadeGameDefinition>[
     id: 'fall_due',
     title: 'FALL DUE',
     subtitle: 'Gravity-debt platformer',
-    detail: 'Borrow gravity for air time—then pay the landing back.',
+    detail: 'Give weight, take it away, and change your route.',
     missionLabel: 'LEDGER STAGES',
     campaignStages: gameCampaignLevelCount,
     icon: Icons.south_rounded,

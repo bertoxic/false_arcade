@@ -1,7 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/game_feedback.dart';
 import '../../core/game_loop.dart';
@@ -12,6 +15,7 @@ import '../../core/gameplay.dart';
 import '../../core/logical_viewport.dart';
 import '../../core/arcade_achievements.dart';
 import '../../core/arcade_fever.dart';
+import '../../core/canvas_text.dart';
 import '../../ui/game_controls.dart';
 import '../../ui/screen_shake.dart';
 
@@ -21,6 +25,15 @@ part 'fall_due_simulation.dart';
 part 'fall_due_painter.dart';
 part 'fall_due_scenery.dart';
 part 'fall_due_level_generator.dart';
+part 'fall_due_story.dart';
+part 'fall_due_story_levels.dart';
+part 'fall_due_story_page.dart';
+part 'fall_due_story_painter.dart';
+part 'fall_due_workshops.dart';
+part 'fall_due_workshop_art.dart';
+part 'fall_due_encounters.dart';
+part 'fall_due_encounter_art.dart';
+part '_story_audit.dart';
 
 const _duePlayfieldSize = Size(FallDueTuning.viewWidth, FallDueTuning.viewHeight);
 
@@ -61,6 +74,14 @@ abstract final class FallDueTuning {
   static const dashDebtCost = 22.0;
   static const parryRange = 170.0;
   static const parryBonusScore = 450;
+
+  static const double repulsorRadius = 130.0;
+  static const double gravityWellPull = 450.0;
+  static const double laserDamage = 100.0;
+  static const double tetherMaxDistance = 240.0;
+  static const double phaseShiftDuration = 0.40;
+  static const double repulsorStunDuration = 1.20;
+  static const double wallSlideSpeed = 180.0;
 
   static double airDashSpeedLimit(double remaining) =>
       runSpeed + (dashImpulse - runSpeed) *
@@ -143,4 +164,39 @@ abstract final class FallDueRules {
 
   static double slamConcussionPush(double borrowPower) =>
       70.0 + (borrowPower.clamp(0.0, FallDueTuning.maxDebt) * 0.3);
+
+  static double crumblingLedgeCollapseDuration(double payback) =>
+      1.20 *
+      (1.0 -
+          0.65 *
+              (payback.clamp(0.0, FallDueTuning.maxDebt) /
+                  FallDueTuning.maxDebt));
+
+  static bool retractableSpikeActive(double time) => (time % 3.20) < 1.50;
+
+  static bool laserGateActive(double time, bool switchEngaged) {
+    if (switchEngaged) return false;
+    return (time % 2.20) < 1.20;
+  }
+
+  static double repulsorBurstPushForce(double debt) =>
+      480.0 + (debt.clamp(0.0, FallDueTuning.maxDebt) * 1.5);
+
+  static double phaseShiftDuration() => FallDueTuning.phaseShiftDuration;
+
+  static bool conduitPowerConnected(List<int> alignment) =>
+      alignment.isNotEmpty && alignment.every((v) => v == 1);
+
+  static bool weightAnchorSatisfied(double weightOnPlate) =>
+      weightOnPlate >= FallDueTuning.anchorDebt;
+
+  static int bossMaxLives() => 3;
+  static double bossStompStunDuration() => 2.2;
+  static double bossSlamStunDuration() => 3.8;
+  static double bossStompBounceSpeed() => -410.0;
+  static double bossSlamBounceSpeed() => -520.0;
+
+  static double crateCrushVelocityThreshold() => 210.0;
+  static double gravityWellPullForce() => FallDueTuning.gravityWellPull;
+  static double laserDamage() => FallDueTuning.laserDamage;
 }

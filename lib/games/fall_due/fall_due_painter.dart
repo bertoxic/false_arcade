@@ -18,6 +18,7 @@ class _FallPainter extends CustomPainter {
     if (size.isEmpty) return;
     final viewport = LogicalViewport.fit(size, _duePlayfieldSize);
     final preview = game.phase == _DuePhase.intro;
+    final preparedWorld = !preview || game.platforms.isNotEmpty;
     final stage = preview
         ? game._stageFor(game._initialLevelIndex)
         : game.level;
@@ -33,25 +34,45 @@ class _FallPainter extends CustomPainter {
     canvas.clipRect(Offset.zero & _duePlayfieldSize);
     _drawAtmosphere(canvas);
     canvas.translate(-game.camera, 0);
+    final workshops = game.workshops.where((workshop) => world.overlaps(workshop.view)).toList();
+    for (final workshop in workshops) {
+      _drawWorkshopBackground(canvas, workshop, world);
+    }
 
-    for (final platform in preview ? stage.platforms : game.platforms) {
+    for (final platform in preparedWorld ? game.platforms : stage.platforms) {
       if (!world.overlaps(platform)) continue;
+      if (game.crumblingLedges.any((c) => c.rect == platform)) continue;
+      if (game.weakPanels.any((w) => w.rect == platform)) continue;
       _drawPlatform(canvas, platform);
       _drawScenery(canvas, platform);
     }
-    final spikes = preview ? stage.spikes : game.spikes;
+    final spikes = preparedWorld ? game.spikes : stage.spikes;
+    final trapRects = preparedWorld
+        ? game.spikeTraps.map((t) => t.rect)
+        : stage.allSpikeTraps.map((t) => t.rect);
     for (var index = 0; index < spikes.length; index++) {
-      if (!world.overlaps(spikes[index])) continue;
-      _drawSpikes(canvas, spikes[index], game.disabledSpikes.contains(index));
+      final s = spikes[index];
+      if (!world.overlaps(s)) continue;
+      if (trapRects.any((r) => r.overlaps(s))) continue;
+      _drawSpikes(canvas, s, game.disabledSpikes.contains(index));
+    }
+    if (game._openingRelay case final opening?) {
+      _drawOpeningRelay(canvas, opening, world);
     }
 
     if (preview) {
-      for (final seal in stage.seals) {
+      for (final well in game.gravityWells) {
+        if (world.contains(well.center)) _drawGravityWell(canvas, well);
+      }
+      for (final workshop in workshops) {
+        _drawWorkshopMachines(canvas, workshop, world);
+      }
+      for (final seal in preparedWorld ? game.seals.map((seal) => seal.position) : stage.seals) {
         if (world.contains(seal)) _drawSeal(canvas, seal);
       }
       _drawHero(
         canvas,
-        Offset(stage.platforms.first.left + 160, stage.platforms.first.top),
+        preparedWorld ? game.player.rect.bottomCenter : Offset(stage.platforms.first.left + 160, stage.platforms.first.top),
         1,
         true,
         0,
@@ -60,8 +81,38 @@ class _FallPainter extends CustomPainter {
       return;
     }
 
+    for (final workshop in workshops) {
+      _drawWorkshopMachines(canvas, workshop, world);
+    }
+    if (game.activeBoss case final boss?) {
+      _drawNativeBoss(canvas, boss, world);
+    }
+
     for (final panel in game.weakPanels) {
       if (world.overlaps(panel.rect)) _drawWeakPanel(canvas, panel);
+    }
+    for (final ledge in game.crumblingLedges) {
+      if (world.overlaps(ledge.rect)) _drawCrumblingLedge(canvas, ledge);
+    }
+    for (final trap in game.spikeTraps) {
+      if (world.overlaps(trap.rect)) _drawSpikeTrap(canvas, trap);
+    }
+    for (final well in game.gravityWells) {
+      if (world.contains(well.center) || world.overlaps(well.rect)) {
+        _drawGravityWell(canvas, well);
+      }
+    }
+    for (final laser in game.laserGates) {
+      if (world.overlaps(laser.rect)) _drawLaserGate(canvas, laser);
+    }
+    for (final vent in game.vents) {
+      if (world.overlaps(vent.rect)) _drawKineticVent(canvas, vent);
+    }
+    for (final conduit in game.conduits) {
+      _drawConduit(canvas, conduit);
+    }
+    for (final plate in game.weightPlates) {
+      if (world.overlaps(plate.rect)) _drawWeightPlate(canvas, plate);
     }
     for (final pad in game.safeDebtPads) {
       if (world.overlaps(pad.rect)) _drawSafePad(canvas, pad);
@@ -420,6 +471,7 @@ class _FallPainter extends CustomPainter {
   }
 
   void _drawTarget(Canvas canvas, _DueTarget target) {
+    _drawEnemyTell(canvas, target);
     final r = target.rect;
     final stateColor = target.anchored
         ? _dueMint
@@ -434,6 +486,8 @@ class _FallPainter extends CustomPainter {
       _TargetKind.heavy => const Color(0xFFB97385),
       _TargetKind.drone => const Color(0xFFBA9CCC),
       _TargetKind.leecher => const Color(0xFF82B9A1),
+      _TargetKind.swordsman => const Color(0xFFE5A823),
+      _TargetKind.archer => const Color(0xFF4EA5A0),
       null => landscape.stoneLight,
     };
 
@@ -475,8 +529,7 @@ class _FallPainter extends CustomPainter {
           target.debt.abs() > 1 || target.anchored ? stateColor : _dueGold,
         );
       case _TargetKind.drone:
-        final charging =
-            target.droneRecoveryTimer <= 0 && target.abilityCooldown < .6;
+        final charging = target.attackTell > 0;
         if (charging) {
           _dueGlow(canvas, r.center, r.width, _dueCoral.withValues(alpha: .65));
         }
@@ -501,9 +554,6 @@ class _FallPainter extends CustomPainter {
           canvas.restore();
         }
         _drawCreature(canvas, r.deflate(3), color, singleEye: true);
-        if (charging) {
-          _badge(canvas, 'PULSE', r.topCenter.translate(0, -14), _dueCoral);
-        }
       case _TargetKind.leecher:
         final wisp = Path()
           ..moveTo(r.left, r.center.dy)
@@ -539,6 +589,152 @@ class _FallPainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = target.kind == _TargetKind.heavy ? 3.8 : 1.8,
         );
+      case _TargetKind.swordsman:
+        final facing = target.attackDirection;
+        _drawCreature(canvas, r.deflate(2), color);
+        final helm = Rect.fromLTRB(
+          r.left,
+          r.top - 2,
+          r.right,
+          r.top + r.height * .55,
+        );
+        canvas.drawArc(
+          helm,
+          math.pi,
+          math.pi,
+          false,
+          Paint()
+            ..color = const Color(0xFFFFD280)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.5,
+        );
+        canvas.drawLine(
+          Offset(r.center.dx - 5, r.top + 8),
+          Offset(r.center.dx + 5, r.top + 8),
+          Paint()
+            ..color = const Color(0xFFFF4053)
+            ..strokeWidth = 2.0,
+        );
+        final attacking = target.attackTell > 0;
+        final swordAngle = attacking
+            ? (facing > 0 ? -0.9 : 0.9)
+            : (facing > 0 ? 0.35 : -0.35);
+        canvas.save();
+        canvas.translate(r.center.dx + facing * 8, r.center.dy);
+        canvas.rotate(swordAngle);
+        canvas.drawLine(
+          const Offset(0, 4),
+          const Offset(0, -4),
+          Paint()
+            ..color = const Color(0xFF8A6538)
+            ..strokeWidth = 3,
+        );
+        canvas.drawLine(
+          const Offset(-3, 0),
+          const Offset(3, 0),
+          Paint()
+            ..color = const Color(0xFFFFD56B)
+            ..strokeWidth = 3,
+        );
+        final bladePath = Path()
+          ..moveTo(-2, 0)
+          ..lineTo(-1.5, 24)
+          ..lineTo(0, 29)
+          ..lineTo(1.5, 24)
+          ..lineTo(2, 0)
+          ..close();
+        canvas.drawPath(
+          bladePath,
+          Paint()
+            ..color = attacking
+                ? const Color(0xFFFFE082)
+                : const Color(0xFFE0E6ED),
+        );
+        canvas.drawPath(
+          bladePath,
+          Paint()
+            ..color = _dueInk
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.0,
+        );
+        if (attacking) {
+          _dueGlow(
+            canvas,
+            const Offset(0, 16),
+            14,
+            const Color(0xFFFFAB40).withValues(alpha: 0.7),
+          );
+        }
+        canvas.restore();
+      case _TargetKind.archer:
+        final facing = target.attackDirection;
+        _drawCreature(canvas, r.deflate(2), color);
+        final hood = Path()
+          ..moveTo(r.left - 2, r.top + 10)
+          ..quadraticBezierTo(r.center.dx, r.top - 6, r.right + 2, r.top + 10)
+          ..quadraticBezierTo(r.right, r.top + 2, r.center.dx, r.top + 4)
+          ..quadraticBezierTo(r.left, r.top + 2, r.left - 2, r.top + 10);
+        canvas.drawPath(hood, Paint()..color = const Color(0xFF2C5E55));
+        canvas.drawPath(
+          hood,
+          Paint()
+            ..color = _dueInk
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5,
+        );
+        final bowCenter = r.center + Offset(facing * 12, 0);
+        final bowArc = Path()
+          ..moveTo(bowCenter.dx + facing * 2, bowCenter.dy - 16)
+          ..quadraticBezierTo(
+            bowCenter.dx + facing * 12,
+            bowCenter.dy,
+            bowCenter.dx + facing * 2,
+            bowCenter.dy + 16,
+          );
+        canvas.drawPath(
+          bowArc,
+          Paint()
+            ..color = const Color(0xFF8D5B4C)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.8
+            ..strokeCap = StrokeCap.round,
+        );
+        canvas.drawLine(
+          Offset(bowCenter.dx + facing * 2, bowCenter.dy - 16),
+          Offset(
+            bowCenter.dx - facing * (target.attackTell > 0 ? 4 : 0),
+            bowCenter.dy,
+          ),
+          Paint()
+            ..color = const Color(0xFFF0E6D2)
+            ..strokeWidth = 1.2,
+        );
+        canvas.drawLine(
+          Offset(
+            bowCenter.dx - facing * (target.attackTell > 0 ? 4 : 0),
+            bowCenter.dy,
+          ),
+          Offset(bowCenter.dx + facing * 2, bowCenter.dy + 16),
+          Paint()
+            ..color = const Color(0xFFF0E6D2)
+            ..strokeWidth = 1.2,
+        );
+        if (target.attackTell > 0) {
+          canvas.drawLine(
+            bowCenter,
+            target.attackAim,
+            Paint()
+              ..color = const Color(0xFFFF5252).withValues(alpha: 0.45)
+              ..strokeWidth = 1.2
+              ..strokeCap = StrokeCap.round,
+          );
+          _drawDueGem(
+            canvas,
+            bowCenter + Offset(facing * 6, 0),
+            4,
+            const Color(0xFFFF5252),
+          );
+        }
       case null:
         break;
     }
@@ -600,7 +796,11 @@ class _FallPainter extends CustomPainter {
 
   void _drawEmitter(Canvas canvas, _DueEmitter emitter) {
     final p = emitter.position;
-    final color = emitter.debt > 1 ? _dueGold : _dueCoral;
+    final color = emitter.reprogrammed
+        ? _dueMint
+        : emitter.debt > 1
+        ? _dueGold
+        : _dueCoral;
     final r = emitter.rect;
     _dueRounded(
       canvas,
@@ -622,7 +822,9 @@ class _FallPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round,
     );
     _drawDueGem(canvas, muzzle, 5, color);
-    if (emitter.debt > 1) {
+    if (emitter.reprogrammed) {
+      _badge(canvas, 'HIJACKED', p.translate(0, -24), _dueMint);
+    } else if (emitter.debt > 1) {
       _badge(canvas, '${emitter.debt.round()}%', p.translate(0, -24), color);
     }
   }
@@ -632,8 +834,50 @@ class _FallPainter extends CustomPainter {
         ? _dueBlue
         : bullet.debt > 1
         ? _dueGold
-        : _dueCoral;
+        : (bullet.arrow ? const Color(0xFFE89A3C) : _dueCoral);
     final center = bullet.rect.center;
+    if (bullet.arrow) {
+      final angle = math.atan2(bullet.vy, bullet.vx);
+      canvas.save();
+      canvas.translate(center.dx, center.dy);
+      canvas.rotate(angle);
+      final shaftPaint = Paint()
+        ..color = const Color(0xFFD6C298)
+        ..strokeWidth = 2.4
+        ..strokeCap = StrokeCap.round;
+      canvas.drawLine(const Offset(-14, 0), const Offset(10, 0), shaftPaint);
+      final headPath = Path()
+        ..moveTo(14, 0)
+        ..lineTo(6, -4.5)
+        ..lineTo(8, 0)
+        ..lineTo(6, 4.5)
+        ..close();
+      canvas.drawPath(headPath, Paint()..color = const Color(0xFFE2E8F0));
+      canvas.drawPath(
+        headPath,
+        Paint()
+          ..color = _dueInk
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.0,
+      );
+      final fletchPaint = Paint()
+        ..color = color
+        ..strokeWidth = 1.8
+        ..strokeCap = StrokeCap.round;
+      canvas.drawLine(const Offset(-12, 0), const Offset(-16, -4), fletchPaint);
+      canvas.drawLine(const Offset(-12, 0), const Offset(-16, 4), fletchPaint);
+      canvas.drawLine(const Offset(-8, 0), const Offset(-12, -4), fletchPaint);
+      canvas.drawLine(const Offset(-8, 0), const Offset(-12, 4), fletchPaint);
+      canvas.drawLine(
+        const Offset(-22, 0),
+        const Offset(-14, 0),
+        Paint()
+          ..color = color.withValues(alpha: 0.45)
+          ..strokeWidth = 2.0,
+      );
+      canvas.restore();
+      return;
+    }
     final tail = center - Offset(bullet.vx.sign * 19, bullet.vy.sign * 3);
     canvas.drawLine(
       tail,
@@ -891,6 +1135,71 @@ class _FallPainter extends CustomPainter {
         );
       }
     }
+
+    if (game.isPhaseShiftActive) {
+      final t = game.time * 6.0;
+      final shiftGlow = Color.lerp(
+        const Color(0xFF6CF0FF),
+        const Color(0xFFFF7DF9),
+        (math.sin(t) + 1) / 2,
+      )!;
+      _dueGlow(canvas, player.center, 44, shiftGlow.withValues(alpha: 0.65));
+      for (final off in [const Offset(-4, 0), const Offset(4, 0)]) {
+        canvas.drawOval(
+          player.rect.shift(off).inflate(2),
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5
+            ..color = shiftGlow.withValues(alpha: 0.40),
+        );
+      }
+    }
+
+    if (game.isWallSliding) {
+      final wallX = game._wallSlideDirection < 0 ? player.left : player.right;
+      final sparksY = player.top + player.h * 0.7;
+      canvas.drawLine(
+        Offset(wallX, player.top),
+        Offset(wallX, player.bottom),
+        Paint()
+          ..color = _dueGold.withValues(alpha: 0.7)
+          ..strokeWidth = 2.5
+          ..strokeCap = StrokeCap.round,
+      );
+      _dueGlow(
+        canvas,
+        Offset(wallX, sparksY),
+        18,
+        _dueGold.withValues(alpha: 0.6),
+      );
+    }
+
+    if (game.isTetherActive && game._tetherTarget != null) {
+      final target = game._tetherTarget!;
+      final p1 = player.center;
+      final p2 = target.center;
+      final beamPaint = Paint()
+        ..color = const Color(0xFF8CFFB1).withValues(alpha: 0.75)
+        ..strokeWidth = 2.5
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(p1, p2, beamPaint);
+      final mid = Offset(
+        (p1.dx + p2.dx) / 2,
+        (p1.dy + p2.dy) / 2 - 8 * math.sin(game.time * 8),
+      );
+      final path = Path()
+        ..moveTo(p1.dx, p1.dy)
+        ..quadraticBezierTo(mid.dx, mid.dy, p2.dx, p2.dy);
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = const Color(0xFF42E8FF).withValues(alpha: 0.5)
+          ..strokeWidth = 1.5
+          ..style = PaintingStyle.stroke,
+      );
+      _dueGlow(canvas, p1, 20, const Color(0xFF8CFFB1).withValues(alpha: 0.6));
+      _dueGlow(canvas, p2, 24, const Color(0xFF8CFFB1).withValues(alpha: 0.8));
+    }
   }
 
   void _drawHero(
@@ -1001,6 +1310,352 @@ class _FallPainter extends CustomPainter {
       _dueRounded(canvas, eye, 2, Paint()..color = const Color(0xFF332733));
     }
     canvas.restore();
+  }
+
+  void _drawCrumblingLedge(Canvas canvas, _DueCrumblingLedge ledge) {
+    if (ledge.collapsed) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(ledge.rect, const Radius.circular(3)),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.0
+          ..color = _dueCream.withValues(alpha: 0.15),
+      );
+      return;
+    }
+    final alpha = ledge.collapsing
+        ? 0.4 + 0.6 * (ledge.collapseTimer / ledge.maxCollapseTime)
+        : 1.0;
+    final rrect = RRect.fromRectAndRadius(ledge.rect, const Radius.circular(4));
+    canvas.drawRRect(
+      rrect,
+      Paint()..color = const Color(0xFF7A6858).withValues(alpha: alpha),
+    );
+    if (ledge.collapsing) {
+      final crackPaint = Paint()
+        ..color = _dueCoral.withValues(alpha: 0.85)
+        ..strokeWidth = 1.8
+        ..strokeCap = StrokeCap.round;
+      final x = ledge.rect.left + ledge.rect.width * 0.35;
+      final x2 = ledge.rect.left + ledge.rect.width * 0.7;
+      canvas.drawLine(
+        Offset(x, ledge.rect.top),
+        Offset(x + 5, ledge.rect.bottom),
+        crackPaint,
+      );
+      canvas.drawLine(
+        Offset(x2, ledge.rect.top),
+        Offset(x2 - 4, ledge.rect.bottom),
+        crackPaint,
+      );
+    }
+    canvas.drawLine(
+      ledge.rect.topLeft,
+      ledge.rect.topRight,
+      Paint()
+        ..color = const Color(0xFFD4A373).withValues(alpha: alpha)
+        ..strokeWidth = 2.0,
+    );
+  }
+
+  void _drawSpikeTrap(Canvas canvas, _DueSpikeTrap trap) {
+    final rect = trap.rect;
+    canvas.drawRect(
+      Rect.fromLTWH(rect.left, rect.bottom - 8, rect.width, 8),
+      Paint()..color = const Color(0xFF3E394A),
+    );
+    if (trap.crushedToBridge) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(
+            rect.left,
+            rect.top + rect.height * 0.65,
+            rect.width,
+            rect.height * 0.35,
+          ),
+          const Radius.circular(3),
+        ),
+        Paint()..color = const Color(0xFF8E9BB0),
+      );
+      canvas.drawLine(
+        Offset(rect.left, rect.top + rect.height * 0.65),
+        Offset(rect.right, rect.top + rect.height * 0.65),
+        Paint()
+          ..color = _dueMint
+          ..strokeWidth = 2.0,
+      );
+      return;
+    }
+    if (trap.disarmed) return;
+    final active = trap.isActive(game.time);
+    final telegraphing = trap.isTelegraphing(game.time);
+    if (telegraphing) {
+      _dueGlow(
+        canvas,
+        Offset(rect.center.dx, rect.top + 6),
+        rect.width * 0.4,
+        const Color(0xFFFFB300).withValues(alpha: 0.55),
+      );
+    }
+    if (active) {
+      final toothCount = (rect.width / 16).clamp(2, 24).toInt();
+      final toothW = rect.width / toothCount;
+      final spikePath = Path();
+      for (var i = 0; i < toothCount; i++) {
+        final x0 = rect.left + i * toothW;
+        final xMid = x0 + toothW / 2;
+        final x1 = x0 + toothW;
+        spikePath.moveTo(x0, rect.bottom - 6);
+        spikePath.lineTo(xMid, rect.top);
+        spikePath.lineTo(x1, rect.bottom - 6);
+      }
+      spikePath.close();
+      canvas.drawPath(
+        spikePath,
+        Paint()..color = const Color(0xFFFF4865),
+      );
+      _dueGlow(
+        canvas,
+        rect.center,
+        rect.height,
+        const Color(0xFFFF4865).withValues(alpha: 0.45),
+      );
+    } else {
+      final toothCount = (rect.width / 16).clamp(2, 24).toInt();
+      final toothW = rect.width / toothCount;
+      for (var i = 0; i < toothCount; i++) {
+        final xMid = rect.left + i * toothW + toothW / 2;
+        canvas.drawCircle(
+          Offset(xMid, rect.bottom - 10),
+          2.0,
+          Paint()..color = const Color(0xFF8E8899),
+        );
+      }
+    }
+  }
+
+  void _drawGravityWell(Canvas canvas, _DueGravityWell well) {
+    if (well.rig != null) {
+      _drawRouteRig(canvas, well);
+      return;
+    }
+    final center = well.center;
+    final inverted = well.inverted;
+    final color = inverted ? const Color(0xFF5CE1E6) : const Color(0xFFB37DFF);
+    final t = game.time;
+    for (var r = 1; r <= 3; r++) {
+      final ringR = (r * 18.0 + (t * 22.0 * (inverted ? -1 : 1))) % 56.0;
+      canvas.drawCircle(
+        center,
+        ringR,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.8
+          ..color = color.withValues(alpha: (1.0 - ringR / 56.0) * 0.8),
+      );
+    }
+    canvas.drawCircle(
+      center,
+      12.0,
+      Paint()..color = color.withValues(alpha: 0.85),
+    );
+    canvas.drawCircle(
+      center,
+      6.0,
+      Paint()..color = Colors.white,
+    );
+    _dueGlow(canvas, center, 42, color.withValues(alpha: 0.6));
+    _badge(canvas, well.label, center.translate(0, -32), color);
+  }
+
+  void _drawLaserGate(Canvas canvas, _DueLaserGate laser) {
+    final rect = laser.rect;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(rect.left - 4, rect.top - 8, rect.width + 8, 8),
+        const Radius.circular(2),
+      ),
+      Paint()..color = const Color(0xFF4A4458),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(rect.left - 4, rect.bottom, rect.width + 8, 8),
+        const Radius.circular(2),
+      ),
+      Paint()..color = const Color(0xFF4A4458),
+    );
+    final active = laser.isActive(game.time, false);
+    if (!active) {
+      canvas.drawLine(
+        Offset(rect.center.dx, rect.top),
+        Offset(rect.center.dx, rect.bottom),
+        Paint()
+          ..color = const Color(0xFF4A4458).withValues(alpha: 0.3)
+          ..strokeWidth = 1.0,
+      );
+      return;
+    }
+
+    final occludingCrate = game.targets.where((t) =>
+        t.alive &&
+        t.kind == _TargetKind.crate &&
+        t.rect.right > rect.left + 2 &&
+        t.rect.left < rect.right - 2 &&
+        (t.rect.overlaps(rect) ||
+            (t.rect.bottom >= rect.top - 8 && t.rect.top <= rect.top + 20)),
+    ).firstOrNull;
+
+    final blockedOnTop = occludingCrate != null &&
+        (occludingCrate.rect.bottom <= rect.top + 10 ||
+            occludingCrate.rect.top <= rect.top + 6);
+
+    if (blockedOnTop) {
+      canvas.drawCircle(
+        Offset(rect.center.dx, rect.top),
+        5.0,
+        Paint()..color = const Color(0xFFFF2A55).withValues(alpha: 0.8),
+      );
+      _badge(canvas, 'BLOCKED', Offset(rect.center.dx, rect.top - 16), const Color(0xFF62E9FF));
+      return;
+    }
+
+    final beamBottom = occludingCrate != null
+        ? math.max(rect.top, occludingCrate.rect.top)
+        : rect.bottom;
+
+    final nearWell = game.gravityWells.where((w) =>
+        (w.center.dx - rect.center.dx).abs() < w.radius &&
+        w.center.dy >= rect.top - 30 &&
+        w.center.dy <= rect.bottom + 30,
+    ).firstOrNull;
+
+    final pulse = 0.8 + 0.2 * math.sin(game.time * 16.0);
+    final beamColor = nearWell != null ? const Color(0xFFE249FF) : const Color(0xFFFF2A55);
+    final beamPaint = Paint()
+      ..color = beamColor.withValues(alpha: pulse)
+      ..strokeWidth = rect.width.clamp(3.0, 12.0)
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    final corePaint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = (rect.width * 0.4).clamp(1.5, 4.0)
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    if (nearWell != null) {
+      final bendX = (nearWell.center.dx - rect.center.dx) * 0.45;
+      final path = Path()
+        ..moveTo(rect.center.dx, rect.top)
+        ..quadraticBezierTo(
+          rect.center.dx + bendX,
+          (rect.top + beamBottom) / 2,
+          rect.center.dx,
+          beamBottom,
+        );
+      canvas.drawPath(path, beamPaint);
+      canvas.drawPath(path, corePaint);
+      _dueGlow(
+        canvas,
+        Offset(rect.center.dx + bendX * 0.5, (rect.top + beamBottom) / 2),
+        rect.height * 0.5,
+        beamColor.withValues(alpha: 0.5),
+      );
+    } else {
+      canvas.drawLine(
+        Offset(rect.center.dx, rect.top),
+        Offset(rect.center.dx, beamBottom),
+        beamPaint,
+      );
+      canvas.drawLine(
+        Offset(rect.center.dx, rect.top),
+        Offset(rect.center.dx, beamBottom),
+        corePaint,
+      );
+      _dueGlow(
+        canvas,
+        Offset(rect.center.dx, (rect.top + beamBottom) / 2),
+        (beamBottom - rect.top) * 0.6,
+        const Color(0xFFFF2A55).withValues(alpha: 0.5),
+      );
+    }
+
+    if (occludingCrate != null) {
+      _drawDueGem(canvas, Offset(rect.center.dx, beamBottom), 5.5, const Color(0xFFFFD86E));
+      _dueGlow(canvas, Offset(rect.center.dx, beamBottom), 14, const Color(0xFFFF2A55));
+    }
+  }
+
+  void _drawKineticVent(Canvas canvas, _DueKineticVent vent) {
+    final rect = vent.rect;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(2)),
+      Paint()..color = const Color(0xFF2C2836),
+    );
+    final active = vent.isActive(game.time);
+    if (!active) return;
+    final color =
+        vent.isUpdraft ? const Color(0xFF62E9FF) : const Color(0xFFFF9548);
+    final t = game.time * 3.5;
+    final streakCount = (rect.width / 12).clamp(2, 6).toInt();
+    final streakW = rect.width / streakCount;
+    for (var i = 0; i < streakCount; i++) {
+      final x = rect.left + i * streakW + streakW / 2;
+      final phase = (t + i * 0.3) % 1.0;
+      final yStart = vent.isUpdraft
+          ? rect.top - phase * 60
+          : rect.bottom + phase * 60;
+      final yEnd = vent.isUpdraft ? yStart - 18 : yStart + 18;
+      canvas.drawLine(
+        Offset(x, yStart),
+        Offset(x, yEnd),
+        Paint()
+          ..color = color.withValues(alpha: (1.0 - phase) * 0.8)
+          ..strokeWidth = 2.0
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+    _dueGlow(canvas, rect.center, 24, color.withValues(alpha: 0.45));
+  }
+
+  void _drawConduit(Canvas canvas, _DueConduit conduit) {
+    final p1 = conduit.emitterPos;
+    final p2 = conduit.receptorPos;
+    final connected = conduit.connected;
+    final color = connected ? _dueMint : const Color(0xFFB08968);
+    canvas.drawLine(
+      p1,
+      p2,
+      Paint()
+        ..color = color.withValues(alpha: connected ? 0.9 : 0.4)
+        ..strokeWidth = 2.5
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawCircle(p1, 6.0, Paint()..color = color);
+    canvas.drawCircle(p2, 6.0, Paint()..color = color);
+    if (connected) {
+      _dueGlow(canvas, p1, 16, _dueMint.withValues(alpha: 0.6));
+      _dueGlow(canvas, p2, 16, _dueMint.withValues(alpha: 0.6));
+    }
+  }
+
+  void _drawWeightPlate(Canvas canvas, _DueWeightPlate plate) {
+    final rect = plate.rect;
+    final satisfied = plate.satisfied;
+    final color = satisfied ? _dueMint : const Color(0xFFE29578);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(2)),
+      Paint()..color = const Color(0xFF282330),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect.deflate(1.5), const Radius.circular(2)),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..color = color,
+    );
+    if (satisfied) {
+      _dueGlow(canvas, rect.center, 18, _dueMint.withValues(alpha: 0.5));
+    }
   }
 
   @override

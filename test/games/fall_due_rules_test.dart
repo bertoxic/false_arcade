@@ -3,6 +3,7 @@ import 'package:fluga/core/logical_viewport.dart';
 import 'package:fluga/games/fall_due/fall_due_game.dart';
 import 'package:fluga/ui/game_controls.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -153,7 +154,7 @@ void main() {
 
   group('Fall Due unique enemies with powers', () {
     test(
-      'procedural generator spawns drones, heavy enforcers, and leechers',
+      'procedural generator spawns drones, heavy enforcers, leechers, swordsmen, and archers',
       () {
         final kinds = FallDueRules.generatedStageTargetKinds(6);
         expect(kinds.contains('crate'), isTrue);
@@ -161,6 +162,8 @@ void main() {
         expect(kinds.contains('drone'), isTrue);
         expect(kinds.contains('heavy'), isTrue);
         expect(kinds.contains('leecher'), isTrue);
+        expect(kinds.contains('swordsman'), isTrue);
+        expect(kinds.contains('archer'), isTrue);
       },
     );
 
@@ -172,6 +175,340 @@ void main() {
       expect(FallDueRules.enemyTakeBlastSpeed(), 920.0);
       expect(FallDueRules.enemyTakeBlastSpeed(), greaterThan(500.0));
       expect(FallDueRules.enemyTakeBlastSpeed(), lessThan(1000.0));
+    });
+  });
+
+  group('Fall Due redesigned traps and hazard rules', () {
+    test(
+      'crumbling ledge collapse duration scales inversely with payback and clamps bounds',
+      () {
+        // Zero payback gives maximum ledge stability (1.20s)
+        expect(
+          FallDueRules.crumblingLedgeCollapseDuration(0.0),
+          closeTo(1.20, 1e-9),
+        );
+
+        // Maximum payback (100) reduces collapse time to 0.42s (1.2 * 0.35)
+        expect(
+          FallDueRules.crumblingLedgeCollapseDuration(FallDueTuning.maxDebt),
+          closeTo(0.42, 1e-9),
+        );
+
+        // Mid-payback values scale linearly between 1.20 and 0.42
+        expect(
+          FallDueRules.crumblingLedgeCollapseDuration(50.0),
+          closeTo(0.81, 1e-9),
+        );
+
+        // Strictly inverse monotonic relation across progression
+        double prevDuration = FallDueRules.crumblingLedgeCollapseDuration(0.0);
+        for (double payback = 10.0; payback <= 100.0; payback += 10.0) {
+          final currentDuration =
+              FallDueRules.crumblingLedgeCollapseDuration(payback);
+          expect(currentDuration, lessThan(prevDuration));
+          prevDuration = currentDuration;
+        }
+
+        // Clamping bounds for negative or excessive payback
+        expect(
+          FallDueRules.crumblingLedgeCollapseDuration(-25.0),
+          closeTo(1.20, 1e-9),
+        );
+        expect(
+          FallDueRules.crumblingLedgeCollapseDuration(250.0),
+          closeTo(0.42, 1e-9),
+        );
+      },
+    );
+
+    test('retractable spike follows 3.2s periodicity with 1.5s active window', () {
+      // Cycle is 3.20s total: [0, 1.50) is active, [1.50, 3.20) is retracted
+      // Active phase in cycle 1
+      expect(FallDueRules.retractableSpikeActive(0.0), isTrue);
+      expect(FallDueRules.retractableSpikeActive(0.75), isTrue);
+      expect(FallDueRules.retractableSpikeActive(1.49), isTrue);
+
+      // Inactive/retracted phase in cycle 1 (including telegraph window before extension)
+      expect(FallDueRules.retractableSpikeActive(1.50), isFalse);
+      expect(FallDueRules.retractableSpikeActive(2.00), isFalse);
+      expect(FallDueRules.retractableSpikeActive(2.80), isFalse);
+      expect(FallDueRules.retractableSpikeActive(3.19), isFalse);
+
+      // Cycle 2 wrap-around
+      expect(FallDueRules.retractableSpikeActive(3.20), isTrue);
+      expect(FallDueRules.retractableSpikeActive(3.20 + 0.75), isTrue);
+      expect(FallDueRules.retractableSpikeActive(3.20 + 1.50), isFalse);
+      expect(FallDueRules.retractableSpikeActive(3.20 + 2.50), isFalse);
+
+      // Multi-cycle continuity across multiple periods
+      for (int cycle = 1; cycle <= 5; cycle++) {
+        final cycleStart = cycle * 3.20;
+        expect(
+          FallDueRules.retractableSpikeActive(cycleStart + 0.10),
+          isTrue,
+        );
+        expect(
+          FallDueRules.retractableSpikeActive(cycleStart + 0.75),
+          isTrue,
+        );
+        expect(
+          FallDueRules.retractableSpikeActive(cycleStart + 1.80),
+          isFalse,
+        );
+        expect(
+          FallDueRules.retractableSpikeActive(cycleStart + 2.50),
+          isFalse,
+        );
+      }
+    });
+
+    test('laser gate cycles 2.2s period and respects manual switch override', () {
+      // When switch is engaged, laser is unconditionally deactivated
+      expect(FallDueRules.laserGateActive(0.0, true), isFalse);
+      expect(FallDueRules.laserGateActive(0.60, true), isFalse);
+      expect(FallDueRules.laserGateActive(1.19, true), isFalse);
+      expect(FallDueRules.laserGateActive(1.50, true), isFalse);
+      expect(FallDueRules.laserGateActive(2.20, true), isFalse);
+      expect(FallDueRules.laserGateActive(50.0, true), isFalse);
+
+      // When switch is NOT engaged, cycles 2.20s period: [0, 1.20) active, [1.20, 2.20) inactive
+      // Cycle 1
+      expect(FallDueRules.laserGateActive(0.0, false), isTrue);
+      expect(FallDueRules.laserGateActive(0.60, false), isTrue);
+      expect(FallDueRules.laserGateActive(1.19, false), isTrue);
+      expect(FallDueRules.laserGateActive(1.20, false), isFalse);
+      expect(FallDueRules.laserGateActive(1.80, false), isFalse);
+      expect(FallDueRules.laserGateActive(2.19, false), isFalse);
+
+      // Cycle 2 wrap-around
+      expect(FallDueRules.laserGateActive(2.20, false), isTrue);
+      expect(FallDueRules.laserGateActive(2.20 + 0.50, false), isTrue);
+      expect(FallDueRules.laserGateActive(2.20 + 1.20, false), isFalse);
+      expect(FallDueRules.laserGateActive(2.20 + 1.90, false), isFalse);
+
+      // Multi-cycle continuity across multiple periods
+      for (int cycle = 1; cycle <= 5; cycle++) {
+        final cycleStart = cycle * 2.20;
+        expect(
+          FallDueRules.laserGateActive(cycleStart + 0.10, false),
+          isTrue,
+        );
+        expect(
+          FallDueRules.laserGateActive(cycleStart + 0.60, false),
+          isTrue,
+        );
+        expect(
+          FallDueRules.laserGateActive(cycleStart + 1.40, false),
+          isFalse,
+        );
+        expect(
+          FallDueRules.laserGateActive(cycleStart + 1.80, false),
+          isFalse,
+        );
+      }
+    });
+  });
+
+  group('Fall Due escape mechanisms and mobility rules', () {
+    test('repulsor burst push force scales with carried debt and clamps bounds', () {
+      // At zero debt, baseline knockback is 480 px/s
+      expect(FallDueRules.repulsorBurstPushForce(0.0), closeTo(480.0, 1e-9));
+
+      // At max debt (100.0), push force scales to 630 px/s (480 + 100 * 1.5)
+      expect(
+        FallDueRules.repulsorBurstPushForce(FallDueTuning.maxDebt),
+        closeTo(630.0, 1e-9),
+      );
+
+      // Mid-debt scaling
+      expect(FallDueRules.repulsorBurstPushForce(40.0), closeTo(540.0, 1e-9));
+
+      // Monotonic scaling with debt
+      double prevForce = FallDueRules.repulsorBurstPushForce(0.0);
+      for (double d = 10.0; d <= 100.0; d += 10.0) {
+        final currentForce = FallDueRules.repulsorBurstPushForce(d);
+        expect(currentForce, greaterThan(prevForce));
+        prevForce = currentForce;
+      }
+
+      // Clamping bounds
+      expect(FallDueRules.repulsorBurstPushForce(-20.0), closeTo(480.0, 1e-9));
+      expect(FallDueRules.repulsorBurstPushForce(150.0), closeTo(630.0, 1e-9));
+    });
+
+    test('phase shift duration matches tuning intangibility window', () {
+      expect(
+        FallDueRules.phaseShiftDuration(),
+        equals(FallDueTuning.phaseShiftDuration),
+      );
+      expect(FallDueRules.phaseShiftDuration(), closeTo(0.40, 1e-9));
+      expect(FallDueRules.phaseShiftDuration(), greaterThan(0.0));
+      expect(FallDueRules.phaseShiftDuration(), lessThan(1.0));
+    });
+
+    test(
+      'escape mechanism tuning bounds maintain balanced arcade traversal',
+      () {
+        expect(FallDueTuning.repulsorRadius, equals(130.0));
+        expect(FallDueTuning.repulsorRadius, greaterThan(100.0));
+        expect(FallDueTuning.repulsorRadius, lessThan(200.0));
+
+        expect(FallDueTuning.tetherMaxDistance, equals(240.0));
+        expect(FallDueTuning.tetherMaxDistance, greaterThan(200.0));
+        expect(FallDueTuning.tetherMaxDistance, lessThan(300.0));
+
+        expect(FallDueTuning.phaseShiftDuration, equals(0.40));
+        expect(FallDueTuning.phaseShiftDuration, greaterThan(0.20));
+        expect(FallDueTuning.phaseShiftDuration, lessThan(0.80));
+
+        expect(FallDueTuning.repulsorStunDuration, equals(1.20));
+        expect(FallDueTuning.repulsorStunDuration, greaterThan(0.50));
+        expect(FallDueTuning.repulsorStunDuration, lessThan(2.00));
+
+        expect(FallDueTuning.wallSlideSpeed, equals(180.0));
+        expect(FallDueTuning.wallSlideSpeed, lessThan(FallDueTuning.runSpeed));
+        expect(
+          FallDueTuning.wallSlideSpeed,
+          lessThan(FallDueTuning.terminalVelocity),
+        );
+
+        expect(FallDueTuning.gravityWellPull, equals(450.0));
+        expect(FallDueTuning.laserDamage, equals(100.0));
+      },
+    );
+  });
+
+  group('Fall Due puzzles and interactive mechanisms', () {
+    test('conduit power connection requires non-empty all-aligned array', () {
+      // Empty alignment returns false
+      expect(FallDueRules.conduitPowerConnected([]), isFalse);
+
+      // Single aligned connection
+      expect(FallDueRules.conduitPowerConnected([1]), isTrue);
+
+      // Multi-node aligned connection
+      expect(FallDueRules.conduitPowerConnected([1, 1]), isTrue);
+      expect(FallDueRules.conduitPowerConnected([1, 1, 1]), isTrue);
+      expect(FallDueRules.conduitPowerConnected([1, 1, 1, 1]), isTrue);
+
+      // Any unaligned node breaks connection
+      expect(FallDueRules.conduitPowerConnected([0]), isFalse);
+      expect(FallDueRules.conduitPowerConnected([1, 0]), isFalse);
+      expect(FallDueRules.conduitPowerConnected([0, 1]), isFalse);
+      expect(FallDueRules.conduitPowerConnected([1, 1, 0, 1]), isFalse);
+      expect(FallDueRules.conduitPowerConnected([1, 2, 1]), isFalse);
+      expect(FallDueRules.conduitPowerConnected([-1, 1, 1]), isFalse);
+    });
+
+    test(
+      'weight anchor is satisfied when weight meets or exceeds anchor debt',
+      () {
+        // Below anchor threshold (anchorDebt = 10.0)
+        expect(FallDueRules.weightAnchorSatisfied(0.0), isFalse);
+        expect(FallDueRules.weightAnchorSatisfied(5.0), isFalse);
+        expect(FallDueRules.weightAnchorSatisfied(9.99), isFalse);
+        expect(FallDueRules.weightAnchorSatisfied(-5.0), isFalse);
+
+        // Exactly at anchor threshold
+        expect(
+          FallDueRules.weightAnchorSatisfied(FallDueTuning.anchorDebt),
+          isTrue,
+        );
+
+        // Exceeding anchor threshold
+        expect(FallDueRules.weightAnchorSatisfied(10.01), isTrue);
+        expect(FallDueRules.weightAnchorSatisfied(25.0), isTrue);
+        expect(FallDueRules.weightAnchorSatisfied(100.0), isTrue);
+      },
+    );
+  });
+
+  group('Fall Due interaction, combat, and spatial range hierarchy', () {
+    test(
+      'slam descent velocity, shockwaves, and concussion forces scale consistently',
+      () {
+        // Slam initiation threshold
+        expect(FallDueRules.canInitiateSlam(0.0), isFalse);
+        expect(FallDueRules.canInitiateSlam(7.99), isFalse);
+        expect(FallDueRules.canInitiateSlam(8.0), isTrue);
+        expect(FallDueRules.canInitiateSlam(100.0), isTrue);
+
+        // Slam descent speed scaling
+        expect(FallDueRules.slamDescentSpeed(0.0), closeTo(640.0, 1e-9));
+        expect(FallDueRules.slamDescentSpeed(50.0), closeTo(860.0, 1e-9));
+        expect(FallDueRules.slamDescentSpeed(100.0), closeTo(1080.0, 1e-9));
+        expect(FallDueRules.slamDescentSpeed(-10.0), closeTo(640.0, 1e-9));
+        expect(FallDueRules.slamDescentSpeed(150.0), closeTo(1080.0, 1e-9));
+
+        // Shockwave generation threshold (>= 70 borrow power)
+        expect(FallDueRules.slamCausesShockwave(0.0), isFalse);
+        expect(FallDueRules.slamCausesShockwave(69.99), isFalse);
+        expect(FallDueRules.slamCausesShockwave(70.0), isTrue);
+        expect(FallDueRules.slamCausesShockwave(100.0), isTrue);
+
+        // Concussion radius: 70.0 to 90.0
+        expect(FallDueRules.slamConcussionRadius(0.0), closeTo(70.0, 1e-9));
+        expect(FallDueRules.slamConcussionRadius(50.0), closeTo(80.0, 1e-9));
+        expect(FallDueRules.slamConcussionRadius(100.0), closeTo(90.0, 1e-9));
+        expect(FallDueRules.slamConcussionRadius(-10.0), closeTo(70.0, 1e-9));
+        expect(FallDueRules.slamConcussionRadius(150.0), closeTo(90.0, 1e-9));
+
+        // Concussion push: 70.0 to 100.0
+        expect(FallDueRules.slamConcussionPush(0.0), closeTo(70.0, 1e-9));
+        expect(FallDueRules.slamConcussionPush(50.0), closeTo(85.0, 1e-9));
+        expect(FallDueRules.slamConcussionPush(100.0), closeTo(100.0, 1e-9));
+        expect(FallDueRules.slamConcussionPush(-10.0), closeTo(70.0, 1e-9));
+        expect(FallDueRules.slamConcussionPush(150.0), closeTo(100.0, 1e-9));
+      },
+    );
+
+    test('spatial range hierarchy coordinates tether, parry, and repulsor radii', () {
+      // Range hierarchy ensures intentional tactical envelopes:
+      // Repulsor radius (130) < Parry range (170) < Interaction range (220) < Tether max distance (240)
+      expect(
+        FallDueTuning.repulsorRadius,
+        lessThan(FallDueTuning.parryRange),
+      );
+      expect(
+        FallDueTuning.parryRange,
+        lessThan(FallDueTuning.interactionRange),
+      );
+      expect(
+        FallDueTuning.interactionRange,
+        lessThan(FallDueTuning.tetherMaxDistance),
+      );
+
+      // Exact values
+      expect(FallDueTuning.repulsorRadius, equals(130.0));
+      expect(FallDueTuning.parryRange, equals(170.0));
+      expect(FallDueTuning.interactionRange, equals(220.0));
+      expect(FallDueTuning.tetherMaxDistance, equals(240.0));
+
+      // Parry reward tuning
+      expect(FallDueTuning.parryBonusScore, equals(450));
+    });
+  });
+
+  group('Fall Due advanced combat, bosses, and environmental mechanics', () {
+    test('end bosses have 3 lives and jump/slam stuns with upward rebound', () {
+      expect(FallDueRules.bossMaxLives(), equals(3));
+      expect(FallDueRules.bossStompStunDuration(), equals(2.2));
+      expect(FallDueRules.bossSlamStunDuration(), equals(3.8));
+      expect(FallDueRules.bossSlamStunDuration(), greaterThan(FallDueRules.bossStompStunDuration()));
+      expect(FallDueRules.bossStompBounceSpeed(), equals(-410.0));
+      expect(FallDueRules.bossSlamBounceSpeed(), equals(-520.0));
+      expect(FallDueRules.bossSlamBounceSpeed().abs(), greaterThan(FallDueRules.bossStompBounceSpeed().abs()));
+    });
+
+    test('crate pushing transfers momentum and crushes enemies at high velocity', () {
+      expect(FallDueRules.crateCrushVelocityThreshold(), equals(210.0));
+      expect(FallDueRules.crateCrushVelocityThreshold(), greaterThan(150.0));
+      expect(FallDueRules.crateCrushVelocityThreshold(), lessThan(300.0));
+    });
+
+    test('gravity well gravitational forces and laser hazards are calibrated', () {
+      expect(FallDueRules.gravityWellPullForce(), equals(450.0));
+      expect(FallDueRules.laserDamage(), equals(100.0));
     });
   });
 
@@ -257,6 +594,31 @@ void main() {
     await tester.tap(find.text('RESUME'));
     await tester.pump();
     expect(find.text('RUN PAUSED'), findsNothing);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('Fall Due handles keyboard shortcuts for phase shift and repulsor burst', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: FallDuePage()));
+    await tester.tap(find.text('ENTER THE LEDGER'));
+    await tester.pump();
+
+    // Trigger Phase Shift via 'P'
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyP);
+    await tester.pump();
+    expect(find.textContaining('PHASE SHIFT ENGAGED'), findsOneWidget);
+
+    // Trigger Kinetic Repulsor Shield Burst via 'R'
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyR);
+    await tester.pump();
+    expect(find.textContaining('KINETIC REPULSOR SHIELD BURST'), findsOneWidget);
+
+    // Trigger Tether via 'T'
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+    await tester.pump();
     expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(const SizedBox());

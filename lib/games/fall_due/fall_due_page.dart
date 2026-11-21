@@ -32,11 +32,11 @@ class _FallDuePageState extends State<FallDuePage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     GamePresentation.enterLandscape();
-    GameFeedback.playMusic(_FallDueGame.musicTheme);
     _game = _FallDueGame(
       campaignLevel: widget.level?.number ?? 1,
       campaign: widget.level,
-    );
+    )..preparePreview();
+    GameFeedback.playMusic(_landscapeForStage(_game._initialLevelIndex).music);
     _gameFocus = FocusNode(debugLabel: 'Fall Due controls');
     _gameFocus.addListener(_onFocusChanged);
     _loop = GameLoopController(
@@ -90,6 +90,12 @@ class _FallDuePageState extends State<FallDuePage>
       _game.stealDebt();
     } else if (freshPress && key == LogicalKeyboardKey.keyF) {
       _game.cycleTarget();
+    } else if (freshPress && key == LogicalKeyboardKey.keyR) {
+      _game.performRepulsorBurst();
+    } else if (freshPress && key == LogicalKeyboardKey.keyP) {
+      _game.performPhaseShift();
+    } else if (freshPress && key == LogicalKeyboardKey.keyT) {
+      _game.performTether();
     }
     setState(() {});
     return KeyEventResult.handled;
@@ -110,6 +116,9 @@ class _FallDuePageState extends State<FallDuePage>
     LogicalKeyboardKey.keyF,
     LogicalKeyboardKey.keyS,
     LogicalKeyboardKey.arrowDown,
+    LogicalKeyboardKey.keyR,
+    LogicalKeyboardKey.keyP,
+    LogicalKeyboardKey.keyT,
   };
 
   bool _isAnyPressed(Set<LogicalKeyboardKey> keys) =>
@@ -200,8 +209,7 @@ class _FallDuePageState extends State<FallDuePage>
     final stageIndex = game.phase == _DuePhase.intro
         ? game._initialLevelIndex
         : game.levelIndex;
-    final landscape =
-        _DueLandscape.values[stageIndex % _DueLandscape.values.length];
+    final landscape = _landscapeForStage(stageIndex);
     final playing = game.phase == _DuePhase.playing;
     return Scaffold(
       backgroundColor: _dueInk,
@@ -233,6 +241,16 @@ class _FallDuePageState extends State<FallDuePage>
                 builder: (context, bounds) => Stack(
                   children: [
                     if (playing) ...[
+                      if (game.currentWorkshop != null)
+                        Positioned(
+                          top: 53,
+                          right: 8,
+                          child: _DueIconButton(
+                            icon: Icons.restore_rounded,
+                            tooltip: 'Reset encounter',
+                            onTap: () => setState(game.resetWorkshop),
+                          ),
+                        ),
                       Positioned(
                         top: bounds.maxWidth < 370 ? 56 : 9,
                         left: bounds.maxWidth < 370 ? 9 : 61,
@@ -269,8 +287,9 @@ class _FallDuePageState extends State<FallDuePage>
                       _DueOverlay(
                         landscape: landscape,
                         title: 'Fall Due',
-                        copy:
-                            'Borrow gravity to glide and Slam to discharge it. Tap a target, then Give or Take its weight. Collect seals and touch blue Save beacons to keep your progress.',
+                        copy: stageIndex == 0
+                            ? 'Borrow to glide across gaps and Slam to land hard. Step on or push crates onto weight plates to open route blast gates. Collect all seals to unlock the exit!'
+                            : game.level.briefing,
                         button: 'ENTER THE LEDGER',
                         onTap: () => setState(game.start),
                       ),
@@ -298,7 +317,10 @@ class _FallDuePageState extends State<FallDuePage>
                           title: 'Stage Clear',
                           copy: game.message,
                           button: 'NEXT STAGE',
-                          onTap: () => setState(game.nextStage),
+                          onTap: () => setState(() {
+                            game.nextStage();
+                            GameFeedback.playMusic(_landscapeForStage(game.levelIndex).music);
+                          }),
                         )
                       else
                         _DueOverlay(
@@ -306,7 +328,10 @@ class _FallDuePageState extends State<FallDuePage>
                           copy:
                               'Continue into escalating contract runs or replay the campaign.',
                           button: 'ENTER CONTRACT RUNS',
-                          onTap: () => setState(game.startEndlessContracts),
+                          onTap: () => setState(() {
+                            game.startEndlessContracts();
+                            GameFeedback.playMusic(_landscapeForStage(game.levelIndex).music);
+                          }),
                           secondaryButton: 'REPLAY CAMPAIGN',
                           onSecondaryTap: () => setState(game.start),
                         ),
